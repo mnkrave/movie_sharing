@@ -28,6 +28,7 @@ export default function FeedPage() {
     openMediaModal,
     openSearch,
     userSubscriptions,
+    currentUserAvatar,
   } = useMedia();
 
   // Filter States: Default is "FRIENDS", "hideWatched = true", "onlyStreamable = true"
@@ -424,15 +425,36 @@ export default function FeedPage() {
                     {/* User & Rating Header */}
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2.5">
-                        <div
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow ${
-                            isMyOwn
-                              ? "bg-amber-400"
-                              : "bg-gradient-to-tr from-amber-500 to-rose-500"
-                          }`}
-                        >
-                          {rec.userName.slice(0, 1)}
-                        </div>
+                        {(() => {
+                          const authorImg = isMyOwn
+                            ? currentUserAvatar || rec.userImage
+                            : rec.userImage ||
+                              communityData.friends.find(
+                                (f) => f.name === rec.userName || f.id === rec.userId
+                              )?.image;
+
+                          return authorImg ? (
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-500/40 flex-shrink-0 shadow">
+                              <Image
+                                src={authorImg}
+                                alt={rec.userName}
+                                fill
+                                sizes="32px"
+                                className="object-cover"
+                              />
+                            </div>
+                          ) : (
+                            <div
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow flex-shrink-0 ${
+                                isMyOwn
+                                  ? "bg-amber-400"
+                                  : "bg-gradient-to-tr from-amber-500 to-rose-500"
+                              }`}
+                            >
+                              {rec.userName.slice(0, 1)}
+                            </div>
+                          );
+                        })()}
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-bold text-white">{rec.userName}</span>

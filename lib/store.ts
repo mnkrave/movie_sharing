@@ -442,6 +442,29 @@ export async function updateUserSubscriptions(userId: string, subscriptions: str
   return subscriptions;
 }
 
+export async function updateUserImage(userId: string, image: string | null): Promise<string | null> {
+  if (await isPostgresAvailable()) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { image },
+    });
+    return image;
+  }
+  const db = readLocalDb();
+  const u = db.users.find((x) => x.id === userId);
+  if (u) {
+    u.image = image;
+  }
+  db.mediaStatuses.forEach((m) => {
+    if (m.userId === userId) m.userImage = image;
+  });
+  db.recommendations.forEach((r) => {
+    if (r.userId === userId) r.userImage = image;
+  });
+  writeLocalDb(db);
+  return image;
+}
+
 export async function isEmailWhitelisted(email: string): Promise<boolean> {
   const emailLower = email.toLowerCase().trim();
   if (emailLower === "lukasreinle0@gmail.com") {

@@ -833,3 +833,37 @@ export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Pr
     collection,
   };
 }
+
+export interface PersonSearchResult {
+  id: number;
+  name: string;
+  profilePath: string | null;
+  knownFor: string;
+}
+
+export async function searchPersons(query: string): Promise<PersonSearchResult[]> {
+  if (!query.trim()) return [];
+  try {
+    const data = await tmdbFetch<{ results: any[] }>("/search/person", {
+      query: query.trim(),
+      include_adult: "false",
+    });
+    return (data.results || [])
+      .filter((p) => p.profile_path)
+      .slice(0, 16)
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        profilePath: p.profile_path,
+        knownFor: (p.known_for || [])
+          .map((k: any) => k.title || k.name)
+          .filter(Boolean)
+          .slice(0, 2)
+          .join(", "),
+      }));
+  } catch (err) {
+    console.error("searchPersons error:", err);
+    return [];
+  }
+}
+

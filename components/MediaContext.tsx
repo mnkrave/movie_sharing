@@ -6,6 +6,7 @@ import { MediaModal } from "./MediaModal";
 import { SearchModal } from "./SearchModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { QuickRatingModal, RatingTarget } from "./QuickRatingModal";
+import { AvatarPickerModal } from "./AvatarPickerModal";
 import { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
@@ -66,6 +67,10 @@ interface MediaContextType {
     tags: string[];
   }) => Promise<void>;
   upvoteRecommendation: (recommendationId: string) => Promise<void>;
+  openAvatarPicker: () => void;
+  closeAvatarPicker: () => void;
+  currentUserAvatar: string | null;
+  updateUserAvatar: (avatarUrl: string | null) => Promise<void>;
 }
 
 const MediaContext = createContext<MediaContextType | null>(null);
@@ -82,6 +87,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchInitialMode, setSearchInitialMode] = useState<"quick" | "extended">("quick");
   const [isSubsOpen, setIsSubsOpen] = useState(false);
+  const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
+  const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
   const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
@@ -319,6 +326,36 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  useEffect(() => {
+    if (session?.user?.image) {
+      setCurrentUserAvatar(session.user.image);
+    } else if (session?.user?.email) {
+      const me = communityData.friends.find(
+        (f) => f.email?.toLowerCase() === session.user?.email?.toLowerCase()
+      );
+      if (me?.image) {
+        setCurrentUserAvatar(me.image);
+      }
+    }
+  }, [session?.user?.image, session?.user?.email, communityData.friends]);
+
+  const updateUserAvatar = async (avatarUrl: string | null) => {
+    setCurrentUserAvatar(avatarUrl);
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "avatar", image: avatarUrl }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error updating avatar:", err);
+    }
+  };
+
   const handleSaveRating = async (rating?: number) => {
     if (!ratingTarget) return;
     await updateMediaStatus({
@@ -369,6 +406,10 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         updateMediaStatus,
         submitRecommendation,
         upvoteRecommendation,
+        openAvatarPicker: () => setIsAvatarPickerOpen(true),
+        closeAvatarPicker: () => setIsAvatarPickerOpen(false),
+        currentUserAvatar,
+        updateUserAvatar,
       }}
     >
       {children}
@@ -399,6 +440,14 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         onClose={() => setRatingTarget(null)}
         onSaveRating={handleSaveRating}
         onRemoveWatched={handleRemoveWatched}
+      />
+
+      <AvatarPickerModal
+        isOpen={isAvatarPickerOpen}
+        onClose={() => setIsAvatarPickerOpen(false)}
+        currentAvatar={currentUserAvatar}
+        userName={session?.user?.name || "Kino-Fan"}
+        onSave={updateUserAvatar}
       />
     </MediaContext.Provider>
   );

@@ -2,6 +2,7 @@
 
 import React, { useState, useRef } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "./MediaContext";
@@ -29,7 +30,13 @@ import {
 export function Navbar() {
   const pathname = usePathname();
   const { data: session } = useSession();
-  const { openSearch, openSubscriptions, userSubscriptions } = useMedia();
+  const {
+    openSearch,
+    openSubscriptions,
+    userSubscriptions,
+    currentUserAvatar,
+    openAvatarPicker,
+  } = useMedia();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [discoverDropdownOpen, setDiscoverDropdownOpen] = useState(false);
@@ -248,9 +255,21 @@ export function Navbar() {
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                 className="flex items-center gap-2 p-1.5 sm:pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition"
               >
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-black font-extrabold text-xs">
-                  {session.user.name?.slice(0, 1) || "U"}
-                </div>
+                {currentUserAvatar ? (
+                  <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-amber-500/50 flex-shrink-0">
+                    <Image
+                      src={currentUserAvatar}
+                      alt={session.user.name || "User"}
+                      fill
+                      sizes="28px"
+                      className="object-cover"
+                    />
+                  </div>
+                ) : (
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-black font-extrabold text-xs">
+                    {session.user.name?.slice(0, 1) || "U"}
+                  </div>
+                )}
                 <span className="hidden sm:inline text-xs font-semibold text-white truncate max-w-[100px]">
                   {session.user.name}
                 </span>
@@ -265,6 +284,18 @@ export function Navbar() {
                     <p className="font-bold text-white truncate">{session.user.name}</p>
                     <p className="text-slate-400 text-[11px] truncate">{session.user.email}</p>
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      openAvatarPicker();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Profilbild wählen</span>
+                  </button>
 
                   <Link
                     href="/profile"

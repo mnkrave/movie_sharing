@@ -74,16 +74,19 @@ export const authOptions: NextAuthOptions = {
         token.sub = user.id;
         // @ts-ignore
         token.role = user.role || "USER";
+        token.picture = user.image || null;
       } else if (token.email) {
         const dbUser = await findUserByEmail(token.email);
         if (dbUser) {
           token.sub = dbUser.id;
           token.role = dbUser.role;
+          token.picture = dbUser.image || null;
         }
       } else if (token.sub) {
         const dbUser = await findUserById(token.sub);
         if (dbUser) {
           token.role = dbUser.role;
+          token.picture = dbUser.image || null;
         }
       }
       return token;
@@ -94,6 +97,9 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
         // @ts-ignore
         session.user.role = token.role || "USER";
+        if (token.picture) {
+          session.user.image = token.picture as string;
+        }
       }
       return session;
     },

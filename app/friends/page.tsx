@@ -16,10 +16,11 @@ import {
 } from "lucide-react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import Link from "next/link";
+import Image from "next/image";
 
 export default function FriendsPage() {
   const { data: session } = useSession();
-  const { communityData, friendGroups, addFriendGroup, deleteFriendGroup } = useMedia();
+  const { communityData, friendGroups, addFriendGroup, deleteFriendGroup, currentUserAvatar } = useMedia();
 
   const [showGroupCreator, setShowGroupCreator] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -268,29 +269,47 @@ export default function FriendsPage() {
 
       {/* Friends Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        {communityData.friends.map((friend) => (
-          <div
-            key={friend.id}
-            className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-lg space-y-4"
-          >
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 flex items-center justify-center text-black font-black text-lg shadow-md">
-                  {friend.name.slice(0, 1)}
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                    {friend.name}
-                    {friend.role === "ADMIN" && (
-                      <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-500/30">
-                        Admin
-                      </span>
-                    )}
-                  </h3>
-                  <p className="text-xs text-slate-500">{friend.email}</p>
+        {communityData.friends.map((friend) => {
+          const isMe =
+            (session?.user?.email && friend.email?.toLowerCase() === session.user.email.toLowerCase()) ||
+            ((session?.user as any)?.id && friend.id === (session?.user as any).id);
+          const friendImg = isMe ? currentUserAvatar || friend.image : friend.image;
+
+          return (
+            <div
+              key={friend.id}
+              className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-lg space-y-4"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  {friendImg ? (
+                    <div className="relative w-12 h-12 rounded-2xl overflow-hidden border border-amber-500/40 flex-shrink-0 shadow-md">
+                      <Image
+                        src={friendImg}
+                        alt={friend.name}
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    </div>
+                  ) : (
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 flex items-center justify-center text-black font-black text-lg shadow-md flex-shrink-0">
+                      {friend.name.slice(0, 1)}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                      {friend.name}
+                      {friend.role === "ADMIN" && (
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-500/30">
+                          Admin
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-xs text-slate-500">{friend.email}</p>
+                  </div>
                 </div>
               </div>
-            </div>
 
             {/* Stats */}
             <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-800/80 text-center">
@@ -339,7 +358,8 @@ export default function FriendsPage() {
               </div>
             </div>
           </div>
-        ))}
+        );
+      })}
       </div>
     </div>
   );

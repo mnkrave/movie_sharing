@@ -8,6 +8,7 @@ import {
   addRecommendation,
   toggleRecommendationUpvote,
   updateUserSubscriptions,
+  updateUserImage,
   findUserByEmail,
 } from "@/lib/store";
 
@@ -81,6 +82,8 @@ export async function POST(req: Request) {
         userId,
         Array.isArray(body.subscriptions) ? body.subscriptions : []
       );
+    } else if (action === "avatar" || action === "profile_image") {
+      await updateUserImage(userId, body.image ?? null);
     }
 
     const [community, friends] = await Promise.all([

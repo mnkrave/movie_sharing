@@ -41,6 +41,7 @@ import {
   RefreshCw,
   Filter,
   Tag,
+  Camera,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -85,6 +86,8 @@ function ProfileContent() {
     openRatingModal,
     updateMediaStatus,
     openSearch,
+    openAvatarPicker,
+    currentUserAvatar,
   } = useMedia();
 
   const [metaMap, setMetaMap] = useState<Record<string, BatchMediaMeta>>({});
@@ -472,8 +475,32 @@ function ProfileContent() {
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950/30 via-slate-900 to-[#0b101e] border border-amber-500/30 p-6 sm:p-8 shadow-2xl">
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-500 via-amber-400 to-rose-500 flex items-center justify-center text-black font-black text-3xl shadow-xl shadow-amber-500/20 flex-shrink-0">
-              {myName.slice(0, 1).toUpperCase()}
+            <div
+              className="relative group cursor-pointer flex-shrink-0"
+              onClick={openAvatarPicker}
+              title="Profilbild ändern"
+            >
+              {currentUserAvatar ? (
+                <div className="w-20 h-20 rounded-3xl overflow-hidden relative border-2 border-amber-500/60 shadow-xl shadow-amber-500/20">
+                  <Image
+                    src={currentUserAvatar}
+                    alt={myName}
+                    fill
+                    sizes="80px"
+                    className="object-cover group-hover:scale-105 transition duration-300"
+                  />
+                </div>
+              ) : (
+                <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-500 via-amber-400 to-rose-500 flex items-center justify-center text-black font-black text-3xl shadow-xl shadow-amber-500/20 group-hover:scale-105 transition duration-300">
+                  {myName.slice(0, 1).toUpperCase()}
+                </div>
+              )}
+              <div className="absolute inset-0 bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white backdrop-blur-xs">
+                <Camera className="w-6 h-6 text-amber-400" />
+              </div>
+              <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition">
+                <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
+              </div>
             </div>
             <div className="space-y-1.5">
               <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
@@ -483,7 +510,17 @@ function ProfileContent() {
               <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
                 {myName}
               </h1>
-              <p className="text-xs sm:text-sm text-slate-300 font-medium">{criticPersona}</p>
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="text-xs sm:text-sm text-slate-300 font-medium">{criticPersona}</p>
+                <button
+                  type="button"
+                  onClick={openAvatarPicker}
+                  className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 transition"
+                >
+                  <Camera className="w-3 h-3" />
+                  <span>Profilbild anpassen</span>
+                </button>
+              </div>
               {myEmail && <p className="text-xs text-slate-500">{myEmail}</p>}
             </div>
           </div>
