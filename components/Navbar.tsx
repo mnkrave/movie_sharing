@@ -24,6 +24,7 @@ import {
   Layers,
   User,
   BarChart3,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export function Navbar() {
@@ -69,6 +70,13 @@ export function Navbar() {
   }
 
   const discoverItems = [
+    {
+      href: "/search",
+      label: "Extended Search",
+      sub: "Multifilter für Regie, Cast & Land",
+      icon: SlidersHorizontal,
+      color: "text-amber-400 bg-amber-500/10",
+    },
     {
       href: "/",
       label: "Startseite",
