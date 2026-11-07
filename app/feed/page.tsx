@@ -21,6 +21,9 @@ export default function FeedPage() {
   const { communityData, upvoteRecommendation, openMediaModal, openSearch } = useMedia();
   const [filterType, setFilterType] = useState<"ALL" | "movie" | "tv">("ALL");
 
+  const movieCount = communityData.recommendations.filter((r) => r.mediaType === "movie").length;
+  const tvCount = communityData.recommendations.filter((r) => r.mediaType === "tv").length;
+
   const recommendations = communityData.recommendations.filter((rec) => {
     if (filterType === "ALL") return true;
     return rec.mediaType === filterType;
@@ -30,9 +33,9 @@ export default function FeedPage() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
-        <div className="space-y-1">
+      {/* Header with prominent Top-Right Switcher */}
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
+        <div className="space-y-1 max-w-md">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
             Community-Feed
@@ -41,52 +44,64 @@ export default function FeedPage() {
             Empfehlungen von Freunden
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Finde heraus, welche Filme und Serien deine Freunde gerade feiern und wo du sie streamen kannst.
+            Finde heraus, was deine Freunde gerade feiern und wo du es mit Streaming oder VPN schauen kannst.
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={openSearch}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-bold text-xs transition shadow-lg shadow-rose-500/20 whitespace-nowrap"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Titel empfehlen</span>
-        </button>
-      </div>
+        {/* Top-Right Segmented Switcher & Action */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+          {/* Segmented Switcher Filme vs Serien */}
+          <div className="p-1 rounded-2xl bg-black/60 border border-slate-700/80 backdrop-blur-md flex items-center justify-center shadow-lg">
+            <button
+              onClick={() => setFilterType("movie")}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                filterType === "movie"
+                  ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>Filme</span>
+              <span className="text-[10px] font-mono opacity-80">({movieCount})</span>
+            </button>
 
-      {/* Filter Tabs */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => setFilterType("ALL")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-            filterType === "ALL"
-              ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
-              : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
-          }`}
-        >
-          Alle ({communityData.recommendations.length})
-        </button>
-        <button
-          onClick={() => setFilterType("movie")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-            filterType === "movie"
-              ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
-              : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
-          }`}
-        >
-          Filme
-        </button>
-        <button
-          onClick={() => setFilterType("tv")}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
-            filterType === "tv"
-              ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
-              : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
-          }`}
-        >
-          Serien
-        </button>
+            <button
+              onClick={() => setFilterType("tv")}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+                filterType === "tv"
+                  ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/20"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>Serien</span>
+              <span className="text-[10px] font-mono opacity-80">({tvCount})</span>
+            </button>
+
+            <button
+              onClick={() => setFilterType("ALL")}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
+                filterType === "ALL"
+                  ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <span>Alle</span>
+              <span className="text-[10px] font-mono opacity-80 ml-1">
+                ({communityData.recommendations.length})
+              </span>
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={openSearch}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-bold text-xs transition shadow-lg shadow-rose-500/20 whitespace-nowrap"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Titel empfehlen</span>
+          </button>
+        </div>
       </div>
 
       {/* Feed List */}

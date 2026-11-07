@@ -48,9 +48,15 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"vpn" | "de" | "friends">("vpn");
+  const [activeTab, setActiveTab] = useState<"de" | "vpn" | "friends">("de");
   const [showTrailer, setShowTrailer] = useState(false);
   const [onlyMySubs, setOnlyMySubs] = useState(false);
+
+  const isTv = media.mediaType === "tv";
+  const mediaNoun = isTv ? "die Serie" : "den Film";
+  const mediaPronoun = isTv ? "sie" : "ihn";
+  const mediaSubject = isTv ? "sie" : "er";
+  const mediaDativ = isTv ? "dieser Serie" : "diesem Film";
 
   // Recommendation form state
   const [showRecForm, setShowRecForm] = useState(false);
@@ -375,7 +381,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               <div className="p-4 mb-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 animate-in fade-in">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-semibold text-emerald-300">
-                    Wie fandest du den Film? ({userRatingInput}/10)
+                    Wie fandest du {mediaNoun}? ({userRatingInput}/10)
                   </span>
                   <div className="flex items-center gap-1">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
@@ -420,7 +426,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 <div className="flex items-center justify-between">
                   <h4 className="text-base font-bold text-white flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-amber-400" />
-                    Empfehlung für deine Freunde verfassen
+                    Empfehlung für {mediaNoun} verfassen
                   </h4>
                   <button
                     type="button"
@@ -455,13 +461,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                    Warum müssen deine Freunde das sehen?
+                    Warum müssen deine Freunde {mediaNoun} sehen?
                   </label>
                   <textarea
                     value={recComment}
                     onChange={(e) => setRecComment(e.target.value)}
                     rows={3}
-                    placeholder="z. B. Überragende Schauspieler und ein Twist am Ende, den man nie kommen sieht. Auf Netflix Japan mit VPN verfügbar!"
+                    placeholder={
+                      isTv
+                        ? "z. B. Überragende Charakterentwicklung und Spannung von Folge zu Folge! Auf Netflix Japan mit VPN verfügbar."
+                        : "z. B. Überragende Schauspieler und ein Twist am Ende, den man nie kommen sieht. Auf Netflix Japan mit VPN verfügbar!"
+                    }
                     className="w-full bg-slate-950/80 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
                     required
                   />
@@ -519,6 +529,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             {/* Content Tabs Switcher */}
             <div className="flex items-center gap-1 border-b border-slate-800 mb-6">
               <button
+                onClick={() => setActiveTab("de")}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
+                  activeTab === "de"
+                    ? "border-amber-400 text-amber-400"
+                    : "border-transparent text-slate-400 hover:text-slate-200"
+                }`}
+              >
+                <span>🇩🇪 Streaming in Deutschland</span>
+              </button>
+
+              <button
                 onClick={() => setActiveTab("vpn")}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
                   activeTab === "vpn"
@@ -534,17 +555,6 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               </button>
 
               <button
-                onClick={() => setActiveTab("de")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
-                  activeTab === "de"
-                    ? "border-amber-400 text-amber-400"
-                    : "border-transparent text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <span>🇩🇪 Streaming (DE)</span>
-              </button>
-
-              <button
                 onClick={() => setActiveTab("friends")}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
                   activeTab === "friends"
@@ -557,7 +567,104 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               </button>
             </div>
 
-            {/* TAB 1: Global VPN Finder */}
+            {/* TAB 1: Deutschland Streaming (Jetzt standardmäßig zuerst!) */}
+            {activeTab === "de" && (
+              <div className="space-y-6 pb-8">
+                {/* Flatrate */}
+                <div>
+                  <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
+                    Abo-Flatrates (In Deutschland kostenlos streamen)
+                  </h4>
+                  {details?.watchProvidersDE?.flatrate &&
+                  details.watchProvidersDE.flatrate.length > 0 ? (
+                    <div className="flex flex-wrap gap-3">
+                      {details.watchProvidersDE.flatrate.map((p) => (
+                        <div
+                          key={p.provider_id}
+                          className="flex items-center gap-2.5 p-2 pr-4 rounded-xl bg-slate-900 border border-slate-800 shadow"
+                        >
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
+                            alt={p.provider_name}
+                            width={32}
+                            height={32}
+                            className="rounded-lg"
+                          />
+                          <span className="text-sm font-medium text-white">{p.provider_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-400 bg-slate-900/40 p-4 rounded-xl border border-slate-800/60">
+                      Aktuell in Deutschland in keinem Streaming-Abo enthalten. Schau im Tab{" "}
+                      <span
+                        className="text-amber-400 font-semibold cursor-pointer underline"
+                        onClick={() => setActiveTab("vpn")}
+                      >
+                        Globaler VPN Streaming-Finder
+                      </span>
+                      , ob {mediaSubject} im Ausland (z. B. Japan oder UK) im Flatrate-Abo läuft!
+                    </p>
+                  )}
+                </div>
+
+                {/* Free / Mediatheken */}
+                {details?.watchProvidersDE?.free && details.watchProvidersDE.free.length > 0 && (
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
+                      Kostenlos mit Werbung / Mediathek
+                    </h4>
+                    <div className="flex flex-wrap gap-3">
+                      {details.watchProvidersDE.free.map((p) => (
+                        <div
+                          key={p.provider_id}
+                          className="flex items-center gap-2.5 p-2 pr-4 rounded-xl bg-slate-900 border border-slate-800 shadow"
+                        >
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
+                            alt={p.provider_name}
+                            width={32}
+                            height={32}
+                            className="rounded-lg"
+                          />
+                          <span className="text-sm font-medium text-white">{p.provider_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Rent / Buy */}
+                <div>
+                  <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
+                    Leihen & Kaufen
+                  </h4>
+                  {details?.watchProvidersDE?.rent && details.watchProvidersDE.rent.length > 0 ? (
+                    <div className="flex flex-wrap gap-3">
+                      {details.watchProvidersDE.rent.map((p) => (
+                        <div
+                          key={p.provider_id}
+                          className="flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300"
+                        >
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
+                            alt={p.provider_name}
+                            width={24}
+                            height={24}
+                            className="rounded"
+                          />
+                          <span>{p.provider_name}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">Keine Kauf- oder Leihanbieter gefunden.</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Global VPN Finder (Jetzt als zweiter Tab!) */}
             {activeTab === "vpn" && (
               <div className="space-y-6 pb-8">
                 {/* Info banner & subscription filter */}
@@ -566,7 +673,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     <p className="font-semibold text-slate-200 text-sm mb-0.5">
                       🌐 Weltweite Streaming-Flatrates via VPN
                     </p>
-                    Wenn ein Film in Deutschland nicht im Abo läuft, kannst du dich mit einem VPN
+                    Wenn {mediaNoun} in Deutschland nicht im Abo läuft, kannst du dich mit einem VPN
                     (z. B. Japan 🇯🇵 oder UK 🇬🇧) verbinden und direkt streamen.
                   </div>
 
@@ -659,107 +766,10 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 ) : (
                   <div className="p-8 text-center text-slate-500 rounded-2xl bg-slate-900/30 border border-slate-800/50">
                     {onlyMySubs
-                      ? "In deinen ausgewählten Abos ist dieser Film aktuell in keinem Land verfügbar."
+                      ? `In deinen ausgewählten Abos ist ${mediaNoun} aktuell in keinem Land verfügbar.`
                       : "Für diesen Titel wurden keine globalen Flatrate-Streams gefunden."}
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* TAB 2: Deutschland Streaming */}
-            {activeTab === "de" && (
-              <div className="space-y-6 pb-8">
-                {/* Flatrate */}
-                <div>
-                  <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
-                    Abo-Flatrates (Kostenlos mit Abo)
-                  </h4>
-                  {details?.watchProvidersDE?.flatrate &&
-                  details.watchProvidersDE.flatrate.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {details.watchProvidersDE.flatrate.map((p) => (
-                        <div
-                          key={p.provider_id}
-                          className="flex items-center gap-2.5 p-2 pr-4 rounded-xl bg-slate-900 border border-slate-800 shadow"
-                        >
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
-                            alt={p.provider_name}
-                            width={32}
-                            height={32}
-                            className="rounded-lg"
-                          />
-                          <span className="text-sm font-medium text-white">{p.provider_name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-500">
-                      Aktuell in Deutschland in keinem Streaming-Abo enthalten. Schau im Tab{" "}
-                      <span
-                        className="text-amber-400 cursor-pointer underline"
-                        onClick={() => setActiveTab("vpn")}
-                      >
-                        Globaler VPN-Finder
-                      </span>
-                      , ob er im Ausland verfügbar ist!
-                    </p>
-                  )}
-                </div>
-
-                {/* Free / Mediatheken */}
-                {details?.watchProvidersDE?.free && details.watchProvidersDE.free.length > 0 && (
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
-                      Kostenlos mit Werbung / Mediathek
-                    </h4>
-                    <div className="flex flex-wrap gap-3">
-                      {details.watchProvidersDE.free.map((p) => (
-                        <div
-                          key={p.provider_id}
-                          className="flex items-center gap-2.5 p-2 pr-4 rounded-xl bg-slate-900 border border-slate-800 shadow"
-                        >
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
-                            alt={p.provider_name}
-                            width={32}
-                            height={32}
-                            className="rounded-lg"
-                          />
-                          <span className="text-sm font-medium text-white">{p.provider_name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Rent / Buy */}
-                <div>
-                  <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
-                    Leihen & Kaufen
-                  </h4>
-                  {details?.watchProvidersDE?.rent && details.watchProvidersDE.rent.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {details.watchProvidersDE.rent.map((p) => (
-                        <div
-                          key={p.provider_id}
-                          className="flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300"
-                        >
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
-                            alt={p.provider_name}
-                            width={24}
-                            height={24}
-                            className="rounded"
-                          />
-                          <span>{p.provider_name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-500">Keine Kauf- oder Leihanbieter gefunden.</p>
-                  )}
-                </div>
               </div>
             )}
 
@@ -789,7 +799,9 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-slate-500">Noch kein Freund als gesehen markiert.</p>
+                      <p className="text-xs text-slate-500">
+                        Noch kein Freund hat {mediaNoun} als gesehen markiert.
+                      </p>
                     )}
                   </div>
 
@@ -804,7 +816,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                             key={fw.id}
                             className="text-sm py-1 border-b border-slate-800/40 last:border-0 text-slate-200"
                           >
-                            {fw.userName} möchte diesen Titel schauen
+                            {fw.userName} möchte {isTv ? "diese Serie" : "diesen Film"} schauen
                           </div>
                         ))}
                       </div>
@@ -893,7 +905,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   ) : (
                     <div className="p-8 text-center rounded-2xl bg-slate-900/40 border border-slate-800/60">
                       <p className="text-sm text-slate-400 mb-3">
-                        Noch keine Empfehlung für diesen Titel. Sei der Erste, der diesen Film den
+                        Noch keine Empfehlung für diesen Titel. Sei der Erste, der {mediaNoun} den
                         Freunden ans Herz legt!
                       </p>
                       <button
