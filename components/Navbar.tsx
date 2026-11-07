@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
@@ -31,6 +31,18 @@ export function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [discoverDropdownOpen, setDiscoverDropdownOpen] = useState(false);
+  const discoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleDiscoverEnter = () => {
+    if (discoverTimeoutRef.current) clearTimeout(discoverTimeoutRef.current);
+    setDiscoverDropdownOpen(true);
+  };
+
+  const handleDiscoverLeave = () => {
+    discoverTimeoutRef.current = setTimeout(() => {
+      setDiscoverDropdownOpen(false);
+    }, 200);
+  };
 
   const isAdmin =
     session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
@@ -109,8 +121,8 @@ export function Navbar() {
           {/* Entdecken Dropdown */}
           <div
             className="relative"
-            onMouseEnter={() => setDiscoverDropdownOpen(true)}
-            onMouseLeave={() => setDiscoverDropdownOpen(false)}
+            onMouseEnter={handleDiscoverEnter}
+            onMouseLeave={handleDiscoverLeave}
           >
             <button
               type="button"
@@ -132,32 +144,38 @@ export function Navbar() {
 
             {discoverDropdownOpen && (
               <div
-                className="absolute left-0 mt-1 w-64 rounded-2xl bg-[#0c111d] border border-slate-800 shadow-2xl p-1.5 z-50 animate-in fade-in"
-                onClick={() => setDiscoverDropdownOpen(false)}
+                className="absolute left-0 top-full pt-1.5 w-64 z-50"
+                onMouseEnter={handleDiscoverEnter}
+                onMouseLeave={handleDiscoverLeave}
               >
-                {discoverItems.map((item) => {
-                  const Icon = item.icon;
-                  const active = pathname === item.href;
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      className={`flex items-start gap-3 p-2.5 rounded-xl transition ${
-                        active
-                          ? "bg-amber-500/15 border border-amber-500/30 text-white"
-                          : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
-                      }`}
-                    >
-                      <div className={`p-2 rounded-lg flex-shrink-0 ${item.color}`}>
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-white leading-tight">{item.label}</p>
-                        <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>
-                      </div>
-                    </Link>
-                  );
-                })}
+                <div
+                  className="rounded-2xl bg-[#0c111d] border border-slate-800 shadow-2xl p-1.5 animate-in fade-in"
+                  onClick={() => setDiscoverDropdownOpen(false)}
+                >
+                  {discoverItems.map((item) => {
+                    const Icon = item.icon;
+                    const active = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        className={`flex items-start gap-3 p-2.5 rounded-xl transition ${
+                          active
+                            ? "bg-amber-500/15 border border-amber-500/30 text-white"
+                            : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
+                        }`}
+                      >
+                        <div className={`p-2 rounded-lg flex-shrink-0 ${item.color}`}>
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-white leading-tight">{item.label}</p>
+                          <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
