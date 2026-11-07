@@ -455,6 +455,13 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
               const mySubs = pick.availableProvidersDE.filter((p) => p.isMySub);
               const displayProviders =
                 mySubs.length > 0 ? mySubs : pick.availableProvidersDE.slice(0, 3);
+              const isOnWatchlist = communityData.mediaStatuses.some(
+                (m) =>
+                  m.tmdbId === pick.id &&
+                  m.mediaType === pick.mediaType &&
+                  m.status === "WATCHLIST" &&
+                  (m.userId === (session?.user as any)?.id || m.userName === session?.user?.name)
+              );
 
               return (
                 <div
@@ -605,13 +612,21 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
                           title: pick.title,
                           posterPath: pick.posterPath,
                           releaseYear: pick.releaseYear,
-                          status: "WATCHLIST",
+                          status: isOnWatchlist ? "NONE" : "WATCHLIST",
                         });
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-sky-500 hover:text-black text-slate-200 text-xs font-bold border border-slate-800 transition flex items-center gap-1"
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
+                        isOnWatchlist
+                          ? "bg-emerald-500 text-black border-emerald-400 shadow-sm shadow-emerald-500/20"
+                          : "bg-slate-900 hover:bg-emerald-500 hover:text-black text-slate-200 border-slate-800"
+                      }`}
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Watchlist</span>
+                      {isOnWatchlist ? (
+                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      ) : (
+                        <Plus className="w-3.5 h-3.5" />
+                      )}
+                      <span>{isOnWatchlist ? "Merkliste ✓" : "Merkliste"}</span>
                     </button>
                   </div>
                 </div>

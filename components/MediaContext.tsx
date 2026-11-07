@@ -218,6 +218,59 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     status: "WATCHED" | "WATCHLIST" | "NONE";
     rating?: number | null;
   }) => {
+    const myUserId = (session?.user as any)?.id || "user_lukas";
+    const myName = session?.user?.name || "Lukas Reinle";
+    const myImage = session?.user?.image || null;
+
+    // Snapshot for rollback in case of error
+    const previousStatuses = communityData.mediaStatuses;
+
+    // 1. Optimistic Instant UI Update (0 ms latency)
+    setCommunityData((prev) => {
+      const matchIndex = prev.mediaStatuses.findIndex(
+        (m) =>
+          m.tmdbId === params.tmdbId &&
+          m.mediaType === params.mediaType &&
+          (m.userId === myUserId || (myName && m.userName?.toLowerCase() === myName.toLowerCase()))
+      );
+
+      let nextStatuses = [...prev.mediaStatuses];
+
+      if (params.status === "NONE") {
+        if (matchIndex >= 0) {
+          nextStatuses.splice(matchIndex, 1);
+        }
+      } else if (matchIndex >= 0) {
+        nextStatuses[matchIndex] = {
+          ...nextStatuses[matchIndex],
+          status: params.status,
+          rating: params.rating !== undefined ? params.rating : nextStatuses[matchIndex].rating,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        nextStatuses.push({
+          id: `opt_${Date.now()}`,
+          userId: myUserId,
+          userName: myName,
+          userImage: myImage,
+          tmdbId: params.tmdbId,
+          mediaType: params.mediaType,
+          title: params.title,
+          posterPath: params.posterPath || null,
+          releaseYear: params.releaseYear || null,
+          status: params.status,
+          rating: params.rating ?? null,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      return {
+        ...prev,
+        mediaStatuses: nextStatuses,
+      };
+    });
+
+    // 2. Perform server request in background
     try {
       const res = await fetch("/api/community", {
         method: "POST",
@@ -227,9 +280,14 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setCommunityData(data);
+      } else {
+        // Rollback
+        setCommunityData((prev) => ({ ...prev, mediaStatuses: previousStatuses }));
       }
     } catch (err) {
       console.error("Error updating media status:", err);
+      // Rollback
+      setCommunityData((prev) => ({ ...prev, mediaStatuses: previousStatuses }));
     }
   };
 

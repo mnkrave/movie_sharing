@@ -1468,14 +1468,18 @@ function ProfileContent() {
                               status: isOnWatchlist ? "NONE" : "WATCHLIST",
                             });
                           }}
-                          title={isOnWatchlist ? "Von Watchlist entfernen" : "Auf Watchlist setzen"}
+                          title={isOnWatchlist ? "Von Merkliste entfernen" : "Auf Merkliste setzen"}
                           className={`p-1.5 rounded-lg border transition ${
                             isOnWatchlist
-                              ? "bg-sky-500 text-black border-sky-400"
+                              ? "bg-emerald-500 text-black border-emerald-400 shadow-sm shadow-emerald-500/20"
                               : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800"
                           }`}
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          {isOnWatchlist ? (
+                            <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                          ) : (
+                            <Plus className="w-3.5 h-3.5" />
+                          )}
                         </button>
                       </div>
                     </div>

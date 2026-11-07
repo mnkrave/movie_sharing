@@ -468,9 +468,9 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                   )}
 
                   {!isWatched && isOnWatchlist && (
-                    <div className="absolute bottom-2.5 left-2.5 right-2.5 bg-sky-500/90 backdrop-blur-md text-black font-bold text-xs py-1 px-2 rounded-lg flex items-center justify-center gap-1.5 shadow-lg">
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Auf Watchlist</span>
+                    <div className="absolute bottom-2.5 left-2.5 right-2.5 bg-emerald-500/95 backdrop-blur-md text-black font-black text-xs py-1 px-2 rounded-lg flex items-center justify-center gap-1.5 shadow-lg">
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>Auf deiner Merkliste</span>
                     </div>
                   )}
                 </div>
@@ -515,14 +515,18 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                     <button
                       type="button"
                       onClick={(e) => handleToggleWatchlist(movie, e)}
-                      title={isOnWatchlist ? "Von Watchlist entfernen" : "Auf Watchlist setzen"}
+                      title={isOnWatchlist ? "Von Merkliste entfernen" : "Auf Merkliste setzen"}
                       className={`py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition ${
                         isOnWatchlist
-                          ? "bg-sky-500 text-black"
+                          ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 ring-1 ring-emerald-400"
                           : "bg-slate-800 hover:bg-slate-700 text-slate-300"
                       }`}
                     >
-                      <Plus className="w-3 h-3" />
+                      {isOnWatchlist ? (
+                        <Check className="w-3 h-3 stroke-[2.5]" />
+                      ) : (
+                        <Plus className="w-3 h-3" />
+                      )}
                     </button>
                   </div>
                 </div>

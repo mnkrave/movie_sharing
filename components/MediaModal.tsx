@@ -101,25 +101,52 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     };
   }, [media.id, media.mediaType]);
 
-  // Friend data for this specific movie
-  const friendsWatched = communityData.mediaStatuses.filter(
+  // Current user identification
+  const myUserId = (session?.user as any)?.id;
+  const myName = session?.user?.name;
+  const myEmail = session?.user?.email?.toLowerCase();
+
+  const isMe = (userId?: string | null, userName?: string | null, userEmail?: string | null) => {
+    if (myUserId && userId && userId === myUserId) return true;
+    if (myName && userName && userName.toLowerCase() === myName.toLowerCase()) return true;
+    if (myEmail && userEmail && userEmail.toLowerCase() === myEmail) return true;
+    return false;
+  };
+
+  // Watched: Me vs Friends
+  const allWatched = communityData.mediaStatuses.filter(
     (m) => m.tmdbId === media.id && m.mediaType === media.mediaType && m.status === "WATCHED"
   );
-  const friendsWatchlist = communityData.mediaStatuses.filter(
-    (m) => m.tmdbId === media.id && m.mediaType === media.mediaType && m.status === "WATCHLIST"
+  const myWatched = allWatched.find((m) => isMe(m.userId, m.userName, (m as any).userEmail));
+  const otherFriendsWatched = allWatched.filter(
+    (m) => !isMe(m.userId, m.userName, (m as any).userEmail)
   );
-  const friendsRecommendations = communityData.recommendations.filter(
+
+  // Watchlist: Other Friends
+  const otherFriendsWatchlist = communityData.mediaStatuses.filter(
+    (m) =>
+      m.tmdbId === media.id &&
+      m.mediaType === media.mediaType &&
+      m.status === "WATCHLIST" &&
+      !isMe(m.userId, m.userName, (m as any).userEmail)
+  );
+
+  // Recommendations: Me vs Friends
+  const allRecs = communityData.recommendations.filter(
     (r) => r.tmdbId === media.id && r.mediaType === media.mediaType
+  );
+  const myRec = allRecs.find((r) => isMe(r.userId, r.userName, (r as any).userEmail));
+  const otherFriendsRecs = allRecs.filter(
+    (r) => !isMe(r.userId, r.userName, (r as any).userEmail)
   );
 
   const itemGenres = resolveItemGenres(media.mediaType, media.genreIds, details?.genres);
 
-  const myEmail = session?.user?.email?.toLowerCase();
   const myStatusObj = communityData.mediaStatuses.find(
     (m) =>
       m.tmdbId === media.id &&
       m.mediaType === media.mediaType &&
-      (m.userId === (session?.user as any)?.id || m.userName === session?.user?.name)
+      isMe(m.userId, m.userName, (m as any).userEmail)
   );
 
   const handleStatusChange = async (status: "WATCHED" | "WATCHLIST" | "NONE", rating?: number) => {
@@ -373,17 +400,37 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     <span className="text-xs text-amber-500/70 font-normal">TMDB / IMDb</span>
                   </div>
 
-                  {friendsWatched.length > 0 && (
+                  {/* Watched Badge */}
+                  {(myWatched || otherFriendsWatched.length > 0) && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-semibold">
                       <Check className="w-3.5 h-3.5" />
-                      <span>{friendsWatched.length} Freunde gesehen</span>
+                      <span>
+                        {myWatched && otherFriendsWatched.length === 0
+                          ? "Von dir gesehen"
+                          : myWatched && otherFriendsWatched.length > 0
+                          ? `Von dir & ${otherFriendsWatched.length} ${
+                              otherFriendsWatched.length === 1 ? "Freund" : "Freunden"
+                            } gesehen`
+                          : otherFriendsWatched.length === 1
+                          ? `${otherFriendsWatched[0].userName} hat ihn gesehen`
+                          : `${otherFriendsWatched.length} Freunde gesehen`}
+                      </span>
                     </div>
                   )}
 
-                  {friendsRecommendations.length > 0 && (
+                  {/* Recommendation Badge */}
+                  {(myRec || otherFriendsRecs.length > 0) && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold">
                       <Sparkles className="w-3.5 h-3.5" />
-                      <span>{friendsRecommendations.length}x empfohlen</span>
+                      <span>
+                        {myRec && otherFriendsRecs.length === 0
+                          ? "Von dir empfohlen"
+                          : myRec && otherFriendsRecs.length > 0
+                          ? `Von dir & ${otherFriendsRecs[0].userName} empfohlen`
+                          : otherFriendsRecs.length === 1
+                          ? `Tipp von ${otherFriendsRecs[0].userName}`
+                          : `${allRecs.length}x empfohlen`}
+                      </span>
                     </div>
                   )}
                 </div>
@@ -407,10 +454,10 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     : "bg-slate-800 hover:bg-slate-700 text-slate-200"
                 }`}
               >
-                <Check className="w-4 h-4" />
+                <Check className="w-4 h-4 stroke-[2.5]" />
                 <span>
                   {myStatusObj?.status === "WATCHED"
-                    ? `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10` : "✓"})`
+                    ? `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10 ★` : "✓"})`
                     : "Als gesehen markieren"}
                 </span>
               </button>
@@ -422,12 +469,18 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 }
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
                   myStatusObj?.status === "WATCHLIST"
-                    ? "bg-sky-500 text-black shadow-lg shadow-sky-500/20"
+                    ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/50"
                     : "bg-slate-800 hover:bg-slate-700 text-slate-200"
                 }`}
               >
-                <Plus className="w-4 h-4" />
-                <span>{myStatusObj?.status === "WATCHLIST" ? "Auf Watchlist ✓" : "Watchlist"}</span>
+                {myStatusObj?.status === "WATCHLIST" ? (
+                  <Check className="w-4 h-4 stroke-[2.5]" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
+                <span>
+                  {myStatusObj?.status === "WATCHLIST" ? "Auf Merkliste ✓" : "Merkliste"}
+                </span>
               </button>
 
               <button
@@ -642,9 +695,9 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   <span>Freunde</span>
-                  {friendsRecommendations.length > 0 && (
+                  {allRecs.length > 0 && (
                     <span className="text-[10px] bg-rose-500/20 text-rose-300 px-1.5 py-0.2 rounded font-bold">
-                      {friendsRecommendations.length}
+                      {allRecs.length}
                     </span>
                   )}
                 </button>
@@ -1004,11 +1057,21 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
                     <h5 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5" /> Bereits gesehen ({friendsWatched.length})
+                      <Check className="w-3.5 h-3.5" /> Bereits gesehen ({allWatched.length})
                     </h5>
-                    {friendsWatched.length > 0 ? (
+                    {allWatched.length > 0 ? (
                       <div className="space-y-2">
-                        {friendsWatched.map((fw) => (
+                        {myWatched && (
+                          <div className="flex items-center justify-between text-sm py-1.5 border-b border-emerald-500/20 text-emerald-300 font-semibold">
+                            <span>Du (Selbst gesehen)</span>
+                            {myWatched.rating && (
+                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                                {myWatched.rating}/10 ★
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {otherFriendsWatched.map((fw) => (
                           <div
                             key={fw.id}
                             className="flex items-center justify-between text-sm py-1 border-b border-slate-800/40 last:border-0"
@@ -1030,12 +1093,18 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   </div>
 
                   <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
-                    <h5 className="text-xs font-bold uppercase tracking-wider text-sky-400 mb-2 flex items-center gap-1.5">
-                      <Plus className="w-3.5 h-3.5" /> Auf der Watchlist ({friendsWatchlist.length})
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-2 flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5" /> Auf der Merkliste ({otherFriendsWatchlist.length + (myStatusObj?.status === "WATCHLIST" ? 1 : 0)})
                     </h5>
-                    {friendsWatchlist.length > 0 ? (
+                    {myStatusObj?.status === "WATCHLIST" || otherFriendsWatchlist.length > 0 ? (
                       <div className="space-y-2">
-                        {friendsWatchlist.map((fw) => (
+                        {myStatusObj?.status === "WATCHLIST" && (
+                          <div className="text-sm py-1.5 border-b border-emerald-500/20 text-emerald-300 font-semibold flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Auf deiner Merkliste gespeichert</span>
+                          </div>
+                        )}
+                        {otherFriendsWatchlist.map((fw) => (
                           <div
                             key={fw.id}
                             className="text-sm py-1 border-b border-slate-800/40 last:border-0 text-slate-200"
@@ -1055,7 +1124,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <div className="flex items-center justify-between mb-4">
                     <h4 className="text-base font-bold text-white flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-amber-400" />
-                      Empfehlungen & Meinungen ({friendsRecommendations.length})
+                      Empfehlungen & Meinungen ({allRecs.length})
                     </h4>
                     <button
                       onClick={() => setShowRecForm(true)}
@@ -1065,15 +1134,19 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     </button>
                   </div>
 
-                  {friendsRecommendations.length > 0 ? (
+                  {allRecs.length > 0 ? (
                     <div className="space-y-4">
-                      {friendsRecommendations.map((rec) => {
-                        const myUserId = (session?.user as any)?.id || "user_lukas";
-                        const isUpvoted = rec.upvoterIds.includes(myUserId);
+                      {allRecs.map((rec) => {
+                        const isMine = isMe(rec.userId, rec.userName, (rec as any).userEmail);
+                        const isUpvoted = rec.upvoterIds.includes(myUserId || "");
                         return (
                           <div
                             key={rec.id}
-                            className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 space-y-2.5"
+                            className={`p-4 rounded-2xl border space-y-2.5 ${
+                              isMine
+                                ? "bg-purple-950/20 border-purple-500/30"
+                                : "bg-slate-900/80 border-slate-800"
+                            }`}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2.5">
@@ -1082,6 +1155,11 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                 </div>
                                 <div>
                                   <span className="text-sm font-bold text-white">{rec.userName}</span>
+                                  {isMine && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold ml-1.5 border border-purple-500/30">
+                                      Du
+                                    </span>
+                                  )}
                                   <span className="text-[11px] text-slate-500 ml-2">
                                     {new Date(rec.createdAt).toLocaleDateString("de-DE")}
                                   </span>

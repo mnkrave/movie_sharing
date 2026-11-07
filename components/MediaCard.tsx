@@ -16,19 +16,40 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
   const { openMediaModal, communityData, updateMediaStatus, openRatingModal } = useMedia();
   const { data: session } = useSession();
 
-  // Friends stats for this item
-  const friendsWatched = communityData.mediaStatuses.filter(
+  const myUserId = (session?.user as any)?.id;
+  const myName = session?.user?.name;
+  const myEmail = session?.user?.email?.toLowerCase();
+
+  const isMe = (userId?: string | null, userName?: string | null, userEmail?: string | null) => {
+    if (myUserId && userId && userId === myUserId) return true;
+    if (myName && userName && userName.toLowerCase() === myName.toLowerCase()) return true;
+    if (myEmail && userEmail && userEmail.toLowerCase() === myEmail) return true;
+    return false;
+  };
+
+  // Watched: Me vs Friends
+  const allWatched = communityData.mediaStatuses.filter(
     (m) => m.tmdbId === item.id && m.mediaType === item.mediaType && m.status === "WATCHED"
   );
-  const friendsRecs = communityData.recommendations.filter(
+  const myWatched = allWatched.find((m) => isMe(m.userId, m.userName, (m as any).userEmail));
+  const otherFriendsWatched = allWatched.filter(
+    (m) => !isMe(m.userId, m.userName, (m as any).userEmail)
+  );
+
+  // Recommendations: Me vs Friends
+  const allRecs = communityData.recommendations.filter(
     (r) => r.tmdbId === item.id && r.mediaType === item.mediaType
+  );
+  const myRec = allRecs.find((r) => isMe(r.userId, r.userName, (r as any).userEmail));
+  const otherFriendsRecs = allRecs.filter(
+    (r) => !isMe(r.userId, r.userName, (r as any).userEmail)
   );
 
   const myStatusObj = communityData.mediaStatuses.find(
     (m) =>
       m.tmdbId === item.id &&
       m.mediaType === item.mediaType &&
-      (m.userId === (session?.user as any)?.id || m.userName === session?.user?.name)
+      isMe(m.userId, m.userName, (m as any).userEmail)
   );
 
   const handleQuickWatchlist = (e: React.MouseEvent) => {
@@ -125,19 +146,36 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
 
         {/* Friend Badges on bottom of poster */}
         <div className="absolute bottom-2 left-2 right-2 flex flex-col gap-1 pointer-events-none">
-          {friendsRecs.length > 0 && (
+          {/* Recommendation Badge */}
+          {(myRec || otherFriendsRecs.length > 0) && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-600/90 text-white text-[11px] font-bold backdrop-blur-md shadow truncate">
               <Sparkles className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">Tipp von {friendsRecs[0].userName}</span>
+              <span className="truncate">
+                {myRec && otherFriendsRecs.length === 0
+                  ? "Von dir empfohlen"
+                  : myRec && otherFriendsRecs.length > 0
+                  ? `Von dir & ${otherFriendsRecs[0].userName} empfohlen`
+                  : otherFriendsRecs.length === 1
+                  ? `Tipp von ${otherFriendsRecs[0].userName}`
+                  : `Tipp von ${otherFriendsRecs[0].userName} (+${otherFriendsRecs.length - 1})`}
+              </span>
             </span>
           )}
 
-          {friendsWatched.length > 0 && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600/80 text-white text-[10px] font-semibold backdrop-blur-md shadow">
-              <Check className="w-3 h-3" />
-              <span>
-                {friendsWatched.length}{" "}
-                {friendsWatched.length === 1 ? "Freund hat" : "Freunde haben"} ihn gesehen
+          {/* Watched Badge */}
+          {(myWatched || otherFriendsWatched.length > 0) && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600/90 text-white text-[10px] font-semibold backdrop-blur-md shadow truncate">
+              <Check className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">
+                {myWatched && otherFriendsWatched.length === 0
+                  ? "Gesehen"
+                  : myWatched && otherFriendsWatched.length > 0
+                  ? `Gesehen (+ ${otherFriendsWatched.length} ${
+                      otherFriendsWatched.length === 1 ? "Freund" : "Freunde"
+                    })`
+                  : otherFriendsWatched.length === 1
+                  ? `${otherFriendsWatched[0].userName} hat ihn gesehen`
+                  : `${otherFriendsWatched.length} Freunde haben ihn gesehen`}
               </span>
             </span>
           )}
@@ -148,27 +186,39 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           <button
             type="button"
             onClick={handleQuickWatchlist}
-            title={myStatusObj?.status === "WATCHLIST" ? "Von Watchlist entfernen" : "Auf Watchlist setzen"}
-            className={`p-3 rounded-full transition shadow-lg ${
+            title={
               myStatusObj?.status === "WATCHLIST"
-                ? "bg-sky-500 text-black hover:bg-sky-400 scale-110"
+                ? "Auf Merkliste (klicken zum Entfernen)"
+                : "Auf Merkliste setzen"
+            }
+            className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
+              myStatusObj?.status === "WATCHLIST"
+                ? "bg-emerald-500 text-black hover:bg-emerald-400 scale-110 shadow-emerald-500/30 ring-2 ring-emerald-400/50"
                 : "bg-slate-800/90 text-white hover:bg-slate-700 hover:scale-110"
             }`}
           >
-            <Plus className="w-5 h-5" />
+            {myStatusObj?.status === "WATCHLIST" ? (
+              <Check className="w-5 h-5 stroke-[2.5]" />
+            ) : (
+              <Plus className="w-5 h-5" />
+            )}
           </button>
 
           <button
             type="button"
             onClick={handleQuickWatched}
-            title={myStatusObj?.status === "WATCHED" ? "Gesehen zurücknehmen" : "Als gesehen markieren"}
-            className={`p-3 rounded-full transition shadow-lg ${
+            title={
               myStatusObj?.status === "WATCHED"
-                ? "bg-emerald-500 text-black hover:bg-emerald-400 scale-110"
+                ? "Gesehen zurücknehmen"
+                : "Als gesehen markieren"
+            }
+            className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
+              myStatusObj?.status === "WATCHED"
+                ? "bg-emerald-500 text-black hover:bg-emerald-400 scale-110 shadow-emerald-500/30 ring-2 ring-emerald-400/50"
                 : "bg-slate-800/90 text-white hover:bg-slate-700 hover:scale-110"
             }`}
           >
-            <Check className="w-5 h-5" />
+            <Check className="w-5 h-5 stroke-[2.5]" />
           </button>
         </div>
       </div>
