@@ -1,8 +1,6 @@
 import { getTopRatedMovies, getTopRatedTv, getTrendingAll, getOscarWinnersList } from "@/lib/tmdb";
 import { HomeContentClient } from "@/components/HomeContentClient";
-import { Sparkles, Award, Flame } from "lucide-react";
-import Link from "next/link";
-import Image from "next/image";
+import { HomeHero } from "@/components/HomeHero";
 
 export const revalidate = 3600; // Cache 1 hour
 
@@ -18,62 +16,8 @@ export default async function HomePage() {
 
   return (
     <div className="space-y-12 pb-20">
-      {/* Hero Showcase Section */}
-      {heroItem && (
-        <section className="relative h-[480px] sm:h-[540px] w-full overflow-hidden bg-slate-950">
-          {heroItem.backdropPath && (
-            <Image
-              src={`https://image.tmdb.org/t/p/original${heroItem.backdropPath}`}
-              alt={heroItem.title}
-              fill
-              priority
-              fetchPriority="high"
-              sizes="100vw"
-              className="object-cover object-top opacity-50"
-            />
-          )}
-
-          <div className="absolute inset-0 bg-gradient-to-t from-[#07090e] via-[#07090e]/70 to-transparent" />
-          <div className="absolute inset-0 bg-gradient-to-r from-[#07090e] via-[#07090e]/60 to-transparent" />
-
-          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col justify-end pb-12 sm:pb-16 max-w-3xl">
-            <div className="flex items-center gap-2 mb-3">
-              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-300 text-xs font-bold tracking-wide uppercase">
-                <Flame className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                Trending diese Woche
-              </span>
-              <span className="text-slate-400 text-xs font-semibold">
-                {heroItem.releaseYear} • {heroItem.voteAverage} ★ TMDB
-              </span>
-            </div>
-
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-              {heroItem.title}
-            </h1>
-
-            <p className="mt-3 text-sm sm:text-base text-slate-300 line-clamp-3 leading-relaxed max-w-2xl">
-              {heroItem.overview}
-            </p>
-
-            <div className="flex items-center gap-3 mt-6">
-              <Link
-                href={`/feed`}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-sm transition shadow-lg shadow-amber-500/25 hover:scale-105"
-              >
-                <Sparkles className="w-4 h-4" />
-                <span>Freunde-Empfehlungen</span>
-              </Link>
-              <Link
-                href={`/oscars`}
-                className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-slate-900/80 hover:bg-slate-800 text-white font-semibold text-sm border border-slate-700/80 backdrop-blur-md transition"
-              >
-                <Award className="w-4 h-4 text-amber-400" />
-                <span>Oscar-Gewinner</span>
-              </Link>
-            </div>
-          </div>
-        </section>
-      )}
+      {/* Hero Showcase Section with Poster & Clickable Details */}
+      {heroItem && <HomeHero heroItem={heroItem} />}
 
       {/* Main Content with Top-Right Switcher */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
