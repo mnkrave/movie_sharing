@@ -2197,6 +2197,246 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "subGroup": "Serie"
       }
     ]
+  },
+  {
+    "id": "fast-and-furious",
+    "name": "Fast & Furious Saga",
+    "category": "franchise",
+    "tagline": "Für die Familie – Adrenalin, Highspeed & Heists",
+    "description": "Von nächtlichen Straßenrennen in Los Angeles bis zu weltweiten High-Tech-Heists: Die explosive Action-Saga rund um Dominic Toretto, Brian O'Conner und ihre Crew.",
+    "backdropPath": "/z5A5W3WYJc3UVEWljSGwdjDgQ0j.jpg",
+    "posterPath": "/vEq10ZynOwHaSIIQ3mWohbHzvRb.jpg",
+    "subGroupLabel": "Kategorie",
+    "movies": [
+      {
+        "id": 9799,
+        "title": "The Fast and the Furious",
+        "originalTitle": "The Fast and the Furious",
+        "releaseYear": "2001",
+        "posterPath": "/qmRrB8HFhEThLDhqJ7bZqZb6pm9.jpg",
+        "backdropPath": "/jY9ef5nqY4xIIMu3yzW3qamUCoi.jpg",
+        "voteAverage": 7,
+        "overview": "Eine Reihe von Trucküberfällen hält die Polizei von Los Angeles in Atem. Mit frisierten Autos jagen Verbrecher LKWs, kapern diese und klauen die Fracht. Die Polizei glaubt, dass hinter den Überfällen der PS-Junkie Dominic steckt. Er organisiert mit seiner Freundin Letty illegale Straßenrennen in der Großstadt. Die teilnehmenden Fahrzeuge sind allesamt frisiert. Also wird jemand eingeschleust: Brian. Er arbeitet undercover für die Polizei und ist in Doms Schwester verliebt...",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 584,
+        "title": "2 Fast 2 Furious",
+        "originalTitle": "2 Fast 2 Furious",
+        "releaseYear": "2003",
+        "posterPath": "/ys09XLdIqpzXpi0SYIrnkQByYr1.jpg",
+        "backdropPath": "/90ooE5SbUEO0OVJHewNO7pgySb6.jpg",
+        "voteAverage": 6.5,
+        "overview": "Dem Cop Brian O'Conner werden nach einem Einsatz in der illegalen Rennszene wegen nicht ganz legaler Ermittlungsmethoden Führerschein und Dienstmarke entzogen. Nun erhält der auf Eis gelegte Gesetzeshüter eine Chance zur Bewährung: Gemeinsam mit der Undercover-Agentin Monica soll er Licht ins Dunkel diffuser Transaktionen eines verdächtigen Geschäftsmannes in Miami bringen. Wie es sich so fügt, ist jener auch ein begeisterter Anhänger destruktiver Sportwagenevents.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 9615,
+        "title": "The Fast and the Furious: Tokyo Drift",
+        "originalTitle": "The Fast and the Furious: Tokyo Drift",
+        "releaseYear": "2006",
+        "posterPath": "/wIn7bFRDeUfW4IBcVbrIfCamEaq.jpg",
+        "backdropPath": "/dMARcKLrv0T7kVJ4iQR3vqTTdtT.jpg",
+        "voteAverage": 6.6,
+        "overview": "Sean liebt illegale Straßenrennen, welche ihm aber schon des Öfteren große Schwierigkeiten bereiteten und er durch sie nun kurz vor dem Jugendknast steht. Die letzte Alternative ist sein Vater in Tokio, bei dem er unterkommt und bei dem er sich keine Fehltritte erlauben darf. Doch schon nach kurzer Zeit lernt er Twinkie kennen, der ihn in die Rennszene Tokios einführt. Allerdings stellt Sean beim ersten Rennen in einem Parkhaus fest, dass hier anders gefahren wird: Driften steht an der Tagesordnung - ein Fahrstil, von dem er vorher nie gehört hat. Als er dort seine Mitschülerin Neela anspricht und ihr Freund D.K. daraufhin die Fronten klärt, fordert Sean ihn zu einem Rennen heraus. Nur mit D.K.s Partner Han kann Sean überhaupt in einem Auto an die Startlinie fahren, welches während des Rennens allerdings einen Totalschaden erleidet. Für eine Revanche muss er erstmal das Driften lernen...",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 13804,
+        "title": "Fast & Furious - Neues Modell. Originalteile.",
+        "originalTitle": "Fast & Furious",
+        "releaseYear": "2009",
+        "posterPath": "/kOF0WIlSCnxadGgjNJsSy69sXIc.jpg",
+        "backdropPath": "/25HepicRtrzZ3MVCqhfoxGDbHjw.jpg",
+        "voteAverage": 6.7,
+        "overview": "Schnelle Autos und schnelles Geld hat Dom Toretto auch nach seiner Flucht nicht hinter sich gelassen. Er klaut in der dominikanischen Republik Tanklastzüge - während der Fahrt. Ein Mord sorgt für das Wiedertreffen von Toretto und Brian O'Conner in L.A. und gemeinsam - wenn auch widerwillig - stellen sie sich einem übermächtigen Drogenkartell. Bei packenden Rennen durchs nächtliche L.A. und auf wilden Verfolgungsjagden durch die mexikanische Wüste gibt es aufheulende Motoren und eine deftige Beschleunigung.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 51497,
+        "title": "Fast & Furious Five",
+        "originalTitle": "Fast Five",
+        "releaseYear": "2011",
+        "posterPath": "/usw7idwf2SkS5d0NlHzf58DAIp7.jpg",
+        "backdropPath": "/tQN9JEQ4N4aqej7O6AkQtt0dLpt.jpg",
+        "voteAverage": 7.2,
+        "overview": "Nachdem Brian und Mia Toretto Dom aus der Gefangenschaft befreit haben, müssen sie auf ihrer Flucht vor den Behörden viele Landesgrenzen überqueren. In Rio de Janeiro stehen sie erneut mit dem Rücken zur Wand und sind gezwungen, ein letztes Ding zu drehen - denn nur so können sie die langersehnte Freiheit erlangen. Während sie ein Elite-Team der besten Racer zusammenstellen, wird ihnen eines klar: Um ein für alle Mal aussteigen zu können, müssen sie sich einem korrupten Unternehmer stellen, der nichts mehr will, als sie tot zu sehen. Er ist allerdings nicht der Einzige, der hinter ihnen her ist. Dem kompromisslosen Federal Agent Luke Hobbs entkommt niemand.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 82992,
+        "title": "Fast & Furious 6",
+        "originalTitle": "Fast & Furious 6",
+        "releaseYear": "2013",
+        "posterPath": "/fkZDVrBzI5jAzYl9KcYp4ScsrYa.jpg",
+        "backdropPath": "/xDp29MSWa7O3ROC13r6dPTFnREJ.jpg",
+        "voteAverage": 6.8,
+        "overview": "Nach ihrem großen Rio-Coup haben sich Dominic Toretto, Brian O'Conner und ihre Crew über die ganze Welt verstreut. Durch die erbeuteten 100 Millionen Dollar sind sie zwar reich, leben jedoch ständig auf der Flucht. An eine Rückkehr in ihre Heimat ist nicht zu denken. FBI-Agent Luke Hobbs ist derweil auf der Jagd nach einer Organisation von zum Töten ausgebildeten Rennfahrern. Die Söldner agieren in über zwölf Ländern. Ihre Befehle erhalten sie von dem übergeordneten Bandenführer Owen Shaw. Unterstützung erhält der Boss von Letty, der totgeglaubten großen Liebe von Dom. Hobbs weiß, dass er die kriminelle Bande nur stoppen kann, wenn er sie auf der Straße besiegt. Dafür braucht er die Hilfe von Dom und bietet diesem an, sich seinem Elite-Team in London anzuschließen. Als Belohnung würden Dom und seine Partner von ihren Verbrechen freigesprochen werden.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 168259,
+        "title": "Fast & Furious 7",
+        "originalTitle": "Furious 7",
+        "releaseYear": "2015",
+        "posterPath": "/lyZDOEX6zr9yv9RBjKQoYr6LyYk.jpg",
+        "backdropPath": "/ehzI1mVcnHqB58NqPyQwpMqcVoz.jpg",
+        "voteAverage": 7.2,
+        "overview": "Nachdem Dominic Toretto und sein Team den Bösewicht Owen Shaw ausgeschaltet haben, sinnt dessen Bruder Deckard nach blutiger Rache. Doch der ist nicht ihr einziges Problem. Die Bleifuß-Freunde sollen nämlich gleichzeitig - im Auftrag eines mysteriösen Agenten namens Mr. Nobody - heimtückischen Terroristen ein \"Das Auge Gottes\" genanntes GPS-Programm abjagen und die Programmiererin Ramsey aus deren Händen befreien. Also klemmt sich die Crew noch einmal hinters Steuer und trotzt dabei mehrfach der Schwerkraft.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 337339,
+        "title": "Fast & Furious 8",
+        "originalTitle": "The Fate of the Furious",
+        "releaseYear": "2017",
+        "posterPath": "/qwedY3Aa6TdQ4fFb2Q356EBV5YR.jpg",
+        "backdropPath": "/3IJ8kG8i84PncXkSovu0PaZQfjM.jpg",
+        "voteAverage": 6.8,
+        "overview": "Jetzt, da Dom und Letty ihre Flitterwochen genießen, Brian und Mia ausgestiegen sind und der Rest der Crew entlastet wurde, hat sich bei allen der Anschein eines normalen Lebens eingestellt. Doch als eine mysteriöse Frau Dom dazu verführt, in die Welt des Verbrechens zurückzukehren, der er einfach nicht entkommen kann, und er die verrät, die ihm am nächsten stehen, müssen sie sich Prüfungen wie noch nie zuvor stellen. Von den Stränden Kubas und den Straßen New York bis zu den eisigen Ebenen der arktischen Barentssee - für die Elitetruppe geht es kreuz und quer über den Globus, um eine Anarchistin daran zu hindern, Chaos auf die Welt loszulassen. Und um den Mann nach Hause zu holen, der aus ihnen eine Familie gemacht hat.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 384018,
+        "title": "Fast & Furious: Hobbs & Shaw",
+        "originalTitle": "Fast & Furious Presents: Hobbs & Shaw",
+        "releaseYear": "2019",
+        "posterPath": "/svGppeLBvInr3bl2ROpK8HXIMWA.jpg",
+        "backdropPath": "/hpgda6P9GutvdkDX5MUJ92QG9aj.jpg",
+        "voteAverage": 6.8,
+        "overview": "Secret-Service-Agent Luke Hobbs und Ex-Elitesoldat Deckard Shaw mussten in der Vergangenheit zwar bereits zusammenarbeiten, taten dies jedoch immer zähneknirschend. Doch die Sicherheit des Planeten hat natürlich Vorrang vor den Querelen der beiden und als der internationale Terrorist Brixton auf der Bildfläche auftaucht, sind Hobbs und Shaw gezwungen, einmal mehr zusammenzuarbeiten. Brixton ist nicht nur hochintelligent, sondern durch genetische und kybernetische Weiterentwicklung sogar eine Art Supersoldat. Doch im Doppelpack haben Hobbs und Shaw eine Chance – und Deckard ist nicht der einzige aus der Shaw-Familie, der ein Hühnchen mit Brixton zu rupfen hat. Denn auch seine Schwester, die abtrünnige MI6-Agentin Hattie Shaw ist hinter dem Terroristen her…",
+        "mediaType": "movie",
+        "subGroup": "Spin-Off"
+      },
+      {
+        "id": 385128,
+        "title": "Fast & Furious 9",
+        "originalTitle": "F9",
+        "releaseYear": "2021",
+        "posterPath": "/rOrgyLZNM8B0etjphLpLKjreNAa.jpg",
+        "backdropPath": "/xXHZeb1yhJvnSHPzZDqee0zfMb6.jpg",
+        "voteAverage": 7,
+        "overview": "Dominic Toretto hat immer großen Wert auf die „Familie“ um seine Frau Letty, ihren gemeinsamen Sohn Brian, seiner Schwester Mia und seine Mitstreiter Roman und Tej gelegt. Als dann allerdings plötzlich ein weiterer Blutsverwandter von Dom auf der Bildfläche erscheint, sieht das etwas anders aus. Doms und Mias verschollener Bruder Jakob, ein tödlicher Killer und Dieb, will mit Dom eine Rechnung begleichen und tut sich dafür mit der Cyber-Terroristin Cipher zusammen. Dom steht vor seiner wohl größten Herausforderung. Da kommt es ihm gerade recht, dass er unverhoffte Unterstützung von seinem totgeglaubten Freund Han bekommt, der den Anschlag auf sein Leben offenbar doch überlebt hat. Dom muss sich nun den Sünden seiner Vergangenheit stellen und sich mit seiner Crew zusammenschließen, um die Weltverschwörung zu stoppen, die von Jakob und Cipher angeführt wird.",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      },
+      {
+        "id": 385687,
+        "title": "Fast & Furious 10",
+        "originalTitle": "Fast X",
+        "releaseYear": "2023",
+        "posterPath": "/t1vPsJUBsh3gkgkZlqDNmCPyy49.jpg",
+        "backdropPath": "/4XM8DUTQb3lhLemJC51Jx4a2EuA.jpg",
+        "voteAverage": 7,
+        "overview": "Dominic Toretto ahnt nicht, dass seine Taten, die Jahre zurückliegen, tiefe Spuren bei dem mittlerweile mächtigen Dante hinterlassen haben. Dieser sinnt nun auf Rache und will die ganze Toretto-Familie auseinanderbringen. Es entbrennt eine Rachegeschichte, die alle Mitglieder der Original-Crew, aber auch Deckard Shaw, Bruder Jakob sowie den Neuzugang Tess auf den Plan ruft. Diese haben fortan alle Hände zu tun, um sich gegen den Gegenspieler sowie dessen Gefolgschaft samt Cipher und Aimes zur Wehr setzen zu können. Da Dom nicht jeden aus der großen Familie beschützen kann und der rachsüchtige Rivale vor nichts zurückschreckt, wird er vor die schwierigste Wahl seines Lebens gestellt: Wen wird er retten?",
+        "mediaType": "movie",
+        "subGroup": "Hauptreihe"
+      }
+    ]
+  },
+  {
+    "id": "jurassic-park",
+    "name": "Jurassic Park & Jurassic World",
+    "category": "franchise",
+    "tagline": "Das Leben findet einen Weg – Die Dino-Meisterwerke",
+    "description": "Vom bahnbrechenden Meisterwerk von Steven Spielberg auf Isla Nublar bis zur weltweiten Koexistenz in Jurassic World: Die spektakulärste Dinosaurier-Reihe der Filmgeschichte.",
+    "backdropPath": "/njFixYzIxX8jsn6KMSEtAzi4avi.jpg",
+    "posterPath": "/ugJ6KXdOXq5wAKSypsKBTg0OgWv.jpg",
+    "subGroupLabel": "Ära",
+    "movies": [
+      {
+        "id": 329,
+        "title": "Jurassic Park",
+        "originalTitle": "Jurassic Park",
+        "releaseYear": "1993",
+        "posterPath": "/zgvLWNSKBrufJM8OAtVxJ2s7Nf8.jpg",
+        "backdropPath": "/4SyDTF02R5BepqSdQmOaNCHObzF.jpg",
+        "voteAverage": 8,
+        "overview": "John Hammond, ein reicher Unternehmer, errichtet auf einer einsamen Insel heimlich einen Erlebnispark, der für seine Gäste außergewöhnliche Attraktionen bereithält. Es ist gelungen, aus einer urzeitlichen DNA leibhaftige Dinosaurier ins Leben zu rufen. Bevor der Park für das Publikum geöffnet wird, lädt er einen führenden Paläontologen, dessen Freundin, eine Paläobotanikerin, einen berühmten Mathematiker und seine beiden wißbegierigen Enkel ein, um die besorgten Investoren zu beruhigen. Aber der Besuch seiner ersten Gäste verläuft alles andere als nach Plan. Die urzeitlichen Monster brechen aus, entziehen sich jeder Kontrolle und starten eine mörderische Jagd auf ihre Schöpfer ...",
+        "mediaType": "movie",
+        "subGroup": "Jurassic Park Trilogie"
+      },
+      {
+        "id": 330,
+        "title": "Vergessene Welt: Jurassic Park",
+        "originalTitle": "The Lost World: Jurassic Park",
+        "releaseYear": "1997",
+        "posterPath": "/6oKqsABy0yziUHCrU9d8za09HDC.jpg",
+        "backdropPath": "/A4rYaPdzgocCjQ0n9LUSYUxyvpS.jpg",
+        "voteAverage": 6.6,
+        "overview": "Vier Jahre nach dem Desaster im Jurassic Park: Auf einer nahegelegenen Insel haben die Dinosaurier unbemerkt überlebt und können sich frei bewegen. Doch jetzt droht eine noch viel größere Gefahr - der Plan, die Dinosaurier einzufangen und auf das Festland zu bringen. John Hammond, der die Kontrolle über seine Gesellschaft \"InGen\" verloren hat, sieht die Chance, seine Fehler aus der Vergangenheit wiedergutzumachen und sendet eine Expedition, geleitet von Ian Malcolm, zur Insel, bevor der beauftragte Jagd-Trupp dort ankommt. Die zwei Gruppen stehen sich in extremer Gefahr gegenüber und müssen sich in einem Wettlauf gegen die Zeit zusammenschließen, um zu überleben...",
+        "mediaType": "movie",
+        "subGroup": "Jurassic Park Trilogie"
+      },
+      {
+        "id": 331,
+        "title": "Jurassic Park III",
+        "originalTitle": "Jurassic Park III",
+        "releaseYear": "2001",
+        "posterPath": "/qrMK9LcVAIrOY4meJDvfIoF8fx0.jpg",
+        "backdropPath": "/8v8x4vVbRgrsdU3M4drnD7HQbfe.jpg",
+        "voteAverage": 6.2,
+        "overview": "Bei seiner Forschung über Intelligenz und Sozialverhalten von Velociraptoren bekommt der berühmte Paläontologe Dr. Alan Grant eine Einladung der reichen Eheleute Paul Kirby und dessen Frau, Amanda Kirby. Beide wünschen, dass Grant sie bei einem Rundflug über die Insel Isla Sorna, die ursprünglich als Dinosaurier Zuchtinsel genutzt wurde, begleitet. Grant willigt schwerenherzens ein, da er auf eine Finanzspende für seine weiteren Forschungen hofft. Auf der Insel während des Rundfluges setzt das Flugzeug plötzlich zur Landung an. Grant protestiert, da er um die Gefahren nur zu gut weiß, wird aber bewusstlos geschlagen.",
+        "mediaType": "movie",
+        "subGroup": "Jurassic Park Trilogie"
+      },
+      {
+        "id": 135397,
+        "title": "Jurassic World",
+        "originalTitle": "Jurassic World",
+        "releaseYear": "2015",
+        "posterPath": "/7eXUkEqEpzKYDLfftEyS1Qbq7H4.jpg",
+        "backdropPath": "/dF6FjTZzRTENfB4R17HDN20jLT2.jpg",
+        "voteAverage": 6.7,
+        "overview": "Mehr als 20 Jahre sind vergangen, seitdem die Ereignisse auf Isla Nublar aus dem Ruder liefen. Längst ist der Themenpark wieder eröffnet, größer und sicherer und mit mehr Dinosauriern denn je, so wie es sich John Hammond ursprünglich vorgestellt hatte. Weil die Besucherzahlen deutlich nach unten gehen, arbeitet Projektleiterin Claire an einer neuen Attraktion: Ein selbst geschaffener Dino-Hybrid, der sich jedoch als so gefährlich und unberechenbar erweist, dass selbst Velociraptoren vor ihm Reißaus nehmen. Doch der erfahrene Dino-Trainer Owen nimmt den Kampf mit dem unberechenbaren Biest in seine Hände!",
+        "mediaType": "movie",
+        "subGroup": "Jurassic World"
+      },
+      {
+        "id": 351286,
+        "title": "Jurassic World - Das gefallene Königreich",
+        "originalTitle": "Jurassic World: Fallen Kingdom",
+        "releaseYear": "2018",
+        "posterPath": "/gIbpCh7nMvLOMxBmkWC6MeQgVr1.jpg",
+        "backdropPath": "/gBmrsugfWpiXRh13Vo3j0WW55qD.jpg",
+        "voteAverage": 6.5,
+        "overview": "Vier Jahre nachdem der Freizeitpark Jurassic World geschlossen wurde, haben die Dinosaurier sich auf der kompletten Isla Nublar ausgebreitet. Zwar leben sie mittlerweile vom Menschen ungestört, doch ein bevorstehender Vulkanausbruch auf der Insel droht die Urzeittiere auszulöschen. Die ehemalige Parkmanagerin Claire will dies auf keinen Fall zulassen und bittet daher ihren Ex-Freund Owen Grady um Hilfe. Gemeinsam kehren sie auf die Insel zurück, um das erneute Aussterben der Dinosaurier zu verhindern. Während sich Owen auf die Suche nach seinen ehemaligen Raptoren-Schützlingen macht, stoßen die restlichen Expeditionsmitglieder während ihrer Rettungsmission auf eine Verschwörung.",
+        "mediaType": "movie",
+        "subGroup": "Jurassic World"
+      },
+      {
+        "id": 507086,
+        "title": "Jurassic World - Ein neues Zeitalter",
+        "originalTitle": "Jurassic World Dominion",
+        "releaseYear": "2022",
+        "posterPath": "/lYfWPFEIXdtDuTh5jKfkxptN0eF.jpg",
+        "backdropPath": "/9hk5iiycq7ukRAAXQiJT9HZX3SX.jpg",
+        "voteAverage": 6.6,
+        "overview": "Die Isla Nublar und ihr Park wurden zerstört, aber die Probleme sind noch nicht vorbei. Da sich die Dinosaurier auf der ganzen Welt ausgebreitet haben, führen die angespannten Beziehungen zwischen der Gegenwart und der Vergangenheit zu neuen Konflikten. Das zerbrechliche Gleichgewicht wird dabei auf die Probe gestellt und die Zukunft steht vor einer neuen Ausrichtung. Es wird ein für alle Mal entschieden, welche Spezies auf der Erde existieren soll.",
+        "mediaType": "movie",
+        "subGroup": "Jurassic World"
+      },
+      {
+        "id": 1234821,
+        "title": "Jurassic World: Die Wiedergeburt",
+        "originalTitle": "Jurassic World Rebirth",
+        "releaseYear": "2025",
+        "posterPath": "/uUGZdps8TesT34lPMfvTWuyZmZe.jpg",
+        "backdropPath": "/zNriRTr0kWwyaXPzdg1EIxf0BWk.jpg",
+        "voteAverage": 6.2,
+        "overview": "Fünf Jahre nach den Ereignissen von 'Jurassic World: Ein neue Zeitalter' wird die Spezialistin für verdeckte Operationen, Zora Bennett, auf eine streng geheime Mission geschickt: Sie soll genetisches Material von den drei größten Dinosauriern der Welt sichern. Doch als ihr Team auf eine Familie trifft, deren Boot bei einem Ausflug gekentert ist, stranden sie gemeinsam auf einer abgelegenen Insel. Dort stoßen sie auf eine finstere und schockierende Entdeckung, die jahrzehntelang vor der Menschheit verborgen blieb – und deren Geheimnis alles verändern könnte.",
+        "mediaType": "movie",
+        "subGroup": "Jurassic World"
+      }
+    ]
   }
 ];
 
