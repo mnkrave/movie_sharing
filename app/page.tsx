@@ -12,12 +12,21 @@ export default async function HomePage() {
   ]);
 
   const oscarWinners = getOscarWinnersList().slice(0, 10);
-  const heroItem = trending[0] || topMovies[0];
+
+  // Prepare fallback generic items: 4 movies + 2 series
+  const trendingMovies = trending.filter((item) => item.mediaType === "movie");
+  const trendingTv = trending.filter((item) => item.mediaType === "tv");
+
+  const fallbackMovies = [...trendingMovies, ...topMovies].slice(0, 4);
+  const fallbackTv = [...trendingTv, ...topTv].slice(0, 2);
 
   return (
     <div className="space-y-12 pb-20">
-      {/* Hero Showcase Section with Poster & Clickable Details */}
-      {heroItem && <HomeHero heroItem={heroItem} />}
+      {/* Hero Showcase Carousel: 4 Movies & 2 Series (2 generic + 4 match-based) */}
+      <HomeHero
+        initialGenericMovies={fallbackMovies}
+        initialGenericTv={fallbackTv}
+      />
 
       {/* Main Content with Top-Right Switcher */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
