@@ -210,8 +210,14 @@ function mapRawItem(raw: any, forceMediaType?: "movie" | "tv", rank?: number): M
 
 export async function getTopRatedMovies(pages = 3): Promise<MediaItem[]> {
   try {
+    const today = new Date().toISOString().slice(0, 10);
     const pagePromises = Array.from({ length: pages }, (_, i) =>
-      tmdbFetch<{ results: any[] }>("/movie/top_rated", { page: String(i + 1) })
+      tmdbFetch<{ results: any[] }>("/discover/movie", {
+        sort_by: "vote_average.desc",
+        "vote_count.gte": "4000",
+        "primary_release_date.lte": today,
+        page: String(i + 1),
+      })
     );
     const responses = await Promise.all(pagePromises);
     const allResults = responses.flatMap((r) => r.results || []);
@@ -224,8 +230,14 @@ export async function getTopRatedMovies(pages = 3): Promise<MediaItem[]> {
 
 export async function getTopRatedTv(pages = 2): Promise<MediaItem[]> {
   try {
+    const today = new Date().toISOString().slice(0, 10);
     const pagePromises = Array.from({ length: pages }, (_, i) =>
-      tmdbFetch<{ results: any[] }>("/tv/top_rated", { page: String(i + 1) })
+      tmdbFetch<{ results: any[] }>("/discover/tv", {
+        sort_by: "vote_average.desc",
+        "vote_count.gte": "1000",
+        "first_air_date.lte": today,
+        page: String(i + 1),
+      })
     );
     const responses = await Promise.all(pagePromises);
     const allResults = responses.flatMap((r) => r.results || []);
