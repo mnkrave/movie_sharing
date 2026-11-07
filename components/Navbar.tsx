@@ -21,6 +21,7 @@ import {
   X,
   ChevronDown,
   Compass,
+  Layers,
 } from "lucide-react";
 
 export function Navbar() {
@@ -36,7 +37,11 @@ export function Navbar() {
     (session?.user as any)?.role === "ADMIN";
 
   const isDiscoverActive =
-    pathname === "/" || pathname === "/movies" || pathname === "/tv" || pathname === "/oscars";
+    pathname === "/" ||
+    pathname === "/movies" ||
+    pathname === "/tv" ||
+    pathname.startsWith("/collections") ||
+    pathname === "/oscars";
 
   const mainNavLinks = [
     { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
@@ -55,6 +60,13 @@ export function Navbar() {
       sub: "Übersicht & Trends",
       icon: Film,
       color: "text-amber-400 bg-amber-500/10",
+    },
+    {
+      href: "/collections",
+      label: "Kollektionen & Universen",
+      sub: "Star Wars, Spielberg, MCU & mehr",
+      icon: Layers,
+      color: "text-purple-400 bg-purple-500/10",
     },
     {
       href: "/movies",
