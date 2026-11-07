@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -13,23 +13,66 @@ import {
   Tv,
   Plus,
   MessageSquare,
-  Search,
+  User,
+  Users,
 } from "lucide-react";
 
 export default function FeedPage() {
   const { data: session } = useSession();
   const { communityData, upvoteRecommendation, openMediaModal, openSearch } = useMedia();
+
   const [filterType, setFilterType] = useState<"ALL" | "movie" | "tv">("ALL");
+  const [authorFilter, setAuthorFilter] = useState<"ALL" | "FRIENDS" | "MINE">("ALL");
+  const [selectedTag, setSelectedTag] = useState<string>("ALL");
+
+  const myUserId = (session?.user as any)?.id || "user_lukas";
+  const myName = session?.user?.name;
 
   const movieCount = communityData.recommendations.filter((r) => r.mediaType === "movie").length;
   const tvCount = communityData.recommendations.filter((r) => r.mediaType === "tv").length;
 
-  const recommendations = communityData.recommendations.filter((rec) => {
-    if (filterType === "ALL") return true;
-    return rec.mediaType === filterType;
-  });
+  const myRecCount = communityData.recommendations.filter(
+    (r) => r.userId === myUserId || (myName && r.userName === myName)
+  ).length;
 
-  const myUserId = (session?.user as any)?.id || "user_lukas";
+  const friendsRecCount = communityData.recommendations.length - myRecCount;
+
+  const GENRE_TAGS = [
+    { key: "ALL", label: "Alle Genres & Tags" },
+    { key: "Action", label: "💥 Action" },
+    { key: "Comedy", label: "😂 Comedy" },
+    { key: "Horror", label: "🩸 Horror" },
+    { key: "Drama", label: "🎭 Drama" },
+    { key: "Sci-Fi", label: "🚀 Sci-Fi" },
+    { key: "Thriller", label: "😱 Thriller" },
+    { key: "Mindfuck", label: "🤯 Mindfuck" },
+    { key: "Muss", label: "🔥 Must-Watch" },
+    { key: "Oscar", label: "🏆 Oscar" },
+  ];
+
+  const filteredRecommendations = useMemo(() => {
+    return communityData.recommendations.filter((rec) => {
+      // 1. Media Type Filter (Film vs Serie)
+      if (filterType !== "ALL" && rec.mediaType !== filterType) {
+        return false;
+      }
+
+      // 2. Author Filter (Alle / Nur Freunde / Meine Empfehlungen)
+      const isMine = rec.userId === myUserId || (myName && rec.userName === myName);
+      if (authorFilter === "MINE" && !isMine) return false;
+      if (authorFilter === "FRIENDS" && isMine) return false;
+
+      // 3. Genre / Tag Filter
+      if (selectedTag !== "ALL") {
+        const query = selectedTag.toLowerCase();
+        const hasTag = rec.tags.some((t) => t.toLowerCase().includes(query));
+        const inComment = rec.comment.toLowerCase().includes(query);
+        if (!hasTag && !inComment) return false;
+      }
+
+      return true;
+    });
+  }, [communityData.recommendations, filterType, authorFilter, selectedTag, myUserId, myName]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
@@ -104,15 +147,93 @@ export default function FeedPage() {
         </div>
       </div>
 
+      {/* Filter Bar: Author Switcher & Genre Tags */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
+        {/* Author Switcher (Alle vs Freunde vs Eigene) */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Ansicht:
+            </span>
+            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+              <button
+                onClick={() => setAuthorFilter("ALL")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  authorFilter === "ALL"
+                    ? "bg-slate-800 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Alle ({communityData.recommendations.length})
+              </button>
+
+              <button
+                onClick={() => setAuthorFilter("FRIENDS")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  authorFilter === "FRIENDS"
+                    ? "bg-rose-500 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>Von Freunden ({friendsRecCount})</span>
+              </button>
+
+              <button
+                onClick={() => setAuthorFilter("MINE")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  authorFilter === "MINE"
+                    ? "bg-amber-500 text-black shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Meine Empfehlungen ({myRecCount})</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="text-xs text-slate-400 font-medium">
+            {filteredRecommendations.length}{" "}
+            {filteredRecommendations.length === 1 ? "Empfehlung" : "Empfehlungen"} gefunden
+          </div>
+        </div>
+
+        {/* Genre & Tag Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-2 border-t border-slate-800/60">
+          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1 flex-shrink-0">
+            Genre / Typ:
+          </span>
+          {GENRE_TAGS.map((tag) => (
+            <button
+              key={tag.key}
+              onClick={() => setSelectedTag(tag.key)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+                selectedTag === tag.key
+                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold"
+                  : "bg-slate-950/60 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-slate-200"
+              }`}
+            >
+              {tag.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Feed List */}
-      {recommendations.length > 0 ? (
+      {filteredRecommendations.length > 0 ? (
         <div className="space-y-6">
-          {recommendations.map((rec) => {
+          {filteredRecommendations.map((rec) => {
             const isUpvoted = rec.upvoterIds.includes(myUserId);
+            const isMyOwn = rec.userId === myUserId || (myName && rec.userName === myName);
             return (
               <div
                 key={rec.id}
-                className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-lg flex flex-col sm:flex-row gap-5"
+                className={`p-5 sm:p-6 rounded-3xl border transition shadow-lg flex flex-col sm:flex-row gap-5 ${
+                  isMyOwn
+                    ? "bg-gradient-to-br from-slate-900/90 to-[#121828] border-amber-500/30"
+                    : "bg-slate-900/70 border-slate-800 hover:border-slate-700"
+                }`}
               >
                 {/* Poster Thumbnail */}
                 <div
@@ -150,12 +271,25 @@ export default function FeedPage() {
                     {/* User & Rating Header */}
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-black font-extrabold text-xs">
+                        <div
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow ${
+                            isMyOwn
+                              ? "bg-amber-400"
+                              : "bg-gradient-to-tr from-amber-500 to-rose-500"
+                          }`}
+                        >
                           {rec.userName.slice(0, 1)}
                         </div>
                         <div>
-                          <span className="text-sm font-bold text-white">{rec.userName}</span>
-                          <span className="text-[11px] text-slate-500 ml-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-bold text-white">{rec.userName}</span>
+                            {isMyOwn && (
+                              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/30">
+                                Du
+                              </span>
+                            )}
+                          </div>
+                          <span className="text-[11px] text-slate-500">
                             {new Date(rec.createdAt).toLocaleDateString("de-DE")}
                           </span>
                         </div>
@@ -167,7 +301,7 @@ export default function FeedPage() {
                       </div>
                     </div>
 
-                    {/* Movie Title */}
+                    {/* Movie/TV Title */}
                     <div
                       onClick={() =>
                         openMediaModal({
@@ -183,6 +317,9 @@ export default function FeedPage() {
                         {rec.title}
                         <span className="text-xs font-normal text-slate-400">
                           ({rec.releaseYear || "–"})
+                        </span>
+                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                          {rec.mediaType === "tv" ? "Serie" : "Film"}
                         </span>
                       </h3>
                     </div>
@@ -222,7 +359,7 @@ export default function FeedPage() {
                       className="flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 transition"
                     >
                       <Globe2 className="w-3.5 h-3.5" />
-                      <span>Wo streamen? (VPN prüfen)</span>
+                      <span>Wo streamen? (DE & VPN prüfen)</span>
                     </button>
 
                     <button
@@ -247,16 +384,18 @@ export default function FeedPage() {
         <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-slate-800 text-slate-400 space-y-4">
           <MessageSquare className="w-10 h-10 text-slate-600 mx-auto" />
           <div>
-            <h3 className="text-lg font-bold text-white">Noch keine Empfehlungen vorhanden</h3>
+            <h3 className="text-lg font-bold text-white">Keine Empfehlungen in dieser Ansicht</h3>
             <p className="text-xs text-slate-500 mt-1">
-              Suche nach deinem Lieblingsfilm und teile ihn mit deinen Freunden!
+              {authorFilter === "MINE"
+                ? "Du hast noch keine eigenen Empfehlungen verfasst. Klicke auf 'Titel empfehlen', um deinen Freunden einen Tipp zu geben!"
+                : "Keine Empfehlungen für die gewählten Filter gefunden."}
             </p>
           </div>
           <button
             onClick={openSearch}
             className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-xs"
           >
-            Film suchen & empfehlen
+            Titel suchen & empfehlen
           </button>
         </div>
       )}

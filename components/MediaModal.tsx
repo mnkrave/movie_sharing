@@ -479,17 +479,21 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                    Kategorien / Tags:
+                    Genre & Tags wählen:
                   </label>
                   <div className="flex flex-wrap gap-1.5">
                     {[
-                      "🔥 Absolutes Muss",
+                      "💥 Action",
+                      "😂 Comedy",
+                      "🩸 Horror",
+                      "🎭 Drama",
+                      "🚀 Sci-Fi",
+                      "😱 Thriller",
                       "🤯 Mindfuck",
+                      "🔥 Absolutes Muss",
+                      "🏆 Oscar-Meisterwerk",
                       "🍿 Popcorn-Kino",
                       "😭 Zieht Taschentücher",
-                      "😂 Tränen gelacht",
-                      "🏆 Oscar-Meisterwerk",
-                      "😱 Pure Spannung",
                     ].map((tag) => (
                       <button
                         key={tag}

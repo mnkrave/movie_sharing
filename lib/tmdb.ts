@@ -15,6 +15,7 @@ export interface MediaItem {
   voteAverage: number;
   voteCount?: number;
   rank?: number;
+  genreIds?: number[];
   oscarInfo?: OscarWinnerMeta;
 }
 
@@ -204,6 +205,7 @@ function mapRawItem(raw: any, forceMediaType?: "movie" | "tv", rank?: number): M
     voteAverage: typeof raw.vote_average === "number" ? Number(raw.vote_average.toFixed(1)) : 0,
     voteCount: raw.vote_count || 0,
     rank,
+    genreIds: raw.genre_ids || (raw.genres ? raw.genres.map((g: any) => g.id) : []),
     oscarInfo,
   };
 }
@@ -234,7 +236,7 @@ export async function getTopRatedTv(pages = 2): Promise<MediaItem[]> {
     const pagePromises = Array.from({ length: pages }, (_, i) =>
       tmdbFetch<{ results: any[] }>("/discover/tv", {
         sort_by: "vote_average.desc",
-        "vote_count.gte": "1000",
+        "vote_count.gte": "2500",
         "first_air_date.lte": today,
         page: String(i + 1),
       })
