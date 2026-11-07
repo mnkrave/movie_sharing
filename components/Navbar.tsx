@@ -33,8 +33,10 @@ export function Navbar() {
     (session?.user as any)?.role === "ADMIN";
 
   const navLinks = [
-    { href: "/", label: "Entdecken", icon: Film },
-    { href: "/oscars", label: "Oscar-Gewinner", icon: Award },
+    { href: "/", label: "Home", icon: Film },
+    { href: "/movies", label: "Top Filme", icon: Film },
+    { href: "/tv", label: "Top Serien", icon: Tv },
+    { href: "/oscars", label: "Oscars", icon: Award },
     { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
     { href: "/my-list", label: "Meine Liste", icon: Bookmark },
     { href: "/friends", label: "Freunde", icon: Users },

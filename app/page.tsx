@@ -125,12 +125,30 @@ export default async function HomePage() {
                 </p>
               </div>
             </div>
+            <Link
+              href="/movies"
+              className="flex items-center gap-1 text-xs font-bold text-sky-400 hover:text-sky-300 transition"
+            >
+              <span>Ganze Top 250 ansehen</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {topMovies.slice(0, 15).map((item) => (
               <MediaCard key={item.id} item={item} />
             ))}
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <Link
+              href="/movies"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 font-bold text-xs border border-slate-800 hover:border-sky-500/40 transition shadow-md"
+            >
+              <Film className="w-4 h-4" />
+              <span>Ganze Top 250 Liste entdecken</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Link>
           </div>
         </section>
 
@@ -150,12 +168,30 @@ export default async function HomePage() {
                 </p>
               </div>
             </div>
+            <Link
+              href="/tv"
+              className="flex items-center gap-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition"
+            >
+              <span>Alle Top-Serien ansehen</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
             {topTv.slice(0, 10).map((item) => (
               <MediaCard key={item.id} item={item} />
             ))}
+          </div>
+
+          <div className="flex justify-center pt-2">
+            <Link
+              href="/tv"
+              className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 font-bold text-xs border border-slate-800 hover:border-cyan-500/40 transition shadow-md"
+            >
+              <Tv className="w-4 h-4" />
+              <span>Alle Top-Serien entdecken</span>
+              <ArrowRight className="w-3.5 h-3.5 ml-1" />
+            </Link>
           </div>
         </section>
 
