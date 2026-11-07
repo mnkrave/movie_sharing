@@ -24,7 +24,6 @@ import {
   Layers,
   User,
   BarChart3,
-  SlidersHorizontal,
 } from "lucide-react";
 
 export function Navbar() {
@@ -56,13 +55,13 @@ export function Navbar() {
     pathname === "/movies" ||
     pathname === "/tv" ||
     pathname.startsWith("/collections") ||
-    pathname === "/oscars";
+    pathname === "/oscars" ||
+    pathname.startsWith("/recommendations");
 
   const mainNavLinks = [
     { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
     { href: "/my-list", label: "Meine Liste", icon: Bookmark },
     { href: "/friends", label: "Freunde", icon: Users },
-    { href: "/profile", label: "Mein Profil", icon: BarChart3 },
   ];
 
   if (isAdmin) {
@@ -71,10 +70,10 @@ export function Navbar() {
 
   const discoverItems = [
     {
-      href: "/search",
-      label: "Extended Search",
-      sub: "Multifilter für Regie, Cast & Land",
-      icon: SlidersHorizontal,
+      href: "/recommendations",
+      label: "Empfehlungen",
+      sub: "KI-Berater & Algorithmus-Matches",
+      icon: Sparkles,
       color: "text-amber-400 bg-amber-500/10",
     },
     {

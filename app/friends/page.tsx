@@ -101,7 +101,7 @@ export default function FriendsPage() {
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
               Erstelle feste Gruppen (z. B. „WG-Couch“, „Date Night“) und nutze sie im{" "}
-              <Link href="/profile" className="text-emerald-400 hover:underline font-semibold">
+              <Link href="/recommendations" className="text-emerald-400 hover:underline font-semibold">
                 KI-Filmberater
               </Link>{" "}
               mit Befehlen wie{" "}
@@ -252,7 +252,7 @@ export default function FriendsPage() {
                 </div>
 
                 <Link
-                  href={`/profile?tab=ai&prompt=${encodeURIComponent(
+                  href={`/recommendations?tab=ai&prompt=${encodeURIComponent(
                     `Heute will ich mit ${grp.name} einen Film schauen`
                   )}`}
                   className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition"
