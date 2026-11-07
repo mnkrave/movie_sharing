@@ -22,6 +22,8 @@ import {
   ChevronDown,
   Compass,
   Layers,
+  User,
+  BarChart3,
 } from "lucide-react";
 
 export function Navbar() {
@@ -59,6 +61,7 @@ export function Navbar() {
     { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
     { href: "/my-list", label: "Meine Liste", icon: Bookmark },
     { href: "/friends", label: "Freunde", icon: Users },
+    { href: "/profile", label: "Mein Profil", icon: BarChart3 },
   ];
 
   if (isAdmin) {
@@ -255,6 +258,14 @@ export function Navbar() {
                     <p className="font-bold text-white truncate">{session.user.name}</p>
                     <p className="text-slate-400 text-[11px] truncate">{session.user.email}</p>
                   </div>
+
+                  <Link
+                    href="/profile"
+                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                  >
+                    <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Mein Profil & Statistik</span>
+                  </Link>
 
                   <Link
                     href="/my-list"
