@@ -15,6 +15,7 @@ import type {
   RecommendedMediaItem,
   TasteSummary,
 } from "@/app/api/tmdb/recommendations/route";
+import { AiMovieAdvisor } from "@/components/AiMovieAdvisor";
 import {
   User,
   Star,
@@ -557,6 +558,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Stufe 2: KI-Filmberater & Gruppen-Matcher (Gemini Flash) */}
+      <AiMovieAdvisor />
 
       {/* Empty State if user hasn't marked anything watched yet */}
       {watchedItems.length === 0 ? (

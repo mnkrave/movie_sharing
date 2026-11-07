@@ -9,6 +9,34 @@ import { QuickRatingModal, RatingTarget } from "./QuickRatingModal";
 import { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
+export interface FriendGroup {
+  id: string;
+  name: string;
+  emoji: string;
+  memberNames: string[];
+}
+
+const DEFAULT_FRIEND_GROUPS: FriendGroup[] = [
+  {
+    id: "grp_wg_couch",
+    name: "WG-Couch",
+    emoji: "🛋️",
+    memberNames: ["Lukas", "Max", "Sarah"],
+  },
+  {
+    id: "grp_kino_nerds",
+    name: "Kino-Nerds",
+    emoji: "🍿",
+    memberNames: ["Lukas", "Max"],
+  },
+  {
+    id: "grp_date_night",
+    name: "Date Night",
+    emoji: "✨",
+    memberNames: ["Lukas", "Sarah"],
+  },
+];
+
 interface MediaContextType {
   openMediaModal: (item: {
     id: number;
@@ -27,6 +55,9 @@ interface MediaContextType {
   setOnlyMySubs: (val: boolean) => void;
   toggleOnlyMySubs: () => void;
   openRatingModal: (target: RatingTarget) => void;
+  friendGroups: FriendGroup[];
+  addFriendGroup: (name: string, emoji: string, memberNames: string[]) => void;
+  deleteFriendGroup: (id: string) => void;
   communityData: {
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -72,6 +103,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
   const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
+  const [friendGroups, setFriendGroupsState] = useState<FriendGroup[]>(DEFAULT_FRIEND_GROUPS);
   const [communityData, setCommunityData] = useState<{
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -82,7 +114,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     friends: [],
   });
 
-  // Load subscriptions & onlyMySubs filter from localStorage on start
+  // Load subscriptions, onlyMySubs & friendGroups from localStorage on start
   useEffect(() => {
     try {
       const saved = localStorage.getItem("cinecircle_subs");
@@ -93,10 +125,44 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       if (savedFilter !== null) {
         setOnlyMySubsState(savedFilter === "true");
       }
+      const savedGroups = localStorage.getItem("cinecircle_friend_groups");
+      if (savedGroups) {
+        const parsed = JSON.parse(savedGroups);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setFriendGroupsState(parsed);
+        }
+      }
     } catch {
       // ignore
     }
   }, []);
+
+  const addFriendGroup = (name: string, emoji: string, memberNames: string[]) => {
+    if (!name.trim() || memberNames.length === 0) return;
+    const newGroup: FriendGroup = {
+      id: `grp_${Date.now()}`,
+      name: name.trim(),
+      emoji: emoji || "🍿",
+      memberNames,
+    };
+    const updated = [...friendGroups, newGroup];
+    setFriendGroupsState(updated);
+    try {
+      localStorage.setItem("cinecircle_friend_groups", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const deleteFriendGroup = (id: string) => {
+    const updated = friendGroups.filter((g) => g.id !== id);
+    setFriendGroupsState(updated);
+    try {
+      localStorage.setItem("cinecircle_friend_groups", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
 
   const setOnlyMySubs = (val: boolean) => {
     setOnlyMySubsState(val);
@@ -248,6 +314,9 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         setOnlyMySubs,
         toggleOnlyMySubs,
         openRatingModal: (target) => setRatingTarget(target),
+        friendGroups,
+        addFriendGroup,
+        deleteFriendGroup,
         communityData,
         refreshCommunity,
         updateMediaStatus,
