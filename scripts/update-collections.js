@@ -190,31 +190,36 @@ async function main() {
     { id: 429617, type: "movie", subGroup: "Phase 3" },
 
     // Phase 4
-    { id: 85271, type: "tv", subGroup: "Phase 4" },
-    { id: 88396, type: "tv", subGroup: "Phase 4" },
-    { id: 84958, type: "tv", subGroup: "Phase 4" },
-    { id: 497698, type: "movie", subGroup: "Phase 4" },
-    { id: 91363, type: "tv", subGroup: "Phase 4" },
-    { id: 566525, type: "movie", subGroup: "Phase 4" },
-    { id: 524434, type: "movie", subGroup: "Phase 4" },
-    { id: 88329, type: "tv", subGroup: "Phase 4" },
-    { id: 634649, type: "movie", subGroup: "Phase 4" },
-    { id: 92749, type: "tv", subGroup: "Phase 4" },
-    { id: 453395, type: "movie", subGroup: "Phase 4" },
-    { id: 92782, type: "tv", subGroup: "Phase 4" },
-    { id: 616037, type: "movie", subGroup: "Phase 4" },
-    { id: 92783, type: "tv", subGroup: "Phase 4" },
-    { id: 1013860, type: "movie", subGroup: "Phase 4" },
-    { id: 505642, type: "movie", subGroup: "Phase 4" },
+    { id: 85271, type: "tv", subGroup: "Phase 4" }, // WandaVision
+    { id: 88396, type: "tv", subGroup: "Phase 4" }, // The Falcon and the Winter Soldier
+    { id: 84958, type: "tv", subGroup: "Phase 4" }, // Loki
+    { id: 497698, type: "movie", subGroup: "Phase 4" }, // Black Widow
+    { id: 91363, type: "tv", subGroup: "Phase 4" }, // What If...?
+    { id: 566525, type: "movie", subGroup: "Phase 4" }, // Shang-Chi and the Legend of the Ten Rings
+    { id: 524434, type: "movie", subGroup: "Phase 4" }, // Eternals
+    { id: 88329, type: "tv", subGroup: "Phase 4" }, // Hawkeye
+    { id: 634649, type: "movie", subGroup: "Phase 4" }, // Spider-Man: No Way Home
+    { id: 92749, type: "tv", subGroup: "Phase 4" }, // Moon Knight
+    { id: 453395, type: "movie", subGroup: "Phase 4" }, // Doctor Strange in the Multiverse of Madness
+    { id: 92782, type: "tv", subGroup: "Phase 4" }, // Ms. Marvel
+    { id: 616037, type: "movie", subGroup: "Phase 4" }, // Thor: Love and Thunder
+    { id: 92783, type: "tv", subGroup: "Phase 4" }, // She-Hulk: Die Anwältin
+    { id: 894205, type: "movie", subGroup: "Phase 4" }, // Werewolf by Night
+    { id: 505642, type: "movie", subGroup: "Phase 4" }, // Black Panther: Wakanda Forever
+    { id: 774752, type: "movie", subGroup: "Phase 4" }, // The Guardians of the Galaxy Holiday Special
 
     // Phase 5
-    { id: 640146, type: "movie", subGroup: "Phase 5" },
-    { id: 447365, type: "movie", subGroup: "Phase 5" },
-    { id: 114479, type: "tv", subGroup: "Phase 5" },
-    { id: 609681, type: "movie", subGroup: "Phase 5" },
-    { id: 138502, type: "tv", subGroup: "Phase 5" },
-    { id: 533535, type: "movie", subGroup: "Phase 5" },
-    { id: 138501, type: "tv", subGroup: "Phase 5" }
+    { id: 640146, type: "movie", subGroup: "Phase 5" }, // Ant-Man and the Wasp: Quantumania
+    { id: 447365, type: "movie", subGroup: "Phase 5" }, // Guardians of the Galaxy Vol. 3
+    { id: 114472, type: "tv", subGroup: "Phase 5" }, // Secret Invasion
+    { id: 609681, type: "movie", subGroup: "Phase 5" }, // The Marvels
+    { id: 122226, type: "tv", subGroup: "Phase 5" }, // Echo
+    { id: 533535, type: "movie", subGroup: "Phase 5" }, // Deadpool & Wolverine
+    { id: 138501, type: "tv", subGroup: "Phase 5" }, // Agatha All Along
+    { id: 822119, type: "movie", subGroup: "Phase 5" }, // Captain America: Brave New World
+    { id: 202555, type: "tv", subGroup: "Phase 5" }, // Daredevil: Born Again
+    { id: 986056, type: "movie", subGroup: "Phase 5" }, // Thunderbolts*
+    { id: 114471, type: "tv", subGroup: "Phase 5" } // Ironheart
   ];
 
   const mcuMovies = [];
