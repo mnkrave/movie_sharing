@@ -413,6 +413,181 @@ export async function searchMultiMedia(query: string): Promise<MediaItem[]> {
   }
 }
 
+export interface DiscoverFilters {
+  mediaType?: "all" | "movie" | "tv";
+  genreId?: number | null;
+  director?: string | null;
+  actor?: string | null;
+  country?: string | null;
+  minRating?: number | null;
+  era?: string | null;
+  sortBy?: "popularity.desc" | "vote_average.desc" | "primary_release_date.desc";
+  query?: string | null;
+}
+
+export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem[]> {
+  const mediaType = filters.mediaType || "all";
+  const sortBy = filters.sortBy || "popularity.desc";
+
+  // If title/keyword text query is provided, use search and apply extra filters
+  if (filters.query?.trim()) {
+    const rawSearchResults = await searchMultiMedia(filters.query.trim());
+    return rawSearchResults.filter((item) => {
+      if (mediaType !== "all" && item.mediaType !== mediaType) return false;
+      if (filters.genreId && item.genreIds && !item.genreIds.includes(filters.genreId))
+        return false;
+      if (filters.minRating && item.voteAverage < filters.minRating) return false;
+      if (filters.era) {
+        const year = parseInt(item.releaseYear, 10);
+        if (year) {
+          if (filters.era === "new" && (year < 2024 || year > 2026)) return false;
+          if (filters.era === "2020s" && (year < 2020 || year > 2029)) return false;
+          if (filters.era === "2010s" && (year < 2010 || year > 2019)) return false;
+          if (filters.era === "2000s" && (year < 2000 || year > 2009)) return false;
+          if (filters.era === "1990s" && (year < 1990 || year > 1999)) return false;
+          if (filters.era === "classics" && year > 1989) return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  // Resolve person IDs if director or actor provided
+  let directorId: number | null = null;
+  if (filters.director?.trim()) {
+    try {
+      const pData = await tmdbFetch<{ results: any[] }>("/search/person", {
+        query: filters.director.trim(),
+      });
+      if (pData.results && pData.results.length > 0) {
+        directorId = pData.results[0].id;
+      }
+    } catch {}
+  }
+
+  let actorId: number | null = null;
+  if (filters.actor?.trim()) {
+    try {
+      const pData = await tmdbFetch<{ results: any[] }>("/search/person", {
+        query: filters.actor.trim(),
+      });
+      if (pData.results && pData.results.length > 0) {
+        actorId = pData.results[0].id;
+      }
+    } catch {}
+  }
+
+  const MOVIE_TO_TV_GENRE: Record<number, number> = {
+    28: 10759, // Action -> Action & Adventure
+    12: 10759, // Abenteuer -> Action & Adventure
+    878: 10765, // Sci-Fi -> Sci-Fi & Fantasy
+    14: 10765, // Fantasy -> Sci-Fi & Fantasy
+    35: 35,
+    80: 80,
+    18: 18,
+    16: 16,
+    99: 99,
+    9648: 9648,
+    10751: 10751,
+    10752: 10768,
+    36: 10768,
+    37: 37,
+  };
+
+  const buildParams = (type: "movie" | "tv"): Record<string, string> => {
+    const p: Record<string, string> = {
+      sort_by:
+        sortBy === "primary_release_date.desc" && type === "tv"
+          ? "first_air_date.desc"
+          : sortBy,
+    };
+
+    if (filters.genreId) {
+      const gId = type === "tv" ? (MOVIE_TO_TV_GENRE[filters.genreId] || filters.genreId) : filters.genreId;
+      p["with_genres"] = String(gId);
+    }
+    if (directorId) {
+      if (type === "movie") p["with_crew"] = String(directorId);
+      else p["with_people"] = String(directorId);
+    }
+    if (actorId) {
+      if (type === "movie") p["with_cast"] = String(actorId);
+      else p["with_people"] = String(actorId);
+    }
+    if (filters.country && filters.country !== "ALL") {
+      p["with_origin_country"] = filters.country;
+    }
+    if (filters.minRating && filters.minRating > 0) {
+      p["vote_average.gte"] = String(filters.minRating);
+      p["vote_count.gte"] = filters.minRating >= 8 ? "100" : "30";
+    }
+
+    if (filters.era) {
+      const isMovie = type === "movie";
+      const startKey = isMovie ? "primary_release_date.gte" : "first_air_date.gte";
+      const endKey = isMovie ? "primary_release_date.lte" : "first_air_date.lte";
+
+      if (filters.era === "new") {
+        p[startKey] = "2024-01-01";
+        p[endKey] = "2026-12-31";
+      } else if (filters.era === "2020s") {
+        p[startKey] = "2020-01-01";
+        p[endKey] = "2029-12-31";
+      } else if (filters.era === "2010s") {
+        p[startKey] = "2010-01-01";
+        p[endKey] = "2019-12-31";
+      } else if (filters.era === "2000s") {
+        p[startKey] = "2000-01-01";
+        p[endKey] = "2009-12-31";
+      } else if (filters.era === "1990s") {
+        p[startKey] = "1990-01-01";
+        p[endKey] = "1999-12-31";
+      } else if (filters.era === "classics") {
+        p[endKey] = "1989-12-31";
+      }
+    }
+
+    return p;
+  };
+
+  try {
+    let items: MediaItem[] = [];
+
+    if (mediaType === "movie") {
+      const res = await tmdbFetch<{ results: any[] }>("/discover/movie", buildParams("movie"));
+      items = (res.results || []).map((r) => mapRawItem(r, "movie"));
+    } else if (mediaType === "tv") {
+      const res = await tmdbFetch<{ results: any[] }>("/discover/tv", buildParams("tv"));
+      items = (res.results || []).map((r) => mapRawItem(r, "tv"));
+    } else {
+      const [mRes, tRes] = await Promise.all([
+        tmdbFetch<{ results: any[] }>("/discover/movie", buildParams("movie")),
+        actorId || directorId
+          ? Promise.resolve({ results: [] })
+          : tmdbFetch<{ results: any[] }>("/discover/tv", buildParams("tv")),
+      ]);
+      const movieItems = (mRes.results || []).map((r) => mapRawItem(r, "movie"));
+      const tvItems = (tRes.results || []).map((r) => mapRawItem(r, "tv"));
+      const combined = [...movieItems, ...tvItems];
+
+      if (sortBy === "vote_average.desc") {
+        items = combined.sort((a, b) => b.voteAverage - a.voteAverage);
+      } else if (sortBy === "primary_release_date.desc") {
+        items = combined.sort(
+          (a, b) => (parseInt(b.releaseYear, 10) || 0) - (parseInt(a.releaseYear, 10) || 0)
+        );
+      } else {
+        items = combined;
+      }
+    }
+
+    return items.slice(0, 36);
+  } catch (err) {
+    console.error("Error discovering media:", err);
+    return [];
+  }
+}
+
 export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Promise<MediaDetails> {
   const data = await tmdbFetch<any>(`/${mediaType}/${id}`, {
     append_to_response: "credits,videos,watch/providers,external_ids,similar",

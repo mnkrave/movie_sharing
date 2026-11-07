@@ -27,7 +27,7 @@ interface MediaContextType {
     genreIds?: number[];
   }) => void;
   closeMediaModal: () => void;
-  openSearch: () => void;
+  openSearch: (mode?: "quick" | "extended" | any) => void;
   closeSearch: () => void;
   openSubscriptions: () => void;
   userSubscriptions: string[];
@@ -80,6 +80,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     genreIds?: number[];
   } | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchInitialMode, setSearchInitialMode] = useState<"quick" | "extended">("quick");
   const [isSubsOpen, setIsSubsOpen] = useState(false);
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
@@ -348,7 +349,10 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       value={{
         openMediaModal: (item) => setSelectedMedia(item),
         closeMediaModal: () => setSelectedMedia(null),
-        openSearch: () => setIsSearchOpen(true),
+        openSearch: (mode?: "quick" | "extended" | any) => {
+          if (mode === "quick" || mode === "extended") setSearchInitialMode(mode);
+          setIsSearchOpen(true);
+        },
         closeSearch: () => setIsSearchOpen(false),
         openSubscriptions: () => setIsSubsOpen(true),
         userSubscriptions,
@@ -380,6 +384,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}
         onSelectMedia={(item) => setSelectedMedia(item)}
+        initialMode={searchInitialMode}
       />
 
       <SubscriptionModal
