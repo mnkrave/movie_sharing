@@ -49,6 +49,26 @@ export interface GlobalProviderVpnMatch {
   }[];
 }
 
+export interface MediaCollectionPart {
+  id: number;
+  mediaType: "movie";
+  title: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  releaseYear: string;
+  voteAverage: number;
+  overview?: string;
+}
+
+export interface MediaCollectionInfo {
+  id: number;
+  name: string;
+  overview?: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  parts: MediaCollectionPart[];
+}
+
 export interface MediaDetails extends MediaItem {
   runtime?: number;
   numberOfSeasons?: number;
@@ -68,6 +88,7 @@ export interface MediaDetails extends MediaItem {
   vpnProviders: GlobalProviderVpnMatch[];
   allCountriesFlatrate: CountryWatchData[];
   similar: MediaItem[];
+  collection?: MediaCollectionInfo | null;
 }
 
 export const COUNTRY_META: Record<string, { name: string; flag: string; priority: number }> = {
@@ -531,6 +552,44 @@ export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Pr
 
   const baseItem = mapRawItem(data, mediaType);
 
+  // Fetch franchise collection parts if this movie belongs to a film series
+  let collection: MediaCollectionInfo | null = null;
+  if (mediaType === "movie" && data.belongs_to_collection?.id) {
+    try {
+      const colData = await tmdbFetch<any>(`/collection/${data.belongs_to_collection.id}`);
+      if (colData && Array.isArray(colData.parts)) {
+        const sortedParts: MediaCollectionPart[] = colData.parts
+          .map((p: any) => ({
+            id: p.id,
+            mediaType: "movie" as const,
+            title: p.title || p.name || "",
+            posterPath: p.poster_path || null,
+            backdropPath: p.backdrop_path || null,
+            releaseYear: (p.release_date || "").slice(0, 4),
+            voteAverage:
+              typeof p.vote_average === "number" ? Math.round(p.vote_average * 10) / 10 : 0,
+            overview: p.overview || "",
+          }))
+          .sort((a: MediaCollectionPart, b: MediaCollectionPart) => {
+            const yA = parseInt(a.releaseYear, 10) || 9999;
+            const yB = parseInt(b.releaseYear, 10) || 9999;
+            return yA - yB;
+          });
+
+        collection = {
+          id: colData.id,
+          name: colData.name || data.belongs_to_collection.name,
+          overview: colData.overview || "",
+          posterPath: colData.poster_path || data.belongs_to_collection.poster_path || null,
+          backdropPath: colData.backdrop_path || data.belongs_to_collection.backdrop_path || null,
+          parts: sortedParts,
+        };
+      }
+    } catch (colErr) {
+      console.error("Error fetching collection details:", colErr);
+    }
+  }
+
   return {
     ...baseItem,
     overview: overview || baseItem.overview,
@@ -547,5 +606,6 @@ export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Pr
     vpnProviders,
     allCountriesFlatrate,
     similar: (data.similar?.results || []).slice(0, 8).map((s: any) => mapRawItem(s, mediaType)),
+    collection,
   };
 }

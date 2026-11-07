@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { COLLECTIONS_DATA } from "@/lib/collections";
 import {
   MediaDetails,
   CountryWatchData,
@@ -30,6 +32,7 @@ import {
   ExternalLink,
   ChevronRight,
   Filter,
+  Layers,
 } from "lucide-react";
 
 interface MediaModalProps {
@@ -46,6 +49,8 @@ interface MediaModalProps {
 export function MediaModal({ media, onClose }: MediaModalProps) {
   const { data: session } = useSession();
   const {
+    openMediaModal,
+    closeMediaModal,
     communityData,
     updateMediaStatus,
     submitRecommendation,
@@ -56,6 +61,10 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     setOnlyMySubs,
     toggleOnlyMySubs,
   } = useMedia();
+
+  const curatedCollection = useMemo(() => {
+    return COLLECTIONS_DATA.find((col) => col.movies.some((m) => m.id === media.id));
+  }, [media.id]);
 
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
@@ -432,6 +441,21 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                           : `${allRecs.length}x empfohlen`}
                       </span>
                     </div>
+                  )}
+
+                  {/* Franchise / Filmreihe Quick Jump Badge */}
+                  {details?.collection && details.collection.parts.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const el = document.getElementById("franchise-collection");
+                        if (el) el.scrollIntoView({ behavior: "smooth" });
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-amber-500/20 via-rose-500/15 to-purple-500/20 border border-amber-500/35 text-amber-300 text-xs font-bold hover:scale-105 transition cursor-pointer shadow-sm group/hint"
+                    >
+                      <Layers className="w-3.5 h-3.5 text-amber-400 group-hover/hint:rotate-12 transition-transform" />
+                      <span>Filmreihe: {details.collection.name} ({details.collection.parts.length} Teile) ↓</span>
+                    </button>
                   )}
                 </div>
               </div>
@@ -1268,6 +1292,150 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                       </span>
                     ))}
                   </div>
+                </div>
+              )}
+
+              {/* Franchise & Sequel Collection */}
+              {details?.collection && details.collection.parts.length > 1 && (
+                <div id="franchise-collection" className="border-t border-slate-800 pt-6 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-amber-400 mb-1">
+                        <Layers className="w-3.5 h-3.5" />
+                        <span>Filmreihe & Fortsetzungen</span>
+                      </div>
+                      <h4 className="text-lg sm:text-xl font-black text-white">
+                        {details.collection.name}
+                      </h4>
+                      {details.collection.overview && (
+                        <p className="text-xs text-slate-400 max-w-2xl mt-1 leading-relaxed">
+                          {details.collection.overview}
+                        </p>
+                      )}
+                    </div>
+                    <span className="self-start sm:self-auto px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300">
+                      {details.collection.parts.length} Teile chronologisch
+                    </span>
+                  </div>
+
+                  {/* Grid of Parts in this franchise */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3.5 pt-1">
+                    {details.collection.parts.map((part, index) => {
+                      const isCurrent = part.id === media.id;
+                      const partStatus = communityData.mediaStatuses.find(
+                        (m) => m.tmdbId === part.id && m.mediaType === "movie"
+                      );
+                      const isWatched = partStatus?.status === "WATCHED";
+
+                      return (
+                        <div
+                          key={part.id}
+                          onClick={() => {
+                            if (!isCurrent) {
+                              openMediaModal({
+                                id: part.id,
+                                mediaType: "movie",
+                                title: part.title,
+                                posterPath: part.posterPath,
+                              });
+                            }
+                          }}
+                          className={`group/part relative rounded-2xl overflow-hidden bg-slate-900/90 border transition-all duration-300 flex flex-col ${
+                            isCurrent
+                              ? "border-amber-500 ring-2 ring-amber-500/40 shadow-xl shadow-amber-500/10 cursor-default"
+                              : "border-slate-800 hover:border-amber-500/50 hover:-translate-y-1 cursor-pointer shadow-lg hover:shadow-2xl"
+                          }`}
+                        >
+                          {/* Poster */}
+                          <div className="relative aspect-[2/3] w-full bg-slate-950">
+                            {part.posterPath ? (
+                              <Image
+                                src={`https://image.tmdb.org/t/p/w342${part.posterPath}`}
+                                alt={part.title}
+                                fill
+                                sizes="200px"
+                                className="object-cover group-hover/part:scale-105 transition duration-500 ease-out"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-slate-600">
+                                <Film className="w-8 h-8" />
+                              </div>
+                            )}
+
+                            {/* Part # Badge */}
+                            <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-amber-400 font-black text-xs border border-white/10 shadow">
+                              Teil {index + 1}
+                            </div>
+
+                            {/* Current Film Badge */}
+                            {isCurrent && (
+                              <div className="absolute bottom-2 left-2 right-2 px-2 py-1 rounded-lg bg-amber-500 text-black font-black text-[11px] text-center shadow-lg">
+                                Gerade geöffnet
+                              </div>
+                            )}
+
+                            {/* Watched Badge */}
+                            {!isCurrent && isWatched && (
+                              <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-emerald-500 text-black font-bold text-[10px] shadow flex items-center gap-0.5">
+                                <Check className="w-3 h-3 stroke-[3]" />
+                                <span>Gesehen</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Meta Info */}
+                          <div className="p-3 flex-1 flex flex-col justify-between space-y-1">
+                            <h5
+                              className={`text-xs font-bold line-clamp-2 leading-snug ${
+                                isCurrent
+                                  ? "text-amber-400"
+                                  : "text-white group-hover/part:text-amber-300 transition"
+                              }`}
+                            >
+                              {part.title}
+                            </h5>
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                              <span>{part.releaseYear || "–"}</span>
+                              {part.voteAverage > 0 && (
+                                <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                                  <Star className="w-3 h-3 fill-amber-400" />
+                                  {part.voteAverage.toFixed(1)}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Link to Curated Collection if part of MCU, Star Wars, Harry Potter, etc. */}
+              {curatedCollection && (
+                <div className="border-t border-slate-800 pt-5">
+                  <Link
+                    href={`/collections/${curatedCollection.id}`}
+                    onClick={() => onClose()}
+                    className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-purple-500/10 border border-amber-500/30 flex items-center justify-between hover:border-amber-400 transition group shadow-md"
+                  >
+                    <div className="flex items-center gap-3.5">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center text-xl flex-shrink-0">
+                        🎬
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                          CineCircle Universum & Sammlung
+                        </div>
+                        <div className="text-sm font-black text-white group-hover:text-amber-300 transition">
+                          {curatedCollection.name} ({curatedCollection.movies.length} Titel)
+                        </div>
+                      </div>
+                    </div>
+                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1 group-hover:translate-x-1 transition">
+                      Ganze Reihe ansehen <ChevronRight className="w-4 h-4" />
+                    </span>
+                  </Link>
                 </div>
               )}
             </div>
