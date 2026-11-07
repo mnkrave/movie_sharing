@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { MediaItem } from "@/lib/tmdb";
+import { MediaItem, formatGermanReleaseDate } from "@/lib/tmdb";
 import {
   Search,
   X,
@@ -419,12 +419,25 @@ export function SearchModal({
                             </>
                           )}
                         </span>
-                        {item.releaseYear && <span>{item.releaseYear}</span>}
-                        {item.voteAverage > 0 && (
-                          <span className="flex items-center gap-1 text-amber-400 font-semibold">
-                            <Star className="w-3 h-3 fill-amber-400" />
-                            {item.voteAverage}
+                        {item.isUpcoming ? (
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-amber-300 bg-amber-500/15 px-1.5 py-0.5 rounded border border-amber-500/30">
+                            <Sparkles className="w-2.5 h-2.5 text-amber-400" />
+                            <span>
+                              {item.releaseDate
+                                ? `Erscheint: ${formatGermanReleaseDate(item.releaseDate)}`
+                                : "Upcoming"}
+                            </span>
                           </span>
+                        ) : (
+                          <>
+                            {item.releaseYear && <span>{item.releaseYear}</span>}
+                            {item.voteAverage > 0 && (
+                              <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                                <Star className="w-3 h-3 fill-amber-400" />
+                                {item.voteAverage}
+                              </span>
+                            )}
+                          </>
                         )}
                       </div>
                     </div>
@@ -893,12 +906,17 @@ export function SearchModal({
                           )}
                         </div>
 
-                        {item.voteAverage > 0 && (
+                        {item.isUpcoming ? (
+                          <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-gradient-to-r from-amber-500 to-orange-500 text-[10px] font-black text-slate-950 shadow flex items-center gap-0.5">
+                            <Sparkles className="w-2.5 h-2.5 fill-slate-950" />
+                            <span>Upcoming</span>
+                          </div>
+                        ) : item.voteAverage > 0 ? (
                           <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded bg-black/80 backdrop-blur-md text-[11px] font-bold text-amber-400 border border-amber-500/30 flex items-center gap-0.5">
                             <Star className="w-3 h-3 fill-amber-400" />
                             <span>{item.voteAverage.toFixed(1)}</span>
                           </div>
-                        )}
+                        ) : null}
                       </div>
 
                       <div className="p-2.5 flex-1 flex flex-col justify-between">
@@ -908,7 +926,13 @@ export function SearchModal({
                           </h4>
                         </div>
                         <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
-                          <span>{item.releaseYear || "—"}</span>
+                          <span className={item.isUpcoming ? "text-amber-300 font-semibold text-[10px]" : ""}>
+                            {item.isUpcoming
+                              ? item.releaseDate
+                                ? `Start: ${formatGermanReleaseDate(item.releaseDate)}`
+                                : "Upcoming"
+                              : item.releaseYear || "—"}
+                          </span>
                           <span className="text-amber-400/80 font-medium group-hover:translate-x-0.5 transition">
                             Details →
                           </span>

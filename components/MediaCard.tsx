@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { MediaItem } from "@/lib/tmdb";
+import { MediaItem, formatGermanReleaseDate } from "@/lib/tmdb";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -135,13 +135,18 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             )}
           </div>
 
-          {/* TMDB / IMDb Rating */}
-          {item.voteAverage > 0 && (
+          {/* TMDB / IMDb Rating or Upcoming Badge */}
+          {item.isUpcoming ? (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 font-black text-[10px] shadow-lg">
+              <Sparkles className="w-3 h-3 fill-slate-950" />
+              <span>{item.releaseDate ? formatGermanReleaseDate(item.releaseDate) : "Upcoming"}</span>
+            </span>
+          ) : item.voteAverage > 0 ? (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md text-amber-400 font-extrabold text-xs border border-white/10 shadow">
               <Star className="w-3 h-3 fill-amber-400" />
               <span>{item.voteAverage}</span>
             </span>
-          )}
+          ) : null}
         </div>
 
         {/* Friend Badges on bottom of poster */}
@@ -229,7 +234,13 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           {item.title}
         </h3>
         <div className="flex items-center justify-between mt-0.5 text-xs text-slate-400">
-          <span>{item.releaseYear || "–"}</span>
+          <span className={item.isUpcoming ? "text-amber-300 font-semibold text-[11px]" : ""}>
+            {item.isUpcoming
+              ? item.releaseDate
+                ? `Kinostart ${item.releaseDate.slice(0, 4)}`
+                : "Upcoming"
+              : item.releaseYear || "–"}
+          </span>
           <span className="uppercase text-[10px] tracking-wider text-slate-500 font-mono">
             {item.mediaType === "tv" ? "Serie" : "Film"}
           </span>

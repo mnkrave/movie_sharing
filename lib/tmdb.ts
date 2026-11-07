@@ -12,6 +12,9 @@ export interface MediaItem {
   posterPath: string | null;
   backdropPath: string | null;
   releaseYear: string;
+  releaseDate?: string;
+  isUpcoming?: boolean;
+  status?: string;
   voteAverage: number;
   voteCount?: number;
   rank?: number;
@@ -56,8 +59,33 @@ export interface MediaCollectionPart {
   posterPath: string | null;
   backdropPath: string | null;
   releaseYear: string;
+  releaseDate?: string;
+  isUpcoming?: boolean;
   voteAverage: number;
   overview?: string;
+}
+
+export function formatGermanReleaseDate(dateStr?: string | null): string {
+  if (!dateStr) return "";
+  try {
+    const parts = dateStr.trim().split("-");
+    if (parts.length === 3) {
+      const year = parseInt(parts[0], 10);
+      const month = parseInt(parts[1], 10) - 1;
+      const day = parseInt(parts[2], 10);
+      const d = new Date(year, month, day);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("de-DE", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        });
+      }
+    } else if (parts.length === 1 && parts[0].length === 4) {
+      return parts[0];
+    }
+  } catch {}
+  return dateStr;
 }
 
 export interface MediaCollectionInfo {
@@ -308,9 +336,16 @@ function mapRawItem(raw: any, forceMediaType?: "movie" | "tv", rank?: number): M
     forceMediaType || (raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie");
   const title = raw.title || raw.name || "Unbekannter Titel";
   const originalTitle = raw.original_title || raw.original_name;
-  const dateStr = raw.release_date || raw.first_air_date || "";
+  const dateStr = (raw.release_date || raw.first_air_date || "").trim();
   const releaseYear = dateStr ? dateStr.slice(0, 4) : "";
   const oscarInfo = mediaType === "movie" ? getOscarInfo(raw.id) : undefined;
+
+  const rawStatus = (raw.status || "").toLowerCase();
+  const today = new Date().toISOString().slice(0, 10);
+  const isStatusUpcoming = ["post production", "in production", "planned", "rumored", "pilot"].includes(rawStatus);
+  const isFutureDate = Boolean(dateStr && dateStr > today);
+  const isNoDateUpcoming = !dateStr && (raw.vote_count === 0 || raw.vote_count === undefined) && rawStatus !== "released" && rawStatus !== "ended" && rawStatus !== "canceled";
+  const isUpcoming = Boolean(isStatusUpcoming || isFutureDate || (raw.is_upcoming ?? false) || isNoDateUpcoming);
 
   return {
     id: raw.id,
@@ -321,6 +356,9 @@ function mapRawItem(raw: any, forceMediaType?: "movie" | "tv", rank?: number): M
     posterPath: raw.poster_path || null,
     backdropPath: raw.backdrop_path || null,
     releaseYear,
+    releaseDate: dateStr || undefined,
+    isUpcoming,
+    status: raw.status || undefined,
     voteAverage: typeof raw.vote_average === "number" ? Number(raw.vote_average.toFixed(1)) : 0,
     voteCount: raw.vote_count || 0,
     rank,
@@ -733,18 +771,29 @@ export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Pr
     try {
       const colData = await tmdbFetch<any>(`/collection/${data.belongs_to_collection.id}`);
       if (colData && Array.isArray(colData.parts)) {
+        const today = new Date().toISOString().slice(0, 10);
         const sortedParts: MediaCollectionPart[] = colData.parts
-          .map((p: any) => ({
-            id: p.id,
-            mediaType: "movie" as const,
-            title: p.title || p.name || "",
-            posterPath: p.poster_path || null,
-            backdropPath: p.backdrop_path || null,
-            releaseYear: (p.release_date || "").slice(0, 4),
-            voteAverage:
-              typeof p.vote_average === "number" ? Math.round(p.vote_average * 10) / 10 : 0,
-            overview: p.overview || "",
-          }))
+          .map((p: any) => {
+            const partDate = (p.release_date || "").trim();
+            const partYear = partDate ? partDate.slice(0, 4) : "";
+            const isPartFuture = Boolean(partDate && partDate > today);
+            const isPartNoDate = !partDate && (p.vote_count === 0 || !p.vote_count);
+            const isPartUpcoming = isPartFuture || isPartNoDate;
+
+            return {
+              id: p.id,
+              mediaType: "movie" as const,
+              title: p.title || p.name || "",
+              posterPath: p.poster_path || null,
+              backdropPath: p.backdrop_path || null,
+              releaseYear: partYear,
+              releaseDate: partDate || undefined,
+              isUpcoming: isPartUpcoming,
+              voteAverage:
+                typeof p.vote_average === "number" ? Math.round(p.vote_average * 10) / 10 : 0,
+              overview: p.overview || "",
+            };
+          })
           .sort((a: MediaCollectionPart, b: MediaCollectionPart) => {
             const yA = parseInt(a.releaseYear, 10) || 9999;
             const yB = parseInt(b.releaseYear, 10) || 9999;
