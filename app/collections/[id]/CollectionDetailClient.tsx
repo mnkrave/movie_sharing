@@ -18,6 +18,8 @@ import {
   Calendar,
   Layers,
   Clock,
+  Tv,
+  Filter,
 } from "lucide-react";
 
 interface CollectionDetailClientProps {
@@ -29,6 +31,8 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
   const { communityData, updateMediaStatus, openMediaModal, openRatingModal } = useMedia();
 
   const [filterMode, setFilterMode] = useState<"all" | "unwatched" | "watched">("all");
+  const [selectedSubGroup, setSelectedSubGroup] = useState<string>("ALL");
+  const [mediaTypeFilter, setMediaTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
   const [sortBy, setSortBy] = useState<"year_asc" | "rating_desc">("year_asc");
 
   // Map of watched movies by current user
@@ -63,6 +67,25 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     return set;
   }, [communityData.mediaStatuses, session]);
 
+  // SubGroups (e.g. Actors for Bond, Phases for Marvel)
+  const availableSubGroups = useMemo(() => {
+    const counts: Record<string, number> = {};
+    collection.movies.forEach((m) => {
+      if (m.subGroup) {
+        counts[m.subGroup] = (counts[m.subGroup] || 0) + 1;
+      }
+    });
+    return Object.entries(counts).map(([name, count]) => ({ name, count }));
+  }, [collection.movies]);
+
+  // Check if collection contains TV series
+  const hasTvSeries = useMemo(() => {
+    return collection.movies.some((m) => m.mediaType === "tv");
+  }, [collection.movies]);
+
+  const movieCount = collection.movies.filter((m) => (m.mediaType || "movie") === "movie").length;
+  const tvCount = collection.movies.filter((m) => m.mediaType === "tv").length;
+
   // Progress stats
   const totalCount = collection.movies.length;
   const watchedCount = collection.movies.filter((m) => myWatchedMap.has(m.id)).length;
@@ -80,6 +103,14 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
       list = list.filter((m) => myWatchedMap.has(m.id));
     }
 
+    if (selectedSubGroup !== "ALL") {
+      list = list.filter((m) => m.subGroup === selectedSubGroup);
+    }
+
+    if (mediaTypeFilter !== "ALL") {
+      list = list.filter((m) => (m.mediaType || "movie") === mediaTypeFilter);
+    }
+
     if (sortBy === "year_asc") {
       list.sort((a, b) => (parseInt(a.releaseYear) || 0) - (parseInt(b.releaseYear) || 0));
     } else if (sortBy === "rating_desc") {
@@ -87,7 +118,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     }
 
     return list;
-  }, [collection.movies, filterMode, sortBy, myWatchedMap]);
+  }, [collection.movies, filterMode, selectedSubGroup, mediaTypeFilter, sortBy, myWatchedMap]);
 
   const handleToggleWatched = (movie: CollectionMovie, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -98,7 +129,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     const watchedInfo = myWatchedMap.get(movie.id);
     openRatingModal({
       tmdbId: movie.id,
-      mediaType: "movie",
+      mediaType: movie.mediaType || "movie",
       title: movie.title,
       posterPath: movie.posterPath,
       releaseYear: movie.releaseYear,
@@ -116,7 +147,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     const isOnWatchlist = myWatchlistSet.has(movie.id);
     await updateMediaStatus({
       tmdbId: movie.id,
-      mediaType: "movie",
+      mediaType: movie.mediaType || "movie",
       title: movie.title,
       posterPath: movie.posterPath,
       releaseYear: movie.releaseYear,
@@ -165,7 +196,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                   {collection.category === "franchise" ? "Universum / Filmreihe" : "Regisseur-Sammlung"}
                 </span>
                 <span className="text-xs text-slate-400">•</span>
-                <span className="text-xs font-bold text-slate-300">{totalCount} Filme</span>
+                <span className="text-xs font-bold text-slate-300">{totalCount} Titel</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
@@ -230,10 +261,10 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
               {/* Motivation quote */}
               <p className="text-[11px] text-slate-400 mt-2.5 bg-slate-950/60 p-2.5 rounded-xl border border-slate-800/60 leading-tight">
                 {isComplete
-                  ? "Meisterleistung! Du hast jeden einzelnen Film dieser Kollektion gesehen."
+                  ? "Meisterleistung! Du hast jeden einzelnen Titel dieser Kollektion gesehen."
                   : watchedCount > 0
-                  ? `Stark! Dir fehlen nur noch ${remainingCount} Filme bis zur Komplettierung.`
-                  : "Du hast noch keinen Film dieser Kollektion als gesehen markiert."}
+                  ? `Stark! Dir fehlen nur noch ${remainingCount} Titel bis zur Komplettierung.`
+                  : "Du hast noch keinen Titel dieser Kollektion als gesehen markiert."}
               </p>
             </div>
           </div>
@@ -241,43 +272,87 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
       </div>
 
       {/* Filter and Sorting Toolbar */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-2 rounded-2xl bg-slate-900/60 border border-slate-800">
-          {/* Status Filter */}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setFilterMode("all")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                filterMode === "all"
-                  ? "bg-amber-500 text-black shadow"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Alle ({totalCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode("unwatched")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                filterMode === "unwatched"
-                  ? "bg-amber-500 text-black shadow"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              ⏳ Ungesehen ({remainingCount})
-            </button>
-            <button
-              type="button"
-              onClick={() => setFilterMode("watched")}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
-                filterMode === "watched"
-                  ? "bg-emerald-500 text-black shadow"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              ✓ Gesehen ({watchedCount})
-            </button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-4">
+        {/* Row 1: Status Filter & Media Type & Sort */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Status Filter */}
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setFilterMode("all")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  filterMode === "all"
+                    ? "bg-amber-500 text-black shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                Alle ({totalCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode("unwatched")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  filterMode === "unwatched"
+                    ? "bg-amber-500 text-black shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                ⏳ Ungesehen ({remainingCount})
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterMode("watched")}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                  filterMode === "watched"
+                    ? "bg-emerald-500 text-black shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                ✓ Gesehen ({watchedCount})
+              </button>
+            </div>
+
+            {/* Optional Type Filter for collections with series (like MCU) */}
+            {hasTvSeries && (
+              <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setMediaTypeFilter("ALL")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition ${
+                    mediaTypeFilter === "ALL"
+                      ? "bg-slate-700 text-white"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Alles
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMediaTypeFilter("movie")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                    mediaTypeFilter === "movie"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Film className="w-3 h-3" />
+                  <span>Filme ({movieCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMediaTypeFilter("tv")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition flex items-center gap-1 ${
+                    mediaTypeFilter === "tv"
+                      ? "bg-sky-500/20 text-sky-300 border border-sky-500/40"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Tv className="w-3 h-3" />
+                  <span>Serien ({tvCount})</span>
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Sort Selector */}
@@ -294,20 +369,59 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
           </div>
         </div>
 
+        {/* Row 2: SubGroup Pills (e.g. James Bond Actors or Marvel Phases) */}
+        {availableSubGroups.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 pr-2 flex-shrink-0">
+              <Filter className="w-3.5 h-3.5 text-amber-400" />
+              <span>{collection.subGroupLabel || "Filter"}:</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setSelectedSubGroup("ALL")}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+                selectedSubGroup === "ALL"
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+              }`}
+            >
+              Alle ({totalCount})
+            </button>
+
+            {availableSubGroups.map(({ name, count }) => (
+              <button
+                key={name}
+                type="button"
+                onClick={() => setSelectedSubGroup(name)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
+                  selectedSubGroup === name
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                    : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
+                }`}
+              >
+                <span>{name}</span>
+                <span className="text-[10px] font-mono text-slate-500">({count})</span>
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* Movies Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 mt-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6 pt-2">
           {displayedMovies.map((movie, idx) => {
             const watchedData = myWatchedMap.get(movie.id);
             const isWatched = myWatchedMap.has(movie.id);
             const isOnWatchlist = myWatchlistSet.has(movie.id);
+            const isTv = movie.mediaType === "tv";
 
             return (
               <div
-                key={movie.id}
+                key={`${movie.mediaType || "movie"}_${movie.id}`}
                 onClick={() =>
                   openMediaModal({
                     id: movie.id,
-                    mediaType: "movie",
+                    mediaType: movie.mediaType || "movie",
                     title: movie.title,
                     posterPath: movie.posterPath,
                   })
@@ -326,7 +440,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                     />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-slate-600">
-                      <Film className="w-8 h-8 mb-2" />
+                      {isTv ? <Tv className="w-8 h-8 mb-2" /> : <Film className="w-8 h-8 mb-2" />}
                       <span className="text-xs">{movie.title}</span>
                     </div>
                   )}
@@ -367,7 +481,19 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                     <h4 className="text-xs sm:text-sm font-bold text-white group-hover:text-amber-400 transition line-clamp-1 leading-snug">
                       {movie.title}
                     </h4>
-                    <p className="text-[11px] text-slate-400 mt-0.5">{movie.releaseYear}</p>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
+                      {isTv ? (
+                        <span className="text-[10px] uppercase font-bold text-sky-400">Serie</span>
+                      ) : (
+                        <span>{movie.releaseYear}</span>
+                      )}
+                      {movie.subGroup && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate text-slate-300 font-medium">{movie.subGroup}</span>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {/* Quick Action buttons */}
@@ -375,7 +501,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                     <button
                       type="button"
                       onClick={(e) => handleToggleWatched(movie, e)}
-                      title={isWatched ? "Als ungesehen markieren" : "Als gesehen markieren"}
+                      title={isWatched ? "Als ungesehen markieren" : "Als gesehen markieren & bewerten"}
                       className={`flex-1 py-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition ${
                         isWatched
                           ? "bg-emerald-500 text-black shadow-sm"

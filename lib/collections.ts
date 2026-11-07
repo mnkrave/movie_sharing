@@ -8,6 +8,8 @@ export interface CollectionMovie {
   backdropPath?: string | null;
   voteAverage: number;
   overview?: string;
+  mediaType?: "movie" | "tv";
+  subGroup?: string;
 }
 
 export interface CollectionUniverse {
@@ -18,6 +20,7 @@ export interface CollectionUniverse {
   description: string;
   backdropPath: string | null;
   posterPath: string | null;
+  subGroupLabel?: string;
   movies: CollectionMovie[];
 }
 
@@ -751,13 +754,14 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
     ]
   },
   {
-    "id": "marvel-avengers",
-    "name": "Marvel Cinematic Universe: Avengers Saga",
+    "id": "marvel-mcu",
+    "name": "Marvel Cinematic Universe (MCU)",
     "category": "franchise",
-    "tagline": "Die mächtigsten Helden der Welt",
-    "description": "Das revolutionäre Comic-Universum von Iron Man bis zum ultimativen Showdown in Avengers: Endgame.",
-    "backdropPath": "/cKvDv2LpwVEqbdXWoQl4XgGN6le.jpg",
-    "posterPath": "/wyEqQ7dvnYPR0z8M8ZDW5VSvRwZ.jpg",
+    "tagline": "Das komplette Multiversum: Alle Filme & Serien von Phase 1 bis 5",
+    "description": "Von Iron Man und den Avengers bis hin zu Loki, WandaVision und Deadpool & Wolverine. Verfolge deinen Fortschritt durch jede einzelne MCU-Phase!",
+    "backdropPath": "/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg",
+    "posterPath": "/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
+    "subGroupLabel": "MCU Phase",
     "movies": [
       {
         "id": 1726,
@@ -767,7 +771,45 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/wyEqQ7dvnYPR0z8M8ZDW5VSvRwZ.jpg",
         "backdropPath": "/cKvDv2LpwVEqbdXWoQl4XgGN6le.jpg",
         "voteAverage": 7.7,
-        "overview": "Der Großindustrielle und Erfinder Tony Stark weiß zu leben: Als Milliardär liegen ihm die Frauen zu Füßen, er feiert Partys im Privatjet und verspielt Riesensummen im Casino, während seine Rüstungsfirma unter Obadiah Stane Rekordumsätze erzielt. Bei einem Waffentestlauf in Afghanistan wird er jedoch Opfer eines Bombenanschlags. Stark überlebt schwer verletzt und wird von einer Gruppe Aufständischer unter Führung des Warlords Raza dazu gezwungen, eine Superwaffe zu entwickeln. Es gelingt ihm jedoch, heimlich eine eiserne Schutzrüstung zu bauen, die ihn dank neuster Technologie zu Superkräften befähigt. Nach einer spektakulären Flucht zurück in die USA muss sich der Iron Man allerdings einem ersten übermächtigen Gegner stellen."
+        "overview": "Der Großindustrielle und Erfinder Tony Stark weiß zu leben: Als Milliardär liegen ihm die Frauen zu Füßen, er feiert Partys im Privatjet und verspielt Riesensummen im Casino, während seine Rüstungsfirma unter Obadiah Stane Rekordumsätze erzielt. Bei einem Waffentestlauf in Afghanistan wird er jedoch Opfer eines Bombenanschlags. Stark überlebt schwer verletzt und wird von einer Gruppe Aufständischer unter Führung des Warlords Raza dazu gezwungen, eine Superwaffe zu entwickeln. Es gelingt ihm jedoch, heimlich eine eiserne Schutzrüstung zu bauen, die ihn dank neuster Technologie zu Superkräften befähigt. Nach einer spektakulären Flucht zurück in die USA muss sich der Iron Man allerdings einem ersten übermächtigen Gegner stellen.",
+        "mediaType": "movie",
+        "subGroup": "Phase 1"
+      },
+      {
+        "id": 1724,
+        "title": "Der unglaubliche Hulk",
+        "originalTitle": "The Incredible Hulk",
+        "releaseYear": "2008",
+        "posterPath": "/bwCgRJRq6WUjhXIvBZjSI1lglRv.jpg",
+        "backdropPath": "/xfBnQ4mgf1jYZsscJGJjr6ce0Ar.jpg",
+        "voteAverage": 6.3,
+        "overview": "Nachdem er bei einem biochemischen Experiment so stark verstrahlt wurde, dass er sich, wann immer er gereizt oder wütend wird, in das grüne Monstrum Hulk verwandelt, lebt der Wissenschaftler Bruce Banner ein zurückgezogenes Leben im brasilianischen Exil. Dorthin hat es ihn auf der Flucht vor dem Militärgeneral Ross verschlagen, der alles unternimmt, um den ehemaligen Freund seiner Tochter Betty für seine Zwecke zu missbrauchen. Während sich für Banner die Uhr rückwärts dreht, er nach einem Gegenmittel für die Mutation forscht und seine Wut unter Kontrolle zu bringen versucht, unterläuft ihm ein Missgeschick: General Ross gelingt es, Banner ausfindig zu machen. Auf der Flucht vor dem Militär und dem ehrgeizigen Soldaten Blonsky sucht er Zuflucht bei Betty, die ihm dabei hilft, die unfreiwilligen Superkräfte zu kontrollieren. Blonsky hat sich Banners einstige Formel zueigen gemacht und ist zur Kampfbestie Abomination mutiert.",
+        "mediaType": "movie",
+        "subGroup": "Phase 1"
+      },
+      {
+        "id": 10138,
+        "title": "Iron Man 2",
+        "originalTitle": "Iron Man 2",
+        "releaseYear": "2010",
+        "posterPath": "/nAhGVbqwWXjUMAaZvlmPr6nJOfR.jpg",
+        "backdropPath": "/7lmBufEG7P7Y1HClYK3gCxYrkgS.jpg",
+        "voteAverage": 6.9,
+        "overview": "Tony Stark ist Iron Man. Nach der Öffentlichmachung dieser Doppelidentität sonnt sich der selbstverliebte Egomane in seinem noch jungen Ruhm als eiserner Weltenretter. Die Eröffnung der eigenen Expo inszeniert er wie ein Popkonzert, den Begehrlichkeiten des US-Militärs hinsichtlich seines Kampfanzugs erteilt er bei einem Untersuchungsausschuss vor laufenden Kameras eine arrogant-zynische Absage. Erst als ihm der russische Physiker und Exsträfling Ivan Vanko bei einem Show Grand Prix in Monte Carlo die Grenzen seiner Erfindung aufzeigt, bekommt Starks ehernes Ego erste Kratzer. Dazu kommt eine von Starks lebenswichtigem Minireaktor ausgehende Paladium-Vergiftung, die, sofern er keine Ersatzquelle auftut, unweigerlich zu seinem Tod führt.",
+        "mediaType": "movie",
+        "subGroup": "Phase 1"
+      },
+      {
+        "id": 10195,
+        "title": "Thor",
+        "originalTitle": "Thor",
+        "releaseYear": "2011",
+        "posterPath": "/wtHxoL3zFjIrjZBCGlRTb8ao1IW.jpg",
+        "backdropPath": "/cDJ61O1STtbWNBwefuqVrRe3d7l.jpg",
+        "voteAverage": 6.8,
+        "overview": "Der mächtige Thor ist ein überragender Krieger im Königreich Asgard, dessen Überheblichkeit und Arroganz seine größte Schwäche ist. Wegen seiner Gedankenlosigkeit wird ein lange vergessen geglaubter Krieg neu entfacht. Die Strafe folgt umgehend: Unter den Menschen soll Thor auf der Erde Demut lernen, was dem Krieger zunächst nicht leicht fällt. Doch dann ist er zur Stelle, als es die Menschheit mit einem übermächtigen Gegner zu tun bekommt, der Unterstützung aus Asgard zu erhalten scheint.",
+        "mediaType": "movie",
+        "subGroup": "Phase 1"
       },
       {
         "id": 1771,
@@ -777,7 +819,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/osELOHV9IVKCIflUpJ60cN7mgP8.jpg",
         "backdropPath": "/yFuKvT4Vm3sKHdFY4eG6I4ldAnn.jpg",
         "voteAverage": 7,
-        "overview": "1942 – die USA ziehen in den Kampf gegen Hitler-Deutschland. Steve Rogers wird auf Grund seines Gesundheitszustands als ungeeignet eingestuft. Mit Hilfe des Project: Rebirth soll er trotzdem in den Kampf gegen Nazis ziehen. Der kränkliche Steve wird in eine Art Super-Soldaten namens Captain America transformiert. Hilfe bekommt der neue Superheld dabei von seinem Freund Bucky Barnes. Gemeinsam kämpfen sie gegen Red Skul, Hitlers Geheimwaffe im Krieg gegen den Rest der Welt."
+        "overview": "1942 – die USA ziehen in den Kampf gegen Hitler-Deutschland. Steve Rogers wird auf Grund seines Gesundheitszustands als ungeeignet eingestuft. Mit Hilfe des Project: Rebirth soll er trotzdem in den Kampf gegen Nazis ziehen. Der kränkliche Steve wird in eine Art Super-Soldaten namens Captain America transformiert. Hilfe bekommt der neue Superheld dabei von seinem Freund Bucky Barnes. Gemeinsam kämpfen sie gegen Red Skul, Hitlers Geheimwaffe im Krieg gegen den Rest der Welt.",
+        "mediaType": "movie",
+        "subGroup": "Phase 1"
       },
       {
         "id": 24428,
@@ -787,7 +831,33 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/hGTqvK9WaI74szUDPMHXrrHfiH3.jpg",
         "backdropPath": "/gHLs7Fy3DzLmLsD4lmfqL55KGcl.jpg",
         "voteAverage": 8.1,
-        "overview": "Nick Fury ist der Anführer der Organisation S.H.I.E.L.D., einer internationalen Friedensorganisation. Die Behörde ist ein Who's Who der Marvel Superhelden, mit Iron Man, Thor, Captain America, Hawkeye, dem Unglaublichen Hulk und Black Widow. Als die weltweite Sicherheit von Thors sinistrem Halbbruder Loki und seiner Schar bedroht wird, werden Nick Fury und sein Team all ihre Kräfte brauchen, um die Welt vor einer Katastrophe zu bewahren ..."
+        "overview": "Nick Fury ist der Anführer der Organisation S.H.I.E.L.D., einer internationalen Friedensorganisation. Die Behörde ist ein Who's Who der Marvel Superhelden, mit Iron Man, Thor, Captain America, Hawkeye, dem Unglaublichen Hulk und Black Widow. Als die weltweite Sicherheit von Thors sinistrem Halbbruder Loki und seiner Schar bedroht wird, werden Nick Fury und sein Team all ihre Kräfte brauchen, um die Welt vor einer Katastrophe zu bewahren ...",
+        "mediaType": "movie",
+        "subGroup": "Phase 1"
+      },
+      {
+        "id": 68721,
+        "title": "Iron Man 3",
+        "originalTitle": "Iron Man 3",
+        "releaseYear": "2013",
+        "posterPath": "/h0vJ6sTYWQmqenNqRa1IiW1t0Ys.jpg",
+        "backdropPath": "/4TSqtluelcWByj8YZdqwzQVjI0O.jpg",
+        "voteAverage": 6.9,
+        "overview": "Die Dellen, die sich Iron Man im Kampf gegen seine Widersacher Justin Hammer und Ivan Vanko zugezogen hatte, sind kaum ausgebeult, da droht neue Gefahr. Ein streng geheimes Serum, welches Extremis genannt wird und auf Nanotechnologie basiert, ermöglicht es den mit dem Serum injizierten Menschen, ungeahnte Kräfte zu entwickeln, allerdings mit einer Tendenz zu ungezügelter Aggressivität. Aldrichs Kollegin Maya Hansen, baut auf die Hilfe von Visionär Tony Stark. Währendessen bedroht eine dunkle Macht in Gestalt von The Mandarin die Welt und möchte dem Wettrüsten ein Ende zu seinen Gunsten setzen. Dabei verübt er einen Anschlag auf die amerikanische Regierung und dessen Präsidenten, sowie auf die Air Force, bei der Tony Starks Freund Rhodey dient. Als ein Anschlag auf Tony Starks Eigenheim folgt, geraten er und Pepper Potts in große Gefahr…",
+        "mediaType": "movie",
+        "subGroup": "Phase 2"
+      },
+      {
+        "id": 76338,
+        "title": "Thor - The Dark Kingdom",
+        "originalTitle": "Thor: The Dark World",
+        "releaseYear": "2013",
+        "posterPath": "/7a3za75dP6UPviHXNKIxzZNEwyx.jpg",
+        "backdropPath": "/5o88bbqcV5STn56jqOeovaaWbAE.jpg",
+        "voteAverage": 6.5,
+        "overview": "Thor und Loki kehren in ihre Heimat Asgard zurück, wo Göttervater Odin darüber entscheidet, wie mit dem adoptierten Prinzen verfahren werden soll. Währenddessen erhebt sich eine andere Macht in einem der 9 Realms. Der Dunkelelf Malekith schart eine Armee uralter Wesen und Monster um sich, mit denen er nicht nur Asgard, sondern den ganzen Kosmos bedroht.  Der Donnergott trifft auf seine Angebetete Jane, die von einem Dämon besessen ist, dessen Verbindung mit den Dunkelelfen sehr nahe liegt. Thor muss also nicht nur seine Menschenfreundin retten, sondern auch eine eigene Streitkraft zusammenstellen, mit der er Malekith besiegen kann. Dafür muss er in die düstersten Ecken Asgards vordringen, wobei ihm jedoch nur eine Person helfen kann: Loki.",
+        "mediaType": "movie",
+        "subGroup": "Phase 2"
       },
       {
         "id": 100402,
@@ -797,7 +867,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/14vWmCoZHXajYmtqSsswWpSOdrd.jpg",
         "backdropPath": "/jJvrPQAHFKmz4pVano4UtWTsRgA.jpg",
         "voteAverage": 7.7,
-        "overview": "Nach den Geschehnissen mit den Avengers in New York zieht sich Steve Rogers nach Washington zurück. Dort hat er nach wie vor Probleme, sich an das moderne Leben zu gewöhnen. Doch er wird wieder in den Einsatz berufen, als ein S.H.I.E.L.D.-Agent Ziel eines Angriffs wird. Dies ist nur der Beginn eines größeren Plans, der die ganze Welt in Gefahr bringen könnte. Steve kehrt als Captain America zurück und versucht mit Hilfe von Agentin Romanoff, auch bekannt als Black Widow, die Verschwörung aufzuklären. Die Beiden erhalten zusätzliche Unterstützung vom Falken. Die Mission birgt einige Gefahren und die beiden werden oftmals Ziel von Attentaten. Doch die größte Gefahr ist der Gegner selbst: der Winter Soldier."
+        "overview": "Nach den Geschehnissen mit den Avengers in New York zieht sich Steve Rogers nach Washington zurück. Dort hat er nach wie vor Probleme, sich an das moderne Leben zu gewöhnen. Doch er wird wieder in den Einsatz berufen, als ein S.H.I.E.L.D.-Agent Ziel eines Angriffs wird. Dies ist nur der Beginn eines größeren Plans, der die ganze Welt in Gefahr bringen könnte. Steve kehrt als Captain America zurück und versucht mit Hilfe von Agentin Romanoff, auch bekannt als Black Widow, die Verschwörung aufzuklären. Die Beiden erhalten zusätzliche Unterstützung vom Falken. Die Mission birgt einige Gefahren und die beiden werden oftmals Ziel von Attentaten. Doch die größte Gefahr ist der Gegner selbst: der Winter Soldier.",
+        "mediaType": "movie",
+        "subGroup": "Phase 2"
       },
       {
         "id": 118340,
@@ -807,7 +879,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/9pbW0r2YIkyWCOieSAUPrmS9cDp.jpg",
         "backdropPath": "/uLtVbjvS1O7gXL8lUOwsFOH4man.jpg",
         "voteAverage": 7.9,
-        "overview": "Nachdem der Abenteurer Peter Quill eine geheimnisvolle Kugel gestohlen hat, wird er das Opfer einer unerbittlichen Kopfgeldjagd mit Ronan the Accuser. Die Ziele des mächtigen Bösewichts bedrohen die Sicherheit des Universums. Um dem hartnäckigen Ronan und seinen Schergen zu entgehen, ist Quill gezwungen, einen nicht gerade einfach einzuhaltenden Waffenstillstand mit einem Quartett von ungleichen Außenseitern einzugehen - dazu gehört der waffenliebende Waschbär Rocket, der Baummensch Groot, die tödliche und rätselhafte Gamora und der rachsüchtige Drax the Destroyer. Als Peter dann die wahre Macht der Kugel und dessen Bedrohung für den Kosmos bewusst wird, muss er sein Bestes geben, um die bunt zusammengewürfelten Rivalen für einen letzten, verzweifelten Widerstand zu vereinen und eine Helden-Truppe aus ihnen machen - denn das Schicksal der Galaxie steht auf dem Spiel."
+        "overview": "Nachdem der Abenteurer Peter Quill eine geheimnisvolle Kugel gestohlen hat, wird er das Opfer einer unerbittlichen Kopfgeldjagd mit Ronan the Accuser. Die Ziele des mächtigen Bösewichts bedrohen die Sicherheit des Universums. Um dem hartnäckigen Ronan und seinen Schergen zu entgehen, ist Quill gezwungen, einen nicht gerade einfach einzuhaltenden Waffenstillstand mit einem Quartett von ungleichen Außenseitern einzugehen - dazu gehört der waffenliebende Waschbär Rocket, der Baummensch Groot, die tödliche und rätselhafte Gamora und der rachsüchtige Drax the Destroyer. Als Peter dann die wahre Macht der Kugel und dessen Bedrohung für den Kosmos bewusst wird, muss er sein Bestes geben, um die bunt zusammengewürfelten Rivalen für einen letzten, verzweifelten Widerstand zu vereinen und eine Helden-Truppe aus ihnen machen - denn das Schicksal der Galaxie steht auf dem Spiel.",
+        "mediaType": "movie",
+        "subGroup": "Phase 2"
       },
       {
         "id": 99861,
@@ -817,7 +891,21 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/woAP8YaiVIuo7YXTeqVQEhXBdfz.jpg",
         "backdropPath": "/kIBK5SKwgqIIuRKhhWrJn3XkbPq.jpg",
         "voteAverage": 7.3,
-        "overview": "Milliardär, Lebemann und Genie Tony Stark aka Iron Man will ein inaktives Friedensprogramm in Gang bringen, doch dabei geht etwas schief. So taucht der niederträchtige Roboter-Bösewicht Ultron auf und verfolgt Pläne zur Ausrottung der Menschheit. Nun ist es an den Helden, sich wieder zu sammeln und das schreckliche Schicksal der Welt abzuwenden. Zusammen mit Iron Man treten Thor, Captain America, Hulk, Black Widow und Hawkeye dem fiesen Ultron entgegen und bekommen dabei Unterstützung von den ehemaligen S.H.I.E.L.D.-Agenten Nick Fury und Maria Hill. Außerdem kreuzen die geheimnisvollen und mit besonderen Fähigkeiten ausgestatteten Newcomer Wanda und Pietro Maximoff den Weg der Helden, wie auch ein alter Bekannter in neuer Gestalt: Vision. Die Rächer müssen ihre Kräfte vereinen, unsichere Allianzen schmieden und auf unerwartete Aktionen reagieren, um die Bewohner der Erde einmal mehr vor dem drohenden Untergang zu bewahren."
+        "overview": "Milliardär, Lebemann und Genie Tony Stark aka Iron Man will ein inaktives Friedensprogramm in Gang bringen, doch dabei geht etwas schief. So taucht der niederträchtige Roboter-Bösewicht Ultron auf und verfolgt Pläne zur Ausrottung der Menschheit. Nun ist es an den Helden, sich wieder zu sammeln und das schreckliche Schicksal der Welt abzuwenden. Zusammen mit Iron Man treten Thor, Captain America, Hulk, Black Widow und Hawkeye dem fiesen Ultron entgegen und bekommen dabei Unterstützung von den ehemaligen S.H.I.E.L.D.-Agenten Nick Fury und Maria Hill. Außerdem kreuzen die geheimnisvollen und mit besonderen Fähigkeiten ausgestatteten Newcomer Wanda und Pietro Maximoff den Weg der Helden, wie auch ein alter Bekannter in neuer Gestalt: Vision. Die Rächer müssen ihre Kräfte vereinen, unsichere Allianzen schmieden und auf unerwartete Aktionen reagieren, um die Bewohner der Erde einmal mehr vor dem drohenden Untergang zu bewahren.",
+        "mediaType": "movie",
+        "subGroup": "Phase 2"
+      },
+      {
+        "id": 102899,
+        "title": "Ant-Man",
+        "originalTitle": "Ant-Man",
+        "releaseYear": "2015",
+        "posterPath": "/myC8VQDoWIFq2WAnu9AAyJVTQRH.jpg",
+        "backdropPath": "/1K3JmSNUN8OpjYsCjc0Hy0SYxAb.jpg",
+        "voteAverage": 7.1,
+        "overview": "Als Hank Pym den smarten Superdieb Scott Lang für einen großen Coup anwirbt, setzt der Knastveteran seine Qualitäten erstmals für das Gute ein. Um zu verhindern, dass Pyms Technologie, mit der Belebtes und Unbelebtes auf Miniaturgröße geschrumpft werden kann, militärisch genutzt wird, soll Lang die Fortschritte von Pyms skrupellosem Kontrahenten Cross sabotieren und dessen Spezialanzug stehlen. Doch dafür muss Lang ein Superheldentraining absolvieren und lernen, ein Heer von Ameisen für seinen Raubüberfall zu kontrollieren.",
+        "mediaType": "movie",
+        "subGroup": "Phase 2"
       },
       {
         "id": 271110,
@@ -827,7 +915,69 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/7iB1ow4vPLRJ9UOnIwvEFQwRHHr.jpg",
         "backdropPath": "/7FWlcZq3r6525LWOcvO9kNWurN1.jpg",
         "voteAverage": 7.5,
-        "overview": "Als bei einem Einsatz der Avengers in Lagos zwar der Diebstahl eines biologischen Kampfstoffes verhindert wird, dabei aber mehrere Zivilisten sterben, beschließen die Vereinten Nationen ein neues Gesetz, das die Avengers unter ihre Aufsicht bringen soll. Während Tony Stark alias Iron Man für eine Kontrolle der Superhelden votiert, stimmt Steve Rogers alias Captain America für ihre Unabhängigkeit. Auch die Teammitglieder sind uneinig und verteilen sich auf die beiden Wortführer. Als ein Bombenattentat auf jene UN-Versammlung verübt wird und man als vermeintlichen Schuldigen Steves alten Freund Bucky Barnes, nun als Winter Soldier bekannt, ausmacht, verschärft sich die Lage. Nachdem Steve Anweisungen missachtet und versucht Bucky auf eigene Faust zu stellen, damit dieser bei seiner Verhaftung nicht getötet wird, kommt es zu immer offeneren Animositäten zwischen den Superhelden ..."
+        "overview": "Als bei einem Einsatz der Avengers in Lagos zwar der Diebstahl eines biologischen Kampfstoffes verhindert wird, dabei aber mehrere Zivilisten sterben, beschließen die Vereinten Nationen ein neues Gesetz, das die Avengers unter ihre Aufsicht bringen soll. Während Tony Stark alias Iron Man für eine Kontrolle der Superhelden votiert, stimmt Steve Rogers alias Captain America für ihre Unabhängigkeit. Auch die Teammitglieder sind uneinig und verteilen sich auf die beiden Wortführer. Als ein Bombenattentat auf jene UN-Versammlung verübt wird und man als vermeintlichen Schuldigen Steves alten Freund Bucky Barnes, nun als Winter Soldier bekannt, ausmacht, verschärft sich die Lage. Nachdem Steve Anweisungen missachtet und versucht Bucky auf eigene Faust zu stellen, damit dieser bei seiner Verhaftung nicht getötet wird, kommt es zu immer offeneren Animositäten zwischen den Superhelden ...",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 284052,
+        "title": "Doctor Strange",
+        "originalTitle": "Doctor Strange",
+        "releaseYear": "2016",
+        "posterPath": "/mzPnP190YLV4KFL3ZgsP7AsPEd2.jpg",
+        "backdropPath": "/kkoiH8ZWxJ9WSAjOadGtuHUQxbm.jpg",
+        "voteAverage": 7.4,
+        "overview": "Doctor Stephen Strange ist ein arroganter, aber auch unglaublich talentierter Neurochirurg. Nach einem schweren Autounfall kann er seiner Tätigkeit trotz mehrerer Operationen und Therapien nicht mehr nachgehen. In seiner Verzweiflung wendet er sich schließlich von der Schulmedizin ab und reist nach Tibet, wo er bei der Einsiedlerin The Ancient One und ihrer Glaubensgemeinschaft lernt, sein verletztes Ego hinten anzustellen und in die Geheimnisse einer verborgenen mystischen Welt voller alternativer Dimensionen eingeführt wird. So entwickelt sich Doctor Strange nach und nach zu einem der mächtigsten Magier der Welt. Doch schon bald muss er seine neu gewonnenen mystischen Kräfte nutzen, um die Welt vor einer Bedrohung aus einer anderen Dimension zu beschützen.",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 283995,
+        "title": "Guardians of the Galaxy Vol. 2",
+        "originalTitle": "Guardians of the Galaxy Vol. 2",
+        "releaseYear": "2017",
+        "posterPath": "/ckujEWphKR2NG3vLLhUaLzJEGny.jpg",
+        "backdropPath": "/aJn9XeesqsrSLKcHfHP4u5985hn.jpg",
+        "voteAverage": 7.6,
+        "overview": "Gerade erst sind in Guardians of the Galaxy aus Feinden Freunde geworden und schon machen die fünf Verbündeten gemeinsam das All unsicher. Peter Quill, Gamora, Rocket Raccoon, Groot und Drax the Destroyer bereisen als Weltraum-Abenteurer diesmal nicht nur bereits bekannte Orte, sondern stoßen auch in neue Winkel der Galaxie vor.  Nachdem die vergangenen Erlebnisse ihnen einige Rätsel aufgegeben haben, machen sie sich nun daran, diese zu lösen. ‚Star-Lord‘ Peter Quill hat beispielsweise gerade entdeckt, dass er nicht rein menschlicher Herkunft ist, und – auch wenn er es noch nicht weiß – rückt ein Zusammentreffen mit seinem Vater nun in greifbare Nähe.",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 315635,
+        "title": "Spider-Man: Homecoming",
+        "originalTitle": "Spider-Man: Homecoming",
+        "releaseYear": "2017",
+        "posterPath": "/elU7H73qN3WEQmmfdn0CdH3q8H8.jpg",
+        "backdropPath": "/lAsr1ytUq0ATWdCbcjf59pupPFy.jpg",
+        "voteAverage": 7.3,
+        "overview": "Nach seinem Aufeinandertreffen mit den Avengers ist Peter Parker alias Spider-Man wieder zurück in New York, wo er bei seiner Tante May wohnt. Seitdem er mit bzw. gegen die anderen Helden kämpfte, fragt er sich, ob er mit seinen herausragenden Fähigkeiten nicht mehr machen sollte, als nur die freundliche Spinne aus der Nachbarschaft zu sein, die den einen oder anderen Einbruch verhindert und Taschendiebe stoppt. Doch daneben muss der von seinem neuen Mentor Tony Stark geförderte Jugendliche auch noch den Alltag auf die Reihe bekommen, den Alltag als Teenager an einer Highschool, wo er sich in Liz verguckt hat. Blöd, dass ausgerechnet in dieser Situation ein Bösewicht für Unruhe sorgt, der technisch bestens ausgestattet ist und von Rachedurst getrieben: der Vogelmann Vulture.",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 284053,
+        "title": "Thor: Tag der Entscheidung",
+        "originalTitle": "Thor: Ragnarok",
+        "releaseYear": "2017",
+        "posterPath": "/8etFULS6CRN39vvXykQH1mUD1yB.jpg",
+        "backdropPath": "/vLmHH8jAy8Jq8uBsLucd3592WGh.jpg",
+        "voteAverage": 7.6,
+        "overview": "Donnergott Thor wird auf der anderen Seite des Universums gefangengenommen. Ohne seinen nützlichen Hammer Mjölnir scheint eine Flucht nahezu ausgeschlossen. Dabei läuft ihm allmählich die Zeit davon. Denn die ebenso mächtige wie erbarmungslose Hela, die nach jahrtausendlanger Gefangenschaft aus ihrem Gefängnis freigekommen ist, macht sich daran, die Macht auf Thors Heimatwelt Asgard zu übernehmen. Um das zu verhindern, setzt Thor alles daran, nach Hause zurückzukehren. Zwischen ihm und seiner Freiheit stehen jedoch tödliche Gladiatorenkämpfe auf dem Planeten Sakaar, die Mülldeponie des Universums. Bei einem dieser Duelle trifft Thor auf den Ex-Avenger und seinen früheren Mitstreiter Hulk den beliebtesten und erfolgreichsten Kämpfer auf Sakaar…",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 284054,
+        "title": "Black Panther",
+        "originalTitle": "Black Panther",
+        "releaseYear": "2018",
+        "posterPath": "/l6y476RPWK35Y7zmiMPcih4uU7A.jpg",
+        "backdropPath": "/b6ZJZHUdMEFECvGiDpJjlfUWela.jpg",
+        "voteAverage": 7.4,
+        "overview": "Aufgrund von Bodenschätzen außerirdischen Ursprungs ist das afrikanische Königreich Wakanda unermesslich reich. Nur hier kommt das Vibrationen jeder Art und Stärke absorbierende Mineral Vibranium vor. Den Bewohnern von Wakanda ist sehr daran gelegen, vor den Augen Fremder verborgen zu bleiben.  Reichtum weckt Begehrlichkeiten, und es braucht einen starken Führer, ihn zu verteidigen: Den Black Panther! Die Verantwortung des Black Panther wird vom König Wakandas an den jeweiligen Nachfolger weitergegeben. Und so nimmt T’Challa die Bürde und die Würde des ihm vorbestimmten Schicksals von seinem Vater T’Chaka nach dessen tragischen Tod entgegen.",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
       },
       {
         "id": 299536,
@@ -837,7 +987,33 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/2hj7diAFcApL2YfWwjiYCuRI4WW.jpg",
         "backdropPath": "/mDfJG3LC3Dqb67AZ52x3Z0jU0uB.jpg",
         "voteAverage": 8.2,
-        "overview": "Der mächtige Titan Thanos  hat es sich zur Aufgabe gemacht das halbe Universum auszulöschen. Um diesen perfiden Plan Realität werden zu lassen, benötigt er allerdings zuerst alle sechs Infinity-Steine, die ihm in Verbindung mit einem speziell gefertigten Handschuh, gottgleiche Kräfte verleihen. Da sich unglücklicherweise auch auf der Erde zwei dieser Steine befinden, betraut er seine treu ergebene Black Order mit deren Beschaffung. Sowohl die Avengers, als auch die Guardians of the Galaxy und Thor erfahren jedoch von Thanos' Plänen und stellen sich dem Schurken entgegen. Doch mit einen derart mächtigen Gegner hatte es bisher keiner von ihnen zu tun..."
+        "overview": "Der mächtige Titan Thanos  hat es sich zur Aufgabe gemacht das halbe Universum auszulöschen. Um diesen perfiden Plan Realität werden zu lassen, benötigt er allerdings zuerst alle sechs Infinity-Steine, die ihm in Verbindung mit einem speziell gefertigten Handschuh, gottgleiche Kräfte verleihen. Da sich unglücklicherweise auch auf der Erde zwei dieser Steine befinden, betraut er seine treu ergebene Black Order mit deren Beschaffung. Sowohl die Avengers, als auch die Guardians of the Galaxy und Thor erfahren jedoch von Thanos' Plänen und stellen sich dem Schurken entgegen. Doch mit einen derart mächtigen Gegner hatte es bisher keiner von ihnen zu tun...",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 363088,
+        "title": "Ant-Man and the Wasp",
+        "originalTitle": "Ant-Man and the Wasp",
+        "releaseYear": "2018",
+        "posterPath": "/41imUCjSKoBjPUrfeCqib8KAvHS.jpg",
+        "backdropPath": "/iYdgEUE2W2aJkgqfSjf1x3gFfuV.jpg",
+        "voteAverage": 6.9,
+        "overview": "Scott Lang hadert  mit den Konsequenzen seiner Taten als Superheld und Vater. Auf Drängen von Hope van Dyne (alias Wasp) und Dr. Hank Pym schlüpft er erneut in die Rolle des Ant-Mans und taucht in die Quantenwelt ein, um eine sehr gefährliche Rettungsmission gegen die Zeit und jede Chance auf Erfolg durchzuführen.",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 299537,
+        "title": "Captain Marvel",
+        "originalTitle": "Captain Marvel",
+        "releaseYear": "2019",
+        "posterPath": "/A7wZNpzhgS6mnER16YWrmvOHPiZ.jpg",
+        "backdropPath": "/qAzYK4YPSWDc7aa4R43LcwRIAyb.jpg",
+        "voteAverage": 6.8,
+        "overview": "Bei einem Einsatz wird die Kree-Soldatin Vers von den Skrull gefangengenommen. Als die Gestaltenwandler auf Anweisung ihres Kapitäns Talos versuchen, mit einer Maschine Informationen aus dem Gehirn ihrer Geisel herauszuziehen, kann Vers mit einer Fluchtkapsel entkommen, woraufhin sie anschließend in den USA der 1990er Jahre durch das Dach einer Videothek kracht. Während die S.H.I.E.L.D.-Agenten Nick Fury und Phil Coulson erst einmal alles daransetzen, die vermeintliche Außerirdische zu fangen, findet Vers schon bald heraus, dass sie offenbar schon einmal auf diesem Planeten war und unter dem Namen Carol Danvers als Kampfpilotin für das US-Militär gearbeitet hat …",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
       },
       {
         "id": 299534,
@@ -847,7 +1023,117 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/ibO8Pj0aA1nwj3Q9FMpMcYZkdCA.jpg",
         "backdropPath": "/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg",
         "voteAverage": 8.2,
-        "overview": "Thanos hat also tatsächlich Wort gehalten, seinen Plan in die Tat umgesetzt und die Hälfte allen Lebens im Universum ausgelöscht. Die Avengers? Machtlos. Iron Man und Nebula sitzen auf dem Planeten Titan fest, während auf der Erde absolutes Chaos herrscht. Doch dann finden Captain America und die anderen überlebenden Helden auf der Erde heraus, dass Nick Fury vor den verheerenden Ereignissen gerade noch ein Notsignal absetzen konnte, um Verstärkung auf den Plan zu rufen. Die Superhelden-Gemeinschaft bekommt mit Captain Marvel kurzerhand tatkräftige Unterstützung im Kampf gegen ihren vermeintlich übermächtigen Widersacher. Und dann ist da auch noch Ant-Man, der wie aus dem Nichts auftaucht und sich der Truppe erneut anschließt, um die ganze Sache womöglich doch noch zu einem guten Ende zu bringen …"
+        "overview": "Thanos hat also tatsächlich Wort gehalten, seinen Plan in die Tat umgesetzt und die Hälfte allen Lebens im Universum ausgelöscht. Die Avengers? Machtlos. Iron Man und Nebula sitzen auf dem Planeten Titan fest, während auf der Erde absolutes Chaos herrscht. Doch dann finden Captain America und die anderen überlebenden Helden auf der Erde heraus, dass Nick Fury vor den verheerenden Ereignissen gerade noch ein Notsignal absetzen konnte, um Verstärkung auf den Plan zu rufen. Die Superhelden-Gemeinschaft bekommt mit Captain Marvel kurzerhand tatkräftige Unterstützung im Kampf gegen ihren vermeintlich übermächtigen Widersacher. Und dann ist da auch noch Ant-Man, der wie aus dem Nichts auftaucht und sich der Truppe erneut anschließt, um die ganze Sache womöglich doch noch zu einem guten Ende zu bringen …",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 429617,
+        "title": "Spider-Man: Far From Home",
+        "originalTitle": "Spider-Man: Far From Home",
+        "releaseYear": "2019",
+        "posterPath": "/mp2rchOm2nchJ3E3fPzTFzkuLd3.jpg",
+        "backdropPath": "/wqBW5ltBJu0gs26yCc8shQQV82d.jpg",
+        "voteAverage": 7.4,
+        "overview": "Nach der epischen Schlacht gegen Thanos und den schicksalshaften Ereignissen um die Avengers ist Peter zurück an seiner alten Schule. Um vom Superheldendasein etwas auszuruhen, kommt ihm eine Klassenfahrt nach Europa gerade recht, auch um seiner heimlichen Liebe \"MJ\" endlich seine Gefühle gestehen zu können. Die erste Station ist Venedig in Italien. Nach einer entspannten Gondelfahrt mit der Reisegruppe bricht aber plötzlich das Chaos los: Ein riesiges Monster kommt aus dem Wasser und greift die Stadt an. Dem stellt sich ein bisher unbekannter Superheld namens Mysterio entgegen. Und als wäre das nicht genug, taucht dann noch Nick Fury auf, um Spider-Man für eine Mission zu rekrutieren...",
+        "mediaType": "movie",
+        "subGroup": "Phase 3"
+      },
+      {
+        "id": 85271,
+        "title": "WandaVision",
+        "originalTitle": "WandaVision",
+        "releaseYear": "2021",
+        "posterPath": "/ijWWwINc8h71NQ8j1LTJMFSj5wr.jpg",
+        "backdropPath": "/fSCb3lzRbHknuKD7apdH4RYJLkc.jpg",
+        "voteAverage": 8.2,
+        "overview": "Wanda Maximoff und Vision – zwei Wesen mit Superkräften, die ein idyllisches Vorstadtleben führen – vermuten, dass nicht alles so ist, wie es scheint.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 88396,
+        "title": "The Falcon and the Winter Soldier",
+        "originalTitle": "The Falcon and the Winter Soldier",
+        "releaseYear": "2021",
+        "posterPath": "/o39vrKrNJOQtrojB5hMYNPoi30M.jpg",
+        "backdropPath": "/aTjbqMONy77fHJrIYu14g1F0d5h.jpg",
+        "voteAverage": 7.6,
+        "overview": "Sam Wilson aka Falcon und Bucky Barnes aka Winter Soldier waren beide auf unterschiedliche Weise Freunde von Steve Rogers, dem Captain America. Nachdem dieser seine Rolle als heldenhaftes Vorbild der amerikanischen Nation nicht mehr ausführen kann, liegt es an den beiden, sein Schild hochzuhalten – im wahrsten Sinn des Wortes. An Herausforderungen mangelt es für die ungleichen Verbündeten nicht: Der aus Sokovian stammende Helmut Zemo sinnt nach dem Tod seiner Familie im Kampf zwischen Avengers und Ultron in seiner Heimat weiterhin auf die Auslöschung aller Superhelden.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 84958,
+        "title": "Loki",
+        "originalTitle": "Loki",
+        "releaseYear": "2021",
+        "posterPath": "/kEl2t3OhXc3Zb9FBh1AuYzRTgZp.jpg",
+        "backdropPath": "/q3jHCb4dMfYF6ojikKuHd6LscxC.jpg",
+        "voteAverage": 8.2,
+        "overview": "Der launische Schurke Loki nimmt seine Rolle als Gott des Schabernacks wieder auf.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 497698,
+        "title": "Black Widow",
+        "originalTitle": "Black Widow",
+        "releaseYear": "2021",
+        "posterPath": "/gkyoYo9d6g98xjScnZwh3nL2Yfp.jpg",
+        "backdropPath": "/keIxh0wPr2Ymj0Btjh4gW7JJ89e.jpg",
+        "voteAverage": 7.1,
+        "overview": "Nachdem sie das Sokovia-Abkommen abgelehnt und Steve Rogers zur Flucht verholfen hat, befindet sich Natasha Romanoff auf der Flucht. Von der Regierung gejagt, führt sie ihr Weg nach Russland, wo sie auf alte Verbündete und neue Feinde trifft.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 91363,
+        "title": "What If...?",
+        "originalTitle": "What If...?",
+        "releaseYear": "2021",
+        "posterPath": "/lztz5XBMG1x6Y5ubz7CxfPFsAcW.jpg",
+        "backdropPath": "/jnzoh5qoxRLFRIQAxnl6D3RStPC.jpg",
+        "voteAverage": 8,
+        "overview": "„What If…?“ stellt das MCU auf den Kopf und lenkt die Handlung der Filme in eine ganz neue Richtung.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 566525,
+        "title": "Shang-Chi and the Legend of the Ten Rings",
+        "originalTitle": "Shang-Chi and the Legend of the Ten Rings",
+        "releaseYear": "2021",
+        "posterPath": "/AjXzHBNlmCXZnvpONbUhGtgiUiA.jpg",
+        "backdropPath": "/r7K6Xt0RX4Mw0cAbZVw5cyb1Tux.jpg",
+        "voteAverage": 7.5,
+        "overview": "Shang-Chi wurde von der terroristischen Geheimorganisation der Ten Rings seit frühster Kindheit zum Killer ausgebildet. Trotz dieses intensiven Martial-Arts-Trainings hat der junge Mann aber versucht, sich ein normales Leben in San Francisco aufzubauen.  Doch als er gerade glaubt, sein früheres Leben vielleicht wirklich hinter sich gelassen zu haben, holt die Vergangenheit ihn wieder ein. Zusammen mit seiner alten Kindheitsfreundin Katy wird er von seinem kriminellen Vater Wenwu in eine Welt gezogen, in der niemand irgendjemanden mit Samthandschuhen anfasst. Nur die zehn Ringe des Mandarin können das Blatt im Kampf gegen das Böse vielleicht noch wenden.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 524434,
+        "title": "Eternals",
+        "originalTitle": "Eternals",
+        "releaseYear": "2021",
+        "posterPath": "/sVvtzCxk4wowhU1g4fS6AG2MWg5.jpg",
+        "backdropPath": "/c6H7Z4u73ir3cIoCteuhJh7UCAR.jpg",
+        "voteAverage": 6.7,
+        "overview": "Die Eternals sind ein Team aus uralten Außerirdischen, die seit Tausenden von Jahren im Verborgenen auf der Erde gelebt haben. Als eine unerwartete Tragödie sie dazu zwingt, aus dem Schatten zu treten, sind sie gezwungen, sich gegen den ältesten Feind der Menschheit, die Deviants, zu vereinen.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 88329,
+        "title": "Hawkeye",
+        "originalTitle": "Hawkeye",
+        "releaseYear": "2021",
+        "posterPath": "/2kLosa4O7g5Gw5D3Lm4AamIgzOy.jpg",
+        "backdropPath": "/uHESULlKh7VSc0MRcqfyIf9Alk4.jpg",
+        "voteAverage": 7.8,
+        "overview": "Der ehemalige Avenger Clint Barton hat eine scheinbar einfache Mission: zu Weihnachten zu seiner Familie zurückzukehren. Wird ihm das gelingen? Vielleicht mithilfe von Kate Bishop, einer 22-jährigen Bogenschützin, die davon träumt, eine Superheldin zu werden. Die beiden sind gezwungen, zusammenzuarbeiten, als jemand aus Bartons Vergangenheit weit mehr zu entgleisen droht als die weihnachtlich-festliche Stimmung.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
       },
       {
         "id": 634649,
@@ -857,19 +1143,442 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/iNKf4D0AzOj9GLq8ZyG3WZaqibL.jpg",
         "backdropPath": "/iQFcwSGbZXMkeyKrxbPnwnRo5fl.jpg",
         "voteAverage": 7.9,
-        "overview": "Peter Parker ist demaskiert und kann sein normales Leben nicht mehr von den hohen Einsätzen als Superheld trennen. Als er Doctor Strange um Hilfe bittet, wird die Lage noch gefährlicher und er muss entdecken, was es wirklich bedeutet, Spider-Man zu sein."
+        "overview": "Peter Parker ist demaskiert und kann sein normales Leben nicht mehr von den hohen Einsätzen als Superheld trennen. Als er Doctor Strange um Hilfe bittet, wird die Lage noch gefährlicher und er muss entdecken, was es wirklich bedeutet, Spider-Man zu sein.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 92749,
+        "title": "Moon Knight",
+        "originalTitle": "Moon Knight",
+        "releaseYear": "2022",
+        "posterPath": "/m9fANhU0knW4wPmTekBCJFOmVve.jpg",
+        "backdropPath": "/1uegR4uAxRxiMyX4nQnpzbXhrTw.jpg",
+        "voteAverage": 7.6,
+        "overview": "Als dem sanftmütigen Souvenirverkäufer Steven Grant auf einmal Filmrisse und Erinnerungen an ein anderes Leben zu schaffen machen, findet er heraus, dass er an einer dissoziativen Identitätsstörung leidet, und seinen Körper mit dem Söldner Marc Spector teilt. Dann tauchen dessen Feinde in Stevens / Marcs Leben auf und während die beiden ihre komplexen Identitäten miteinander ausverhandeln und steuern müssen, finden sie sich inmitten der mächtigen Götter Ägyptens wieder.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 453395,
+        "title": "Doctor Strange in the Multiverse of Madness",
+        "originalTitle": "Doctor Strange in the Multiverse of Madness",
+        "releaseYear": "2022",
+        "posterPath": "/nRDLWnkyMpG2OnI9ZsV11y7Dh28.jpg",
+        "backdropPath": "/AdyJH8kDm8xT8IKTlgpEC15ny4u.jpg",
+        "voteAverage": 7.2,
+        "overview": "Eigentlich wollte Doctor Strange nur seiner Ex-Freundin Christine zur Hochzeit gratulieren. Zum Feiern ist jedoch keine Zeit: Ein riesiges Monster droht, die Stadt in Schutt und Asche zu legen. Ziel des Wesens ist die Teenagerin America Chavez, welche die außergewöhnliche Gabe besitzt, zwischen Paralleluniversen reisen zu können. Zusammen mit dem Obersten Zauberer Wong versucht Strange das Mädchen zu beschützen und dafür zu sorgen, dass ihre mächtige aber zugleich gefährliche Fähigkeit nicht in die falschen Hände gerät.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 92782,
+        "title": "Ms. Marvel",
+        "originalTitle": "Ms. Marvel",
+        "releaseYear": "2022",
+        "posterPath": "/iWiBmZwboHN8WJ9wPHECCFRbW4K.jpg",
+        "backdropPath": "/mfcLUWASJghU8MTNK38eYktfE83.jpg",
+        "voteAverage": 6.3,
+        "overview": "Kamala Khan ist eine muslimisch-amerikanische Teenagerin, die in Jersey City aufwächst. Als begeisterte Gamerin und Verfasserin von Fan Fiction ist Kamala ein Superhelden-Fan mit einer blühenden Fantasie - vor allem, wenn es um Captain Marvel geht. Allerdings hat Kamala das Gefühl, in der Schule und manchmal auch zu Hause nicht so recht reinzupassen. Aber nur, bis sie Superkräfte bekommt wie die Helden, zu denen sie immer aufgesehen hat. Das Leben ist besser mit Superkräften, oder?",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 616037,
+        "title": "Thor: Love and Thunder",
+        "originalTitle": "Thor: Love and Thunder",
+        "releaseYear": "2022",
+        "posterPath": "/1YvsQrN6RWDjxfaI8YMpACLM3HI.jpg",
+        "backdropPath": "/jsoz1HlxczSuTx0mDl2h0lxy36l.jpg",
+        "voteAverage": 6.3,
+        "overview": "Nachdem sein Ruhestand von Gorr dem Götterschlächter, einem galaktischen Killer, der die Auslöschung der Götter anstrebt, unterbrochen wird, bittet Thor Odinson um die Hilfe von König Walküre, Korg und seiner Ex-Freundin Jane Foster, die nun als Mighty Thor den Mjolnir schwingt. Gemeinsam begeben sie sich auf ein erschütterndes kosmisches Abenteuer, um das Geheimnis der Rache des Götterschlächters zu lüften und ihn aufzuhalten, bevor es zu spät ist.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 92783,
+        "title": "She-Hulk: Die Anwältin",
+        "originalTitle": "She-Hulk: Attorney at Law",
+        "releaseYear": "2022",
+        "posterPath": "/fUFsfY8v3mKaNRc3vvNfaSqfzWd.jpg",
+        "backdropPath": "/eljErfkQUcFUgQkI4I1soZcH8MW.jpg",
+        "voteAverage": 6.1,
+        "overview": "Die auf Supermenschenrecht spezialisierte Anwältin Jennifer Walters muss sich nicht nur mit den alltäglichen Schwierigkeiten als Single in den 30ern rumschlagen, sondern auch lernen, das Leben als 2-Meter großer Hulk zu meistern.",
+        "mediaType": "tv",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 1013860,
+        "title": "R.I.P.D. 2: Rise of the Damned",
+        "originalTitle": "R.I.P.D. 2: Rise of the Damned",
+        "releaseYear": "2022",
+        "posterPath": "/g4yJTzMtOBUTAR2Qnmj8TYIcFVq.jpg",
+        "backdropPath": "/kmzppWh7ljL6K9fXW72bPN3gKwu.jpg",
+        "voteAverage": 6.2,
+        "overview": "Der Wilde Westen im Jahre 1876: Sheriff Roy Pulsipher (Jeffrey Donovan) wird bei einer Schießerei mit einer Gaunerbande getötet. Kaum hat er realisiert, dass er nicht mehr lebt, wird ihm im Jenseits auch schon ein neuer Job angeboten: als Cop im R.I.P.D., dem Rest in Peace Department. Verstorbene ehemalige Gesetzeshüter werden dort mit der Aufgabe betraut, die Lebenden vor Dämonen-Angriffen und ähnlichen Unannehmlichkeiten zu beschützen. Als Pulsipher zur Erde zurückgeschickt wird, will er allerdings erst einmal nur eines: seinen eigenen Tod rächen. Doch dann öffnet sich im Städtchen Red Creek ein Tor zur Hölle und der Gesetzeshüter aus dem Jenseits hat nun eine viel größere Aufgabe: Er muss die gesamte Menschheit retten.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 505642,
+        "title": "Black Panther: Wakanda Forever",
+        "originalTitle": "Black Panther: Wakanda Forever",
+        "releaseYear": "2022",
+        "posterPath": "/sv1xJUazXeYqALzczSZ3O6nkH75.jpg",
+        "backdropPath": "/83H0C66AcvkwpG2738VCTHMY9uv.jpg",
+        "voteAverage": 7,
+        "overview": "Der König ist tot! König T'Challa, der als Black Panther auch Mitglied der Avengers-Heldentruppe war, stirbt an einer unbekannten Krankheit und ganz Wakanda ist in Trauer. Die Weltgemeinschaft sieht ihre Chance gekommen, um das vermeintlich geschwächte Königreich endlich zu Zugeständnissen bei der Lieferung des mächtigen Minerals Vibranium zu bewegen - und scheut dabei auch vor bewaffneten Überfällen nicht zurück. Doch Königin Ramonda bleibt standhaft und weist die Staatsoberhäupter in ihre Schranken. Wakanda wird auch ohne König T'Challa und den Black Panther weiter existieren und nicht vor anderen Nationen buckeln. Zur selben Zeit haben die USA mithilfe der erst 19 Jahre alten MIT-Studentin Riri Williams ein Gerät zur Aufspürung von Vibranium entwickelt und werden auch auf dem Grund des Meeres fündig. Angeführt von König Namor, bereitet sich das unter dem Meer lebende Volk der Talokanil aus dem Königreich Talokan darauf vor, einen Krieg mit den Landbewohnern zu beginnen.",
+        "mediaType": "movie",
+        "subGroup": "Phase 4"
+      },
+      {
+        "id": 640146,
+        "title": "Ant-Man and the Wasp: Quantumania",
+        "originalTitle": "Ant-Man and the Wasp: Quantumania",
+        "releaseYear": "2023",
+        "posterPath": "/j3C9sEaEmqFqoZmnzQMFzKbLuNQ.jpg",
+        "backdropPath": "/m8JTwHFwX7I7JY5fPe4SjqejWag.jpg",
+        "voteAverage": 6.2,
+        "overview": "Als Scott Langs Tochter Cassie ein Gerät entwickelt, durch das eine Kommunikation mit der Quantenebene möglich werden soll, endet das Experiment in einer Katastrophe: Cassie, Scott und seine Mitstreiterin Hope van Dyne finden sich ungewollt in dem mystischen Reich wieder. Gemeinsam mit Hopes Eltern Hank Pym und Janet van Dyne arbeitet das Trio an einem Weg zurück, während sie die mysteriöse Welt des Quantenreichs, in der sie auf fremde Kreaturen und eine versteckte Zivilisation treffen, auf Entdeckungsreise lockt. Dabei erfahren sie auch, dass Janet, die 30 Jahre lang hier gefangen war, noch das ein oder andere Geheimnis aus ihrer Vergangenheit vor ihnen verbirgt: Denn ebenso gefangen in der Quantendimension ist der mysteriöse Kang, der die Fähigkeit besitzt, durch Zeit und Multiversum zu reisen, und Scotts Hilfe für eine wichtige Mission benötigt. Doch ist dem mächtigen Kang zu trauen?",
+        "mediaType": "movie",
+        "subGroup": "Phase 5"
+      },
+      {
+        "id": 447365,
+        "title": "Guardians of the Galaxy Vol. 3",
+        "originalTitle": "Guardians of the Galaxy Vol. 3",
+        "releaseYear": "2023",
+        "posterPath": "/d1DEggMecolWV6ZUcrygiLAqxOJ.jpg",
+        "backdropPath": "/5YZbUmjbMa3ClvSW1Wj3D6XGolb.jpg",
+        "voteAverage": 7.9,
+        "overview": "Peter Quill, der immer noch unter dem Verlust von Gamora leidet, muss sein Team um sich versammeln, um das Universum zu verteidigen und gleichzeitig einen der Seinen zu schützen. Eine Mission, die, wenn sie nicht erfolgreich abgeschlossen wird, möglicherweise zum Ende der Guardians, wie wir sie kennen, führen könnte.",
+        "mediaType": "movie",
+        "subGroup": "Phase 5"
+      },
+      {
+        "id": 114479,
+        "title": "The Acolyte",
+        "originalTitle": "The Acolyte",
+        "releaseYear": "2024",
+        "posterPath": "/rGCjqFBO85I1RojOKQMo8uyRQGy.jpg",
+        "backdropPath": "/kwronSXO1ogMqHHFvY2eBxfFLdn.jpg",
+        "voteAverage": 5.3,
+        "overview": "Hundert Jahre vor dem Aufstieg des Imperiums: Der Orden der Jedi und die Galaktische Republik gedeihen seit Jahrhunderten ohne Krieg. Zu dieser Zeit muss sich ein Jedi-Meister der Untersuchung einer erschütternden Verbrechensreihe widmen und sich einem gefährlichen Gegner aus der Vergangenheit stellen.",
+        "mediaType": "tv",
+        "subGroup": "Phase 5"
+      },
+      {
+        "id": 609681,
+        "title": "The Marvels",
+        "originalTitle": "The Marvels",
+        "releaseYear": "2023",
+        "posterPath": "/dWIieoTI4GF1YYSqDMcU4InwVco.jpg",
+        "backdropPath": "/feSiISwgEpVzR1v3zv2n2AU4ANJ.jpg",
+        "voteAverage": 5.9,
+        "overview": "Als die Pflicht sie zu einem anomalen Wurmloch ruft, das ein Kree-Revolutionär ausgelöst hat, werden die Kräfte von Carol Danvers (Captain Marvel), Kamala Khan (Ms. Marvel), ein Superfan Jersey Citys, und Carols Nichte, die S.A.B.E.R.-Astronautin Captain Monica Rambeau, vereint. Das ungleiche Trio muss als „The Marvels“ das Universum retten.",
+        "mediaType": "movie",
+        "subGroup": "Phase 5"
+      },
+      {
+        "id": 138502,
+        "title": "X-Men '97",
+        "originalTitle": "X-Men '97",
+        "releaseYear": "2024",
+        "posterPath": "/2HKBc5UiFw8JrruHq8S1Y7TnlW0.jpg",
+        "backdropPath": "/jIyEmnBrZtl6SEWyBoMO2hZnzMa.jpg",
+        "voteAverage": 8.7,
+        "overview": "\"X-Men '97\" ist eine Zeitreise in die legendären 1990er Jahre, in der die X-Men, eine Gruppe Mutanten, ihre erstaunlichen Kräfte zum Schutz einer Welt einsetzen, von der sie gehasst und gefürchtet werden. Ihnen steht eine nie dagewesene Herausforderung bevor, als sie sich einer unerwarteten und gefährlichen neuen Zukunft stellen müssen.",
+        "mediaType": "tv",
+        "subGroup": "Phase 5"
+      },
+      {
+        "id": 533535,
+        "title": "Deadpool & Wolverine",
+        "originalTitle": "Deadpool & Wolverine",
+        "releaseYear": "2024",
+        "posterPath": "/chDpMyvXNDFMhg3yUknITnGUCUk.jpg",
+        "backdropPath": "/by8z9Fe8y7p4jo2YlW2SZDnptyT.jpg",
+        "voteAverage": 7.6,
+        "overview": "Seit Jahren träumt Deadpool davon, ein Avenger zu werden – und nun bietet ihm der zwielichtige TVA-Agent Mr. Paradox an, in die heilige Zeitlinie zu wechseln, um dort Teil des MCU zu sein. Doch dafür muss der vorlaute Söldner ein großes Opfer bringen: Seine Welt wird ausgelöscht. Weil Deadpool dies nicht zulassen will, schickt Mr. Paradox ihn und eine von Deadpool rekrutierte, abgehalfterte Variante von Wolverine in die Leere – die große Müllhalde aller Universen. Dort hat die finstere Cassandra Nova ein Schreckens-Regime errichtet. Deadpool ist klar: Will er seine Welt, all seine Freunde und seine große Liebe Vanessa retten, muss er an ihr vorbei und auch Mr. Paradox aufhalten. Doch dazu muss er erst einmal den verbitterten Wolverine überzeugen, ihm zu helfen …",
+        "mediaType": "movie",
+        "subGroup": "Phase 5"
+      },
+      {
+        "id": 138501,
+        "title": "Agatha All Along",
+        "originalTitle": "Agatha All Along",
+        "releaseYear": "2024",
+        "posterPath": "/mGsxKwXUjojitRv2E9qMTbxbBRd.jpg",
+        "backdropPath": "/tYLXJW1sZQU09VWY1BhSVPKGIwc.jpg",
+        "voteAverage": 7.4,
+        "overview": "Agatha Harkness versammelt einen Hexenzirkel und begibt sich auf eine gefährliche Reise.",
+        "mediaType": "tv",
+        "subGroup": "Phase 5"
       }
     ]
   },
   {
-    "id": "james-bond-craig",
-    "name": "James Bond 007 (Daniel Craig Ära)",
+    "id": "james-bond",
+    "name": "James Bond 007 (Gesamtreihe)",
     "category": "franchise",
-    "tagline": "Im Geheimdienst Ihrer Majestät",
-    "description": "Der Neuanfang mit 007: Physisch, emotional und kompromisslos von Casino Royale bis Keine Zeit zu sterben.",
-    "backdropPath": "/klJMCIblHLFwCuGjKz7tyOpekIC.jpg",
+    "tagline": "Alle 26 Filme: Von Sean Connery bis Daniel Craig",
+    "description": "Im Geheimdienst Ihrer Majestät: Die legendärste Spionagereihe der Kinogeschichte. Filtere nach deinem Lieblings-Bond-Darsteller!",
+    "backdropPath": "/wkA622CCN2X0uwpgqYEOnUYEDf5.jpg",
     "posterPath": "/uvigE215SzXdsEFPN0XRFR9RPiA.jpg",
+    "subGroupLabel": "Schauspieler",
     "movies": [
+      {
+        "id": 646,
+        "title": "James Bond 007 jagt Dr. No",
+        "originalTitle": "Dr. No",
+        "releaseYear": "1962",
+        "posterPath": "/1NN9uwOnZiw4rj3drWHo0JVGZuq.jpg",
+        "backdropPath": "/srgq7bzZsuDw7NoGXdazRXp7Hl6.jpg",
+        "voteAverage": 7,
+        "overview": "Der mysteriöse Wissenschaftler Dr. No sabotiert von seiner geheimen Basis auf Jamaica aus das amerikanische Raumfahrtprogramm. Der Secret Service setzt seinen besten Agenten auf den Wissenschaftler an.",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 657,
+        "title": "James Bond 007 - Liebesgrüße aus Moskau",
+        "originalTitle": "From Russia with Love",
+        "releaseYear": "1963",
+        "posterPath": "/vmrQOory7HiGII0cZqZLMGpbsUD.jpg",
+        "backdropPath": "/8JMiQa0OqsCYvbNUrQIrMzwV7g2.jpg",
+        "voteAverage": 7.1,
+        "overview": "James Bond soll in Istanbul eine russische Dechiffriermaschine von einer übergelaufenen Agentin erhalten. Das verlockende Angebot entpuppt sich jedoch als tödliche Falle.",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 658,
+        "title": "James Bond 007 - Goldfinger",
+        "originalTitle": "Goldfinger",
+        "releaseYear": "1964",
+        "posterPath": "/okCBHoGLpyvZq8WRUZo9cKtox2I.jpg",
+        "backdropPath": "/mM4WeXqJd2tu1gCF5GYyAZf2Npl.jpg",
+        "voteAverage": 7.4,
+        "overview": "Die teuerste Art zu töten. James Bond, der Superagent seiner Majestät, wird auf die Fährte eines verbrecherischen Genies gesetzt, das die Goldreserven von Fort Knox in seinen Besitz bringen will. Bonds Gegner Goldfinger ist der Mann, der seine abtrünnig gewordene Geliebte einem tödlichen Veredelungsprozeß aussetzte, indem er sie mit Gold überzog. Männliche Rivalen barbiert Odd-Job, der Leibwächter des exzentrischen Mulitmillionärs, mit seiner rasiermesserscharfen Hutkrempe aus Metall. Mit Hilfe von Pussy Galore will Bond den Raub des Goldes vereiteln...",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 660,
+        "title": "James Bond 007 - Feuerball",
+        "originalTitle": "Thunderball",
+        "releaseYear": "1965",
+        "posterPath": "/re3zKpNdDDRnaT1YkqMBo8N5tlF.jpg",
+        "backdropPath": "/7DLCXCQx52YLle1qTokrjROTwVV.jpg",
+        "voteAverage": 6.7,
+        "overview": "Die Verbrecherorganisation Phantom bringt zwei Atombomben in ihre Gewalt und verlangt nun innerhalb von sieben Tagen 100 Millionen Pfund in Form lupenreiner Diamanten als Lösegeld. Der Secret Service schickt James Bond auf die Bahamas, um wieder einmal die Welt zu retten.",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 667,
+        "title": "James Bond 007 - Man lebt nur zweimal",
+        "originalTitle": "You Only Live Twice",
+        "releaseYear": "1967",
+        "posterPath": "/ytGRF5H5A5VNBUZqUv6rsVPqqpm.jpg",
+        "backdropPath": "/cpZAXIYA0lkZMpAt7d1MmH8ojNV.jpg",
+        "voteAverage": 6.6,
+        "overview": "Ein mysteriöses Raumschiff entführt eine russische und eine amerikanische Raumkapsel und bringt die Welt an den Rand eines Weltkrieges. James Bond ermittelt in Japan, trifft auf seinen Erzfeind Blofeld und die raffinierte Helga Brandt.",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 668,
+        "title": "James Bond 007 - Im Geheimdienst Ihrer Majestät",
+        "originalTitle": "On Her Majesty's Secret Service",
+        "releaseYear": "1969",
+        "posterPath": "/6DBLzErXDrPSqUEXSUDk0IQslLv.jpg",
+        "backdropPath": "/58pMrmwwcKamJIdjUlinE6QX1Fs.jpg",
+        "voteAverage": 6.6,
+        "overview": "Im Urlaub kann James Bond die junge Tracy Draco gerade noch davon abbringen, sich umzubringen. Ihr Vater, ein mächtiger Gangsterboss macht daraufhin 007 ein Angebot. Er erhält wichtige Informationen über seinen Erzfeind Blofeld, sollte er Tracy heiraten.",
+        "mediaType": "movie",
+        "subGroup": "George Lazenby"
+      },
+      {
+        "id": 681,
+        "title": "James Bond 007 - Diamantenfieber",
+        "originalTitle": "Diamonds Are Forever",
+        "releaseYear": "1971",
+        "posterPath": "/2HJYuNpFZG5YGaZGNV4vAJM8mop.jpg",
+        "backdropPath": "/pyTDtQCn5sG8gi2zkM5ZylSNmtJ.jpg",
+        "voteAverage": 6.4,
+        "overview": "Große Mengen Diamanten verschwinden, ohne auf dem internationalen Markt wieder aufzutauchen. James Bond wird in einen Schmugglerring infiltriert, um der Sache nachzugehen. Die Spur führt nach Las Vegas und zu keinem Geringeren als Bonds Erzfeind Ernst Stavro Blofeld.",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 253,
+        "title": "James Bond 007 - Leben und sterben lassen",
+        "originalTitle": "Live and Let Die",
+        "releaseYear": "1973",
+        "posterPath": "/suFU9xpyZYtJaTjUyOHbgELuqj7.jpg",
+        "backdropPath": "/hzmmXx6UeYQeylioNbliFKjSbV7.jpg",
+        "voteAverage": 6.5,
+        "overview": "An drei verschiedenen Orten der Erde werden gleichzeitig drei Agenten des britischen Geheimdienstes umgebracht. James Bond wird mit dem brisanten Fall beauftragt, der ihn nach New York führt. Dort stößt er auf den mysteriösen Unterweltboss Mr. Big, der ihn bereits als nächstes Ziel auserkoren hat. Bond kann jedoch entkommen und findet bald eine Verbindung zwischen Mr. Big und dem Diplomaten Katanga. Doch seine Spur führt noch viel weiter in die Unterwelt New Yorks.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 682,
+        "title": "James Bond 007 - Der Mann mit dem goldenen Colt",
+        "originalTitle": "The Man with the Golden Gun",
+        "releaseYear": "1974",
+        "posterPath": "/pBS0mJTBAFmdzn0UNV4uNe9M4u5.jpg",
+        "backdropPath": "/3tpNEbRahT8smy7RraaWa0xg9Gv.jpg",
+        "voteAverage": 6.5,
+        "overview": "Eine goldene Pistolenkugel, auf der 007 eingraviert ist, trifft im Hauptquartier des Secret Service ein. Absender ist der Profikiller Scaramanga, und Scaramanga hat noch nie ein Ziel verfehlt. James Bond versucht den Killer rechtzeitig zu stoppen.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 691,
+        "title": "James Bond 007 - Der Spion, der mich liebte",
+        "originalTitle": "The Spy Who Loved Me",
+        "releaseYear": "1977",
+        "posterPath": "/3z50Zw7ryke1e8BZOoCqTmlfsLt.jpg",
+        "backdropPath": "/lhPq8R8qgoyLNWvVTiqZSkYGLPX.jpg",
+        "voteAverage": 6.8,
+        "overview": "Ein russisches und ein amerikanisches U-Boot mit Atomraketen an Bord verschwinden spurlos von der Bildfläche. Amerikaner und Russen beschuldigen sich gegenseitig. James Bond soll das Rätsel der verschwundenen U-Boote lösen. Aber auch der KGB hat schon einen Agenten losgeschickt.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 698,
+        "title": "James Bond 007 - Moonraker - Streng geheim",
+        "originalTitle": "Moonraker",
+        "releaseYear": "1979",
+        "posterPath": "/6eLKYWcFWhtCTdaI2ErY60Z5uui.jpg",
+        "backdropPath": "/mrDC5DLx2wljt4HZGwgkmqlzfcF.jpg",
+        "voteAverage": 6.2,
+        "overview": "Während des Transportes auf dem Rücken einer Boeing 747 wird ein Space Shuttle entführt und das Flugzeug vernichtet. Seine Nachforschungen führen James Bond zu der Herstellerfirma des Shuttles. Schon bald merkt er, dass deren Besitzer Hugo Drax die gesamte Menschheit vernichten will. Es kommt zum Showdown im Weltall.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 699,
+        "title": "James Bond 007 - In tödlicher Mission",
+        "originalTitle": "For Your Eyes Only",
+        "releaseYear": "1981",
+        "posterPath": "/d1oag1lJECK8GYellrjyDeOHyHh.jpg",
+        "backdropPath": "/z7Jp7HAsY7MqXzPYzTjJnmOQk2r.jpg",
+        "voteAverage": 6.5,
+        "overview": "Ein als Fischkutter getarntes Spionageschiff der Engländer sinkt im ionischen Meer. An Bord befindet sich ein strenggeheimes Steuer- und Verschlüsselungsgerät ATAC. In feindlichen Händen könnte es zum Abschuss von Atomraketen auf westliche Städte verwendet werden. James Bond muss das Gerät finden, bevor es dem Feind in die Hände gerät.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 700,
+        "title": "James Bond 007 - Octopussy",
+        "originalTitle": "Octopussy",
+        "releaseYear": "1983",
+        "posterPath": "/ezfTabPy2lhS2qZA6pByq4Hz8To.jpg",
+        "backdropPath": "/xTS1qCmhzH3vq7cuextO5vQA6eW.jpg",
+        "voteAverage": 6.4,
+        "overview": "Um die wahren Hintergründe einer gigantischen Juwelenschieberei aufzuspüren, ist James Bond der geheimnisvollen Octopussy auf den Fersen. Sie ahnt nicht, dass sie von einem Wahnsinnigen hinters Licht geführt wird. Der russische General Orlov benutzt ihren Octopussy-Zirkus vorgeblich, mit ihm den geraubten Kreml-Schatz durch Europa zu schmuggeln. Tatsächlich dient er ihm nur als trojanisches Pferd für einen atomaren Sprengkörper, der auf dem Gelände der US-Airforce in Feldberg detonieren soll.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 36670,
+        "title": "Sag niemals nie",
+        "originalTitle": "Never Say Never Again",
+        "releaseYear": "1983",
+        "posterPath": "/im3FnMct3LKIqzYdQqKMR3tkKKX.jpg",
+        "backdropPath": "/45uCcAUB8Ljz3uKb1y1JHtT5aCT.jpg",
+        "voteAverage": 6.1,
+        "overview": "Von einem Nato-Stützpunkt in England werden auf spektakuläre Weise zwei Atomraketen gestohlen. Als die Nato damit erpresst werden soll, schicken die Briten ihren Topagenten James Bond, um die nukleare Bedrohung abzuwenden, und die Gangster dingfest zu machen.",
+        "mediaType": "movie",
+        "subGroup": "Sean Connery"
+      },
+      {
+        "id": 707,
+        "title": "James Bond 007 - Im Angesicht des Todes",
+        "originalTitle": "A View to a Kill",
+        "releaseYear": "1985",
+        "posterPath": "/1q95oXKELFwEpqkPkNdKpY40BKN.jpg",
+        "backdropPath": "/hvGWyyC8wER1I8ExSXNtFBs7Mgd.jpg",
+        "voteAverage": 6.3,
+        "overview": "Ein im Westen entwickelter Mikrochip, der unempfindlich gegen elektromagnetische Strahlung durch Nuklearexplosionen ist, fällt dem KGB in die Hände. James Bond soll die undichte Stelle finden. Schnell fällt sein Verdacht auf den Großindustriellen Max Zorin.",
+        "mediaType": "movie",
+        "subGroup": "Roger Moore"
+      },
+      {
+        "id": 708,
+        "title": "James Bond 007 - Der Hauch des Todes",
+        "originalTitle": "The Living Daylights",
+        "releaseYear": "1987",
+        "posterPath": "/10Od1LGlmBbz4EVjPTyTtDV8zuU.jpg",
+        "backdropPath": "/ebaq0ecL1Tu39rIExfHwE4ToFl2.jpg",
+        "voteAverage": 6.6,
+        "overview": "James Bond verhilft einem russischen General zur Flucht in den Westen. Von ihm erfährt er, dass der KGB in einer groß angelegten Aktion alle feindlichen Agenten töten will. Wenig später wird der General vor den Augen des Secret Service entführt. 007 schöpft einen Verdacht.",
+        "mediaType": "movie",
+        "subGroup": "Timothy Dalton"
+      },
+      {
+        "id": 709,
+        "title": "James Bond 007 - Lizenz zum Töten",
+        "originalTitle": "Licence to Kill",
+        "releaseYear": "1989",
+        "posterPath": "/rTGkZ0E69mmBCKVZpNSONlRBA6I.jpg",
+        "backdropPath": "/p6VFbg5lhWj0RCgXf5dj6IDMPvt.jpg",
+        "voteAverage": 6.4,
+        "overview": "James Bond und sein amerikanischer Kollege Felix Leiter verhaften den Drogenbaron Sanchez. Als diesem die Flucht gelingt, rächt er sich auf furchtbare Weise an Leiter und seiner Frau. Bond kennt nur noch ein Ziel: Rache.",
+        "mediaType": "movie",
+        "subGroup": "Timothy Dalton"
+      },
+      {
+        "id": 710,
+        "title": "James Bond 007 - GoldenEye",
+        "originalTitle": "GoldenEye",
+        "releaseYear": "1995",
+        "posterPath": "/dlim5SqnaPVuTAinwc4mhLLRyxR.jpg",
+        "backdropPath": "/fIWsCpYR9iGDMSbMTSAzy8L7Kg5.jpg",
+        "voteAverage": 6.9,
+        "overview": "Die russische Mafia-Gruppe Janus hat “Goldeneye”, zwei Satelliten, deren elektromagnetische Strahlen alle elektrischen Geräte im Umkreis eines anvisierten Ziels zerstören, in ihre Kontrolle gebracht. Der Chef dieser kriminellen Bande ist Ex-”006″ Alec Trevelyan, James Bonds ehemaliger Kollege. Zusammen mit der Computerspezialistin Natalya Simonova setzt sich 007 auf die Spuren des Verräters.",
+        "mediaType": "movie",
+        "subGroup": "Pierce Brosnan"
+      },
+      {
+        "id": 714,
+        "title": "James Bond 007 - Der Morgen stirbt nie",
+        "originalTitle": "Tomorrow Never Dies",
+        "releaseYear": "1997",
+        "posterPath": "/tDfR8AXJO1MglZm1o1BewO22Y7u.jpg",
+        "backdropPath": "/fesAgiKA0pc04vScDTAQe1f9nd4.jpg",
+        "voteAverage": 6.4,
+        "overview": "Der britische Medienmogul Carver will durch Manipulation und Intrigen England in einen Krieg mit China stürzen, denn schlechte Nachrichten bringen Geld. Nur James Bond kann ihn davon abhalten, durch seine Medienpräsenz einer der mächtigsten Männer der Welt zu werden.",
+        "mediaType": "movie",
+        "subGroup": "Pierce Brosnan"
+      },
+      {
+        "id": 36643,
+        "title": "James Bond 007 - Die Welt ist nicht genug",
+        "originalTitle": "The World Is Not Enough",
+        "releaseYear": "1999",
+        "posterPath": "/fdWolbQxwloXsoAlTpn9NlbwrO3.jpg",
+        "backdropPath": "/n2jVDMcBEWsLFooO7W1ZkcMUtWS.jpg",
+        "voteAverage": 6.3,
+        "overview": "Im Hauptquartier des britischen Geheimdienstes kommt Öl-Multi Sir Robert King bei einem Bombenanschlag ums Leben. Agent 007 soll den Mörder entlarven und gleichzeitig Elektra, die bildhübsche Erbin des Milliarden-Imperiums, vor berüchtigten internationalen Terroristen beschützen.",
+        "mediaType": "movie",
+        "subGroup": "Pierce Brosnan"
+      },
+      {
+        "id": 36669,
+        "title": "James Bond 007 - Stirb an einem anderen Tag",
+        "originalTitle": "Die Another Day",
+        "releaseYear": "2002",
+        "posterPath": "/tAWx4Ju69rzDTMkntblMRhuCy.jpg",
+        "backdropPath": "/orI5mvpksYIlhJqzdmeipys6sHQ.jpg",
+        "voteAverage": 6,
+        "overview": "Auf der Jagd nach dem größenwahnsinnigen Schurken Gustav Graves und seinem gnadenlosen Erfüllungsgehilfen Zao reist Bond in die Höhle des Löwen bis nach Island. In einem fantastischen, vollkommen aus Eis erbauten Palast muss er am eigenen Leib die durchschlagende Wirkung einer neuen Superwaffe kennen lernen. Das Geschehen spitzt sich zu, bis es schließlich, wieder am Ausgangsort Korea angelangt, zu einem explosiven Showdown – und einem unvergesslichen Schlussakt – kommt.",
+        "mediaType": "movie",
+        "subGroup": "Pierce Brosnan"
+      },
       {
         "id": 36557,
         "title": "James Bond 007 - Casino Royale",
@@ -878,7 +1587,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/uvigE215SzXdsEFPN0XRFR9RPiA.jpg",
         "backdropPath": "/klJMCIblHLFwCuGjKz7tyOpekIC.jpg",
         "voteAverage": 7.6,
-        "overview": "Sein erster Auftrag, nachdem er die Lizenz zum Töten erhalten hat, führt den MI6-Agenten James Bond nach Madagaskar, wo er auf den Terroristen Mollaka angesetzt wird. Zwar verläuft nicht alles nach Plan, doch als Bond auf eigene Faust weiter ermittelt, kommt er auf die Spur von Le Chiffre, dem Bankier einer weltweit operierenden Terror-Organisation. Dieser plant, das Vermögen seiner Organisation durch ein illegales Pokerspiel im „Casino Royale“ in Montenegro um ein Vielfaches zu erhöhen, wofür natürlich auch ein hoher Einsatz nötig ist. Der MI6 sieht daher die Chance, die Terroristen in den finanziellen Ruin zu treiben und beauftragt James Bond, die Pläne von Le Chiffre zunichte zu machen."
+        "overview": "Sein erster Auftrag, nachdem er die Lizenz zum Töten erhalten hat, führt den MI6-Agenten James Bond nach Madagaskar, wo er auf den Terroristen Mollaka angesetzt wird. Zwar verläuft nicht alles nach Plan, doch als Bond auf eigene Faust weiter ermittelt, kommt er auf die Spur von Le Chiffre, dem Bankier einer weltweit operierenden Terror-Organisation. Dieser plant, das Vermögen seiner Organisation durch ein illegales Pokerspiel im „Casino Royale“ in Montenegro um ein Vielfaches zu erhöhen, wofür natürlich auch ein hoher Einsatz nötig ist. Der MI6 sieht daher die Chance, die Terroristen in den finanziellen Ruin zu treiben und beauftragt James Bond, die Pläne von Le Chiffre zunichte zu machen.",
+        "mediaType": "movie",
+        "subGroup": "Daniel Craig"
       },
       {
         "id": 10764,
@@ -888,7 +1599,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/5aFAFIQrB4uHfuEByUknFGRvLOE.jpg",
         "backdropPath": "/uGs5Z7dMguf7kxWubGFcp9EhKcy.jpg",
         "voteAverage": 6.3,
-        "overview": "Nach dem Tod von Vesper Lynd versucht James Bond an die Hintermänner des Komplotts gegen Lynd zu kommen. Beim MI6 wird dazu Mr. White verhört, dem durch einen internen Verrat während des Verhörs die Flucht gelingt. Die Spur führt Bond nach Haiti. Dort gelangt er durch die attraktive Camille an den zwielichtigen Dominic Greene, der mit dem Komplott in Verbindung zu stehen scheint. Bond muss fortan nicht nur einmal um sein Leben bangen..."
+        "overview": "Nach dem Tod von Vesper Lynd versucht James Bond an die Hintermänner des Komplotts gegen Lynd zu kommen. Beim MI6 wird dazu Mr. White verhört, dem durch einen internen Verrat während des Verhörs die Flucht gelingt. Die Spur führt Bond nach Haiti. Dort gelangt er durch die attraktive Camille an den zwielichtigen Dominic Greene, der mit dem Komplott in Verbindung zu stehen scheint. Bond muss fortan nicht nur einmal um sein Leben bangen...",
+        "mediaType": "movie",
+        "subGroup": "Daniel Craig"
       },
       {
         "id": 37724,
@@ -898,7 +1611,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/AkpcDSA2NQb0tlNyOs2h00qX0K0.jpg",
         "backdropPath": "/wkA622CCN2X0uwpgqYEOnUYEDf5.jpg",
         "voteAverage": 7.3,
-        "overview": "Auf der Jagd nach einer Liste von Undercoveragenten, die mit diesem Dokument enttarnt und in den sicheren Tod geschickt werden könnten, stürzt James Bond, von einer Kugel getroffen, in eine tiefe Schlucht. Von Freund und Feind für tot gehalten, hält sich 007 versteckt, bis ihn ein Bombenanschlag auf seinen Geheimdienst zum Handeln zwingt. So kehrt Bond zum MI6 zurück, kämpft gegen einen unbekannten Gegner, der nur ein Ziel kennt: Dem britischen Geheimdienst empfindlich zu schaden und dessen Chefin M zu töten."
+        "overview": "Auf der Jagd nach einer Liste von Undercoveragenten, die mit diesem Dokument enttarnt und in den sicheren Tod geschickt werden könnten, stürzt James Bond, von einer Kugel getroffen, in eine tiefe Schlucht. Von Freund und Feind für tot gehalten, hält sich 007 versteckt, bis ihn ein Bombenanschlag auf seinen Geheimdienst zum Handeln zwingt. So kehrt Bond zum MI6 zurück, kämpft gegen einen unbekannten Gegner, der nur ein Ziel kennt: Dem britischen Geheimdienst empfindlich zu schaden und dessen Chefin M zu töten.",
+        "mediaType": "movie",
+        "subGroup": "Daniel Craig"
       },
       {
         "id": 206647,
@@ -908,7 +1623,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/zmSO6LBHJdVAnlgRHlBmIyVfm6L.jpg",
         "backdropPath": "/cCKU3EuiSKt6xsOI6gg5kiFgZYm.jpg",
         "voteAverage": 6.6,
-        "overview": "James Bond erhält eine kryptische Nachricht aus seiner Vergangenheit, die ihn auf die Spur einer finsteren Organisation bringt. Bond muss immer mehr entdecken, dass es viele Täuschungen und Lügen gibt, die er entschlüsseln muss. Während sein Boss M mit anderen Problemen kämpft, mit politischen Kräften konfrontiert ist, die den ganzen Geheimdienst gefährden, erkennt Bond erst nach und nach die schreckliche Wahrheit hinter Spectre."
+        "overview": "James Bond erhält eine kryptische Nachricht aus seiner Vergangenheit, die ihn auf die Spur einer finsteren Organisation bringt. Bond muss immer mehr entdecken, dass es viele Täuschungen und Lügen gibt, die er entschlüsseln muss. Während sein Boss M mit anderen Problemen kämpft, mit politischen Kräften konfrontiert ist, die den ganzen Geheimdienst gefährden, erkennt Bond erst nach und nach die schreckliche Wahrheit hinter Spectre.",
+        "mediaType": "movie",
+        "subGroup": "Daniel Craig"
       },
       {
         "id": 370172,
@@ -918,7 +1635,9 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "posterPath": "/bqq2dlwWAm5O5RVPGHVwwxhESK1.jpg",
         "backdropPath": "/x9td0NQha0t44K2qgcMipLOGjVi.jpg",
         "voteAverage": 7.3,
-        "overview": "James Bond hat seine Lizenz zum Töten im Auftrag des britischen Geheimdienstes abgegeben und genießt seinen Ruhestand in Jamaika. Die friedliche Zeit nimmt ein unerwartetes Ende, als sein alter CIA-Kollege Felix Leiter auftaucht und ihn um Hilfe bittet. Ein bedeutender Wissenschaftler ist entführt worden und muss so schnell wie möglich gefunden werden. Was als simple Rettungsmission beginnt, erreicht bald einen bedrohlichen Wendepunkt, denn Bond kommt einem geheimnisvollen Gegenspieler auf die Spur, der im Besitz einer brandgefährlichen neuen Technologie ist."
+        "overview": "James Bond hat seine Lizenz zum Töten im Auftrag des britischen Geheimdienstes abgegeben und genießt seinen Ruhestand in Jamaika. Die friedliche Zeit nimmt ein unerwartetes Ende, als sein alter CIA-Kollege Felix Leiter auftaucht und ihn um Hilfe bittet. Ein bedeutender Wissenschaftler ist entführt worden und muss so schnell wie möglich gefunden werden. Was als simple Rettungsmission beginnt, erreicht bald einen bedrohlichen Wendepunkt, denn Bond kommt einem geheimnisvollen Gegenspieler auf die Spur, der im Besitz einer brandgefährlichen neuen Technologie ist.",
+        "mediaType": "movie",
+        "subGroup": "Daniel Craig"
       }
     ]
   },
@@ -1173,6 +1892,166 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "backdropPath": "/eNI7PtK6DEYgZmHWP9gQNuff8pv.jpg",
         "voteAverage": 6.3,
         "overview": "Thomas Anderson lebt ein normales Leben, arbeitet für eine große Firma und geht regelmäßig zur Therapie, wo sein Therapeut versucht, ihm seine Traumata auszutreiben. Denn Thomas hat Probleme damit, Realität und Fiktion auseinanderzuhalten. Er kann doch nicht wirklich einst als Auserwählter Neo in den Krieg gegen die Maschinen gezogen sein, oder?"
+      }
+    ]
+  },
+  {
+    "id": "jason-bourne",
+    "name": "Jason Bourne Filmreihe",
+    "category": "franchise",
+    "tagline": "Sie gaben ihm ein Gedächtnis – er gab ihnen den Krieg",
+    "description": "Treadstone, Blackbriar und knallharte Nahkämpfe: Die revolutionäre Spionage-Reihe mit Matt Damon.",
+    "backdropPath": "/fE7RqvVHbGHjBC9NjIjlLh2t4zK.jpg",
+    "posterPath": "/fvolOVhsJnKGK8HYUhgQ7tuIsIh.jpg",
+    "subGroupLabel": "Hauptdarsteller",
+    "movies": [
+      {
+        "id": 2501,
+        "title": "Die Bourne Identität",
+        "originalTitle": "The Bourne Identity",
+        "releaseYear": "2002",
+        "posterPath": "/fvolOVhsJnKGK8HYUhgQ7tuIsIh.jpg",
+        "backdropPath": "/kJaRWmy1BGq3pHyE94LOTteiHer.jpg",
+        "voteAverage": 7.5,
+        "overview": "Ein junger Mann wird halb tot, mit 2 Kugeln im Rücken und totaler Amnesie von Fischern aus dem Mittelmeer gezogen. Die Suche nach seinem Ich und seiner Vergangenheit führt ihn nach Zürich, wo er in einem Schließfach Hinweise auf seine Identität findet. Er ist Jason Bourne und auf der Flucht vor seinem ehemaligen Arbeitgeber, der CIA. Schon haben sich Agenten an seine Versen geheftet um ihn aus dem Weg zu räumen, doch mit Hilfe der Touristin Marie gelingt ihm fürs erste die Flucht...",
+        "mediaType": "movie",
+        "subGroup": "Matt Damon"
+      },
+      {
+        "id": 2502,
+        "title": "Die Bourne Verschwörung",
+        "originalTitle": "The Bourne Supremacy",
+        "releaseYear": "2004",
+        "posterPath": "/zKYKQR3rn1ng9R3MwdKNW3ZWrLd.jpg",
+        "backdropPath": "/fE7RqvVHbGHjBC9NjIjlLh2t4zK.jpg",
+        "voteAverage": 7.3,
+        "overview": "Jason Bourne und seine Lebensgefährtin Marie leben zurückgezogen in Indien, doch der immer noch unter Amnesie leidende Jason wird jede Nacht von Alpträumen gequält. Als in Berlin zwei Agenten getötet werden, schiebt man ihm die Schuld in die Schuhe. Wieder setzt die CIA Agenten auf Bourne an und er und Marie müssen flüchten. Doch als die CIA-Killer Marie töten dreht Jason den Spieß um...",
+        "mediaType": "movie",
+        "subGroup": "Matt Damon"
+      },
+      {
+        "id": 2503,
+        "title": "Das Bourne Ultimatum",
+        "originalTitle": "The Bourne Ultimatum",
+        "releaseYear": "2007",
+        "posterPath": "/jHRDOX7WXcW8udRInTthlgnXYa8.jpg",
+        "backdropPath": "/qiBILuWhv7ipF0pxiEqIJdkQzj8.jpg",
+        "voteAverage": 7.4,
+        "overview": "Um das dunkle Kapitel seiner Vergangenheit endlich auszulöschen, muss Jason Bourne sich dieser stellen. Das Projekt, welches ihn erschuf, wird auch weiterhin illegal fortgesetzt. Bourne macht sich daran, den Mord an seiner Freundin zu rächen. Unterstützt wird er dabei von Nicki, einer ehemaligen Agentin und der CIA-Agentin Landy. Doch auch der CIA-Chef Vosen hat seine Killer schon auf Bourne angesetzt, damit alle Gefahren für die Weiterführung des Projekts beseitigt werden.",
+        "mediaType": "movie",
+        "subGroup": "Matt Damon"
+      },
+      {
+        "id": 49040,
+        "title": "Das Bourne Vermächtnis",
+        "originalTitle": "The Bourne Legacy",
+        "releaseYear": "2012",
+        "posterPath": "/h9FIsXXJWETKoQglfJskFSQXf6a.jpg",
+        "backdropPath": "/akNBILfG0vh7WhuzjA1bXfrgpYI.jpg",
+        "voteAverage": 6.3,
+        "overview": "Jason Bourne war nicht alleine: Tatsächlich war er nur einer von vielen Agenten, die beim Treadstone-Programm zu einer willenlosen Tötungsmaschine umprogrammiert wurden. Zu ihnen gehörte auch Aaron Cross, ein Agent, der als verschwunden galt - bis er, wie Bourne, unvermittelt mit gelöschtem Gedächtnis wieder auftaucht und beginnt, Fragen zu stellen. Das sorgt für Panik bei den Verantwortlichen innerhalb des CIA, denn Aaron Cross ist bekannt dafür, noch viel gefährlicher zu sein als Jason Bourne.",
+        "mediaType": "movie",
+        "subGroup": "Jeremy Renner"
+      },
+      {
+        "id": 324668,
+        "title": "Jason Bourne",
+        "originalTitle": "Jason Bourne",
+        "releaseYear": "2016",
+        "posterPath": "/9bijYuGTAiTczZvfJ9N4AZ4wlRF.jpg",
+        "backdropPath": "/7mHeyU0a538bgguOeF57I8ZroSk.jpg",
+        "voteAverage": 6.4,
+        "overview": "Nachdem Jason Bourne nicht nur sein Gedächtnis, sondern auch seine Freundin verloren hat und einen eigenen Feldzug gegen die ihn jagende CIA antrat, um endlich hinter das Geheimnis seiner Vergangenheit zu gelangen, ist er mithilfe von Nicky Parsons  untergetaucht. Doch das Leben eines auf der Flucht lebenden Agenten mit besonders modifizierten Fähigkeiten kann nie lange ruhig bleiben. Denn inzwischen weiß Jason Bourne zwar, wer er ist, aber nicht, was diejenigen, die ihn erschaffen haben, mit ihm vorhatten. Also versucht er – verfolgt von der CIA – die versteckten Wahrheiten in seiner Vergangenheit zu finden.",
+        "mediaType": "movie",
+        "subGroup": "Matt Damon"
+      }
+    ]
+  },
+  {
+    "id": "mission-impossible",
+    "name": "Mission: Impossible Saga",
+    "category": "franchise",
+    "tagline": "Ihre Mission, sollten Sie sie annehmen...",
+    "description": "Ethan Hunt und die IMF im Kampf gegen globale Bedrohungen mit den spektakulärsten Stunts der Kinogeschichte.",
+    "backdropPath": "/5jnoAA74Qwb5w6B9FMvnc20n6Ie.jpg",
+    "posterPath": "/sXzh9I53LWGbVqBucXiHMLXlVGm.jpg",
+    "movies": [
+      {
+        "id": 954,
+        "title": "Mission: Impossible",
+        "originalTitle": "Mission: Impossible",
+        "releaseYear": "1996",
+        "posterPath": "/dNClI7niLaky8fS96fO5JF2UvgR.jpg",
+        "backdropPath": "/sra8XnL96OyLHENcglmZJg6HA8z.jpg",
+        "voteAverage": 7,
+        "overview": "Als eine Liste mit den Codenamen verdeckter Top-Agenten zum Verkauf angeboten wird, soll ein Team von Spezialagenten den Verräter auf frischer Tat überführen.Cruise spielt den Geheimagenten Ethan Hunt, der miterleben muss, wie seine Kollegen bei diesem Einsatz zu Tode kommen. Bei einem Treffen mit seinem Kontaktmann der CIA erkennt Hunt, daß hinter der Mission ein perfides Doppelspiel steckt. Als Überlebenden wird ihm die Schuld am Tod seines Teams angehängt. Um seine Unschuld zu beweisen, muß Hunt den wahren Maulwurf finden. Ob auf der Flucht vor Killerkommandos der Regierung, beim Eindringen in den Hochsicherheitstrakt der CIA oder gar am Dach eines Hochgeschwindigkeitszuges festgeklammert, Hunt muß alles daransetzen, seinen Verfolgern stets einen Schritt voraus zu sein und der schrecklichen Wahrheit Schritt für Schritt näher zu kommen...",
+        "mediaType": "movie"
+      },
+      {
+        "id": 955,
+        "title": "Mission: Impossible II",
+        "originalTitle": "Mission: Impossible II",
+        "releaseYear": "2000",
+        "posterPath": "/egqhogOAaR5nuljs89mVRJWCSyL.jpg",
+        "backdropPath": "/24DZfupDlhXeTchmcOkoGRhP5Vg.jpg",
+        "voteAverage": 6.1,
+        "overview": "Agent Ethan Hunt genießt gerade seinen Urlaub beim Freiklettern, als ihn eine vom Hubschrauber überbrachte Nachricht zur Arbeit zurückruft: Der kriminelle Ex-Kollege Sean Ambrose hat mit seiner Gang ein todbringendes Virus in seinen Besitz gebracht. Nun gilt es, den Verräter schleunigst ausfindig und dingfest zu machen. Deshalb macht sich Ethan gemeinsam mit dem Computer-Genie Luther, dem Australier Billy und der attraktiven Meisterdiebin Nyah an die unmöglich scheinende Mission, das Virus zurückzuholen.",
+        "mediaType": "movie"
+      },
+      {
+        "id": 956,
+        "title": "Mission: Impossible III",
+        "originalTitle": "Mission: Impossible III",
+        "releaseYear": "2006",
+        "posterPath": "/oEOuuYZ82Geduj8dlNEdL7SRPwr.jpg",
+        "backdropPath": "/bYKeB9uUcPmvikjouEEQ86uvPw9.jpg",
+        "voteAverage": 6.8,
+        "overview": "Ethan Hunt hat sich zur Ruhe gesetzt und möchte mit der süßen Julia eine Familie gründen. Doch dann ruft man ihn zu einer allerletzten Mission. Hunts Kollegin Lindsey ist in die Fänge des gemeingefährlichen Psychopathen Owen Davian geraten. Die folgende interkontinentale Hatz führt den Superagenten über Berlin und den Vatikan bis ins fernöstliche Schanghai, wo es zum Showdown kommt. Dort muss Hunt seine inzwischen von Davian entführte Julia befreien und eine Zeitbombe, die unter seiner Schädeldecke tickt, deaktivieren.",
+        "mediaType": "movie"
+      },
+      {
+        "id": 56292,
+        "title": "Mission: Impossible - Phantom Protokoll",
+        "originalTitle": "Mission: Impossible - Ghost Protocol",
+        "releaseYear": "2011",
+        "posterPath": "/qW9vtDoRyeslZDX1i8zdQckw8Q4.jpg",
+        "backdropPath": "/hqyjzDRCs1N5gEsh2gklzPdsEFD.jpg",
+        "voteAverage": 7.1,
+        "overview": "Bei einem Einsatz des IMF im Kreml kommt es zu einem folgenschweren Zwischenfall: IMF-Anführer Ethan Hunt wird Zeuge eines verheerenden Bombenattentats, das der IMF in die Schuhe geschoben wird. Die Regierung verleugnet die Elite-Abteilung und initiiert das Phantom-Protokoll, ihr einziger Kontakt zur Kommandostruktur wird ermordet. Mit seinen Leuten geht Ethan in den Untergrund, um auf eigene Faust den Drahtzieher zu stellen. Die Spur führt nach Dubai, wo sie dem undurchschaubaren Hendricks auf die Schliche kommen.",
+        "mediaType": "movie"
+      },
+      {
+        "id": 177677,
+        "title": "Mission: Impossible - Rogue Nation",
+        "originalTitle": "Mission: Impossible - Rogue Nation",
+        "releaseYear": "2015",
+        "posterPath": "/t4MxhCDLlWPg0ZhSJFD4n4ElKpD.jpg",
+        "backdropPath": "/vYIUN5rrCncHFY8WvcuXQlM4hk5.jpg",
+        "voteAverage": 7.2,
+        "overview": "Nachdem das Pentagon die Impossible Missions Force aufgelöst hat, ist Ethan Hunt auf sich allein gestellt. Doch gerade jetzt hat der ehemalige IMF-Agent die Spur der geheimnisvollen und hochgefährlichen Organisation „Syndikat“ aufgenommen, die sich schon bald als sein mächtigster Gegner erweist. Aus dem Untergrund heraus operiert das „Syndikat“ mit bestens ausgebildeten Spezialagenten und diese scheinen Hunt immer einen Schritt voraus zu sein – und ihre Mission ist teuflisch: Sie wollen durch gezielte Anschläge eine neue Weltordnung schaffen und alle ehemaligen Mitglieder der IMF auslöschen, um ihre Pläne ungestört verwirklichen zu können. In offizieller Mission der Regierung oder nicht, Ethan Hunt kann nicht zusehen, wie der Terror immer weiter um sich greift, und reaktiviert sein einzigartiges Team. Unerwartete Hilfe bekommt das Quartett von der geheimnisvollen Agentin Ilsa Faust – doch auf welcher Seite steht sie wirklich?",
+        "mediaType": "movie"
+      },
+      {
+        "id": 353081,
+        "title": "Mission: Impossible - Fallout",
+        "originalTitle": "Mission: Impossible - Fallout",
+        "releaseYear": "2018",
+        "posterPath": "/sXzh9I53LWGbVqBucXiHMLXlVGm.jpg",
+        "backdropPath": "/5jnoAA74Qwb5w6B9FMvnc20n6Ie.jpg",
+        "voteAverage": 7.5,
+        "overview": "Mit der Wiederbeschaffung gestohlenen Plutoniums beauftragt, stellt Ethan Hunt das Wohl seines Teams über die Vollendung der Mission, wodurch die Nuklearwaffen in die Hände der Apostel, einem tödlichen Netzwerk hochspezialisierter Terroristen, gelangen. Um den drohenden atomaren Holocaust zu verhindern, sind Ethan und sein IMF-Team zur Zusammenarbeit mit dem draufgängerisch agierenden CIA-Agenten Walker gezwungen. Es beginnt ein tödlicher Wettlauf gegen die Zeit ...",
+        "mediaType": "movie"
+      },
+      {
+        "id": 575264,
+        "title": "Mission: Impossible - Dead Reckoning Teil Eins",
+        "originalTitle": "Mission: Impossible - Dead Reckoning Part One",
+        "releaseYear": "2023",
+        "posterPath": "/nrQiVtkneYx9doR1ARG6HDrImpv.jpg",
+        "backdropPath": "/628Dep6AxEtDxjZoGP78TsOxYbK.jpg",
+        "voteAverage": 7.5,
+        "overview": "Ethan Hunt begibt sich auf seine siebte und bislang unmöglichste Mission: Gemeinsam mit seinem IMF-Team soll er eine neuartige Waffe ausfindig machen, die dazu in der Lage ist, die Menschheit an den Rand des Dritten Weltkriegs zu führen – und sieht sich gleich mit mehreren mächtigen Gegnern konfrontiert. Denn zahlreiche Schurken wollen ebenfalls in den Besitz des Schlüssels gelangen, der ihnen die Kontrolle über die mysteriöse Waffe geben würde. Doch der gefährlichste Feind hat weder einen Namen noch ein Gesicht: eine künstliche Intelligenz, die den Agenten immer einen Schritt voraus ist, aber selbst vollkommen unberechenbar agiert. Ein globaler Wettlauf um das Schicksal des Planeten beginnt – der Ethan Hunt gleichzeitig vor einige folgenschwere persönliche Entscheidungen stellt …",
+        "mediaType": "movie"
       }
     ]
   }
