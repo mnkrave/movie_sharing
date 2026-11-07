@@ -40,6 +40,7 @@ export interface RecommendedMediaItem {
   matchScore: number;
   reasons: string[];
   seedTitles: string[];
+  isComboMatch?: boolean;
   availableProvidersDE: {
     providerId: number;
     providerName: string;
@@ -107,14 +108,73 @@ async function fetchDEProviders(mediaType: "movie" | "tv", id: number) {
   }
 }
 
+// Extracts a normalized franchise key to prevent flooding of the same series/universe
+function getFranchiseKey(title: string, raw?: any): string {
+  if (raw?.belongs_to_collection?.id) {
+    return `col_${raw.belongs_to_collection.id}`;
+  }
+  const t = (title || "").toLowerCase();
+
+  const FRANCHISE_PATTERNS = [
+    { key: "batman", patterns: ["batman", "dark knight", "joker", "gotham", "arkham", "batgirl", "catwoman"] },
+    { key: "superman", patterns: ["superman", "man of steel"] },
+    { key: "spiderman", patterns: ["spider-man", "spiderman", "venom", "spider-verse", "morbius"] },
+    { key: "avengers", patterns: ["avengers", "iron man", "captain america", "thor", "guardians of the galaxy", "ant-man"] },
+    { key: "rush_hour", patterns: ["rush hour"] },
+    { key: "star_wars", patterns: ["star wars", "krieg der sterne", "mandalorian", "boba fett", "kenobi"] },
+    { key: "lord_of_the_rings", patterns: ["lord of the rings", "herr der ringe", "hobbit"] },
+    { key: "harry_potter", patterns: ["harry potter", "phantastische tierwesen", "fantastic beasts"] },
+    { key: "fast_and_furious", patterns: ["fast & furious", "fast and furious", "tokyo drift", "hobbs & shaw"] },
+    { key: "jurassic", patterns: ["jurassic park", "jurassic world"] },
+    { key: "mission_impossible", patterns: ["mission: impossible", "mission impossible"] },
+    { key: "matrix", patterns: ["matrix"] },
+    { key: "cars", patterns: ["cars", "planes"] },
+    { key: "despicable_me", patterns: ["ich - einfach unverbesserlich", "ich einfach unverbesserlich", "despicable me", "minions"] },
+    { key: "tom_and_jerry", patterns: ["tom & jerry", "tom and jerry", "tom und jerry"] },
+    { key: "toy_story", patterns: ["toy story", "lightyear"] },
+    { key: "shrek", patterns: ["shrek", "der gestiefelte kater", "puss in boots"] },
+    { key: "ice_age", patterns: ["ice age"] },
+    { key: "madagascar", patterns: ["madagascar", "die pinguine aus madagascar"] },
+    { key: "pirates", patterns: ["fluch der karibik", "pirates of the caribbean"] },
+    { key: "godfather", patterns: ["der pate", "the godfather"] },
+    { key: "hunger_games", patterns: ["tribute von panem", "hunger games"] },
+    { key: "john_wick", patterns: ["john wick", "ballerina"] },
+    { key: "transformers", patterns: ["transformers", "bumblebee"] },
+    { key: "rocky", patterns: ["rocky", "creed"] },
+    { key: "deadpool", patterns: ["deadpool", "wolverine"] },
+    { key: "alien", patterns: ["alien", "prometheus", "romulus"] },
+    { key: "predator", patterns: ["predator", "prey"] },
+    { key: "terminator", patterns: ["terminator"] },
+    { key: "gentlemen_caper", patterns: ["the gentlemen", "rocknrolla", "bube, dame", "snatch", "revolver"] },
+    { key: "knives_out", patterns: ["knives out", "glass onion"] },
+    { key: "dune", patterns: ["dune"] },
+    { key: "top_gun", patterns: ["top gun"] },
+  ];
+
+  for (const f of FRANCHISE_PATTERNS) {
+    if (f.patterns.some((p) => t.includes(p))) {
+      return `franchise_${f.key}`;
+    }
+  }
+
+  // Fallback: title prefix (before colon or dash e.g. "Mission: Impossible - Fallout" -> "mission")
+  const mainPart = t.split(/[:\-\–]/)[0].trim().replace(/[^a-z0-9\s]/g, "");
+  const words = mainPart.split(/\s+/).filter((w) => w.length > 2);
+  if (words.length > 0) {
+    return `title_${words.slice(0, 2).join("_")}`;
+  }
+
+  return `title_${t.slice(0, 15)}`;
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     const watchedItems: SeedInput[] = body.watchedItems || [];
     const watchlistIds: number[] = body.watchlistIds || [];
-    const userSubscriptions: string[] = body.subscriptions || [];
+    const userSubscriptions: string[] = body.subscriptions || body.userSubscriptions || [];
     const onlyMySubscriptions: boolean = body.onlyMySubscriptions ?? true;
-    const targetMediaType: "ALL" | "movie" | "tv" = body.mediaType || "ALL";
+    const targetMediaType: "ALL" | "movie" | "tv" = body.mediaTypeFilter || body.mediaType || "ALL";
     const excludeWatchlist: boolean = body.excludeWatchlist ?? false;
 
     const watchedSet = new Set(watchedItems.map((i) => `${i.mediaType}_${i.tmdbId}`));
@@ -129,7 +189,7 @@ export async function POST(req: Request) {
 
     const positiveSeeds = sortedWatched
       .filter((i) => (typeof i.rating === "number" ? i.rating >= 7 : true))
-      .slice(0, 10);
+      .slice(0, 12);
 
     const dislikedSeeds = sortedWatched.filter(
       (i) => typeof i.rating === "number" && i.rating <= 5
@@ -174,7 +234,7 @@ export async function POST(req: Request) {
 
       // Accumulate Keywords (movies use keywords.keywords, tv uses keywords.results)
       const kwList = data.keywords?.keywords || data.keywords?.results || [];
-      for (const kw of kwList.slice(0, 12)) {
+      for (const kw of kwList.slice(0, 14)) {
         const existing = keywordWeights.get(kw.id) || { id: kw.id, name: kw.name, count: 0 };
         existing.count += weightDelta;
         keywordWeights.set(kw.id, existing);
@@ -189,9 +249,9 @@ export async function POST(req: Request) {
         directorSet.add(directorObj.name);
       }
 
-      // Collect Collaborative Recommendations from this seed
+      // Collect Collaborative Recommendations from this seed (take up to 20 to find more cross-seed Kombi-matches!)
       const recs = data.recommendations?.results || [];
-      for (const rec of recs.slice(0, 12)) {
+      for (const rec of recs.slice(0, 20)) {
         const recType: "movie" | "tv" =
           rec.media_type === "tv" || seed.mediaType === "tv" ? "tv" : "movie";
         if (targetMediaType !== "ALL" && recType !== targetMediaType) continue;
@@ -199,7 +259,7 @@ export async function POST(req: Request) {
         const cKey = `${recType}_${rec.id}`;
         if (watchedSet.has(cKey)) continue;
         if (excludeWatchlist && watchlistSet.has(rec.id)) continue;
-        if ((rec.vote_count || 0) < 150 || (rec.vote_average || 0) < 6.5) continue;
+        if ((rec.vote_count || 0) < 150 || (rec.vote_average || 0) < 6.4) continue;
 
         const existing = candidatesMap.get(cKey);
         if (existing) {
@@ -239,6 +299,10 @@ export async function POST(req: Request) {
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
 
+    // Check if user genuinely watches and likes animated content
+    const animWeight = genreWeights.get(16)?.weight || 0;
+    const userLikesAnimation = animWeight >= 12;
+
     // 3. Build TMDB Provider filter string for user's active subscriptions in DE
     const tmdbProviderIds = new Set<number>();
     userSubscriptions.forEach((subKey) => {
@@ -268,8 +332,8 @@ export async function POST(req: Request) {
         language: "de-DE",
         watch_region: "DE",
         sort_by: "vote_average.desc",
-        "vote_count.gte": type === "movie" ? "800" : "400",
-        "vote_average.gte": "7.2",
+        "vote_count.gte": type === "movie" ? "700" : "350",
+        "vote_average.gte": "7.3",
         ...params,
       });
       if (providerFilterString) {
@@ -319,7 +383,7 @@ export async function POST(req: Request) {
       });
       addDiscoverQuery("tv", {
         with_genres: topMovieGenreIds.join("|"),
-        "vote_count.gte": "500",
+        "vote_count.gte": "400",
       });
     } else {
       addDiscoverQuery("movie", {});
@@ -332,7 +396,7 @@ export async function POST(req: Request) {
         "movie",
         {
           with_keywords: topKeywordIds.join("|"),
-          "vote_count.gte": "500",
+          "vote_count.gte": "400",
         },
         true
       );
@@ -340,7 +404,7 @@ export async function POST(req: Request) {
 
     await Promise.all(discoverPromises);
 
-    // 5. Score all candidates using our Hybrid Taste Formula
+    // 5. Score all candidates using our Improved Hybrid Taste Formula
     const maxGenreWeight = Math.max(...sortedGenres.map((g) => g.weight), 1);
 
     const scoredCandidates = Array.from(candidatesMap.values()).map((entry) => {
@@ -348,48 +412,65 @@ export async function POST(req: Request) {
       const itemGenreIds: number[] =
         raw.genre_ids || (raw.genres ? raw.genres.map((g: any) => g.id) : []);
 
-      // A. Genre Affinity Score (0 - 42 points)
+      // A. Genre Affinity Score (0 - 36 points)
       let genrePoints = 0;
       const matchedGenreNames: string[] = [];
       for (const gid of itemGenreIds) {
         const gw = genreWeights.get(gid);
         if (gw) {
-          genrePoints += (gw.weight / maxGenreWeight) * 18;
+          genrePoints += (gw.weight / maxGenreWeight) * 16;
           matchedGenreNames.push(`${ALL_GENRES_MAP[gid]?.emoji || "🎬"} ${gw.name}`);
         }
       }
-      genrePoints = Math.min(42, genrePoints);
+      genrePoints = Math.min(36, genrePoints);
 
-      // B. Collaborative Seed Overlap Score (0 - 32 points)
+      // B. Collaborative Seed Overlap & Kombi-Matches Score (0 - 45 points)
       let seedPoints = 0;
+      const isComboMatch = seedSources.length >= 2;
+
       if (seedSources.length > 0) {
         const bestSeedRating = Math.max(...seedSources.map((s) => s.rating));
-        seedPoints = 18 + (bestSeedRating - 7) * 3 + (seedSources.length - 1) * 6;
+        const base = 14 + (bestSeedRating - 7) * 2;
+        // Big Kombi-Match bonus: 2 seeds -> +16, 3+ seeds -> +26 points!
+        const comboBonus = isComboMatch ? 16 + (seedSources.length - 2) * 10 : 0;
+        seedPoints = base + comboBonus;
       }
       if (fromKeywordDiscover) {
-        seedPoints += 7;
+        seedPoints += 6;
       }
-      seedPoints = Math.min(32, seedPoints);
+      seedPoints = Math.min(45, seedPoints);
 
-      // C. Global Quality & Popularity Score (0 - 20 points)
+      // C. Global Quality & Popularity Score (0 - 18 points)
       const voteAvg = raw.vote_average || 7.0;
-      const qualityPoints = Math.min(20, Math.max(0, (voteAvg - 6.0) * 5));
+      const qualityPoints = Math.min(18, Math.max(0, (voteAvg - 6.0) * 4.5));
 
       // D. Subscription Bonus (0 - 5 points)
       const subBonus = fromDiscoverSub ? 5 : 2;
 
-      const rawTotal = Math.round(genrePoints + seedPoints + qualityPoints + subBonus);
-      const matchScore = Math.min(99, Math.max(68, rawTotal));
-
-      // Build human-readable reasons
-      const reasons: string[] = [];
-      if (seedSources.length > 0) {
-        const topSeeds = seedSources
-          .slice(0, 2)
-          .map((s) => `${s.title} (${s.rating}★)`)
-          .join(" & ");
-        reasons.push(`Weil dir ${topSeeds} gefallen hat`);
+      // E. Tone / Animation Mismatch Penalty:
+      // If user watched live-action movies and candidate is animated (e.g. Batman: Year One for The Dark Knight),
+      // penalize it heavily unless user has high animation taste!
+      let penalty = 0;
+      const isCandidateAnimated = itemGenreIds.includes(16);
+      if (isCandidateAnimated && !userLikesAnimation) {
+        penalty += 18;
       }
+
+      const rawTotal = Math.round(genrePoints + seedPoints + qualityPoints + subBonus - penalty);
+      const matchScore = Math.min(99, Math.max(65, rawTotal));
+
+      // Build human-readable reasons (Highlighting true Kombi-Matches!)
+      const reasons: string[] = [];
+      if (isComboMatch) {
+        const seedNames = seedSources
+          .slice(0, 2)
+          .map((s) => `${s.title}`)
+          .join(" & ");
+        reasons.push(`🔥 Kombi-Match: Weil dir sowohl ${seedNames} gefallen haben`);
+      } else if (seedSources.length === 1) {
+        reasons.push(`Weil dir ${seedSources[0].title} (${seedSources[0].rating}★) gefallen hat`);
+      }
+
       if (matchedGenreNames.length > 0) {
         reasons.push(`Top-Match für ${matchedGenreNames.slice(0, 2).join(" & ")}`);
       }
@@ -420,18 +501,96 @@ export async function POST(req: Request) {
         matchScore,
         reasons,
         seedTitles: seedSources.map((s) => s.title),
+        isComboMatch,
         fromDiscoverSub,
+        raw,
       };
     });
 
-    // Sort by matchScore descending, then voteAverage descending
-    scoredCandidates.sort((a, b) => b.matchScore - a.matchScore || b.voteAverage - a.voteAverage);
+    // Sort by matchScore (with Kombi-Match priority) and quality
+    scoredCandidates.sort((a, b) => {
+      const aBonus = a.isComboMatch ? 6 : 0;
+      const bBonus = b.isComboMatch ? 6 : 0;
+      return (b.matchScore + bBonus) - (a.matchScore + aBonus) || b.voteAverage - a.voteAverage;
+    });
 
-    // 6. Take top 32 candidates and enrich with exact DE Watch Providers
-    const topPool = scoredCandidates.slice(0, 32);
+    // 6. Diversified Selection:
+    // - STRICT Franchise Capping: Maximum 1 movie per franchise across the entire recommendation pool!
+    //   (Prevents 6 Batman movies, 2 Rush Hours, 2 Minions, etc.)
+    // - Single-Seed Capping: Maximum 1 recommendation stemming exclusively from any single seed movie
+    // - Kombi-Matches (matching 2+ seeds) are prioritized and exempt from single-seed limits!
+    const selectedPool: typeof scoredCandidates = [];
+    const franchiseCounts = new Map<string, number>();
+    const singleSeedCounts = new Map<string, number>();
 
+    const canAddCandidate = (cand: (typeof scoredCandidates)[0], maxPerSeed = 1): boolean => {
+      const fKey = getFranchiseKey(cand.title, cand.raw);
+      // Strictly max 1 per franchise across the entire list!
+      if ((franchiseCounts.get(fKey) || 0) >= 1) return false;
+
+      // If single-seed (matches only 1 seed movie), enforce seed cap
+      if (cand.seedTitles.length === 1) {
+        const seed = cand.seedTitles[0];
+        if ((singleSeedCounts.get(seed) || 0) >= maxPerSeed) return false;
+      }
+      return true;
+    };
+
+    const addCandidate = (cand: (typeof scoredCandidates)[0]) => {
+      selectedPool.push(cand);
+      const fKey = getFranchiseKey(cand.title, cand.raw);
+      franchiseCounts.set(fKey, (franchiseCounts.get(fKey) || 0) + 1);
+      if (cand.seedTitles.length === 1) {
+        const seed = cand.seedTitles[0];
+        singleSeedCounts.set(seed, (singleSeedCounts.get(seed) || 0) + 1);
+      }
+    };
+
+    // Pass 1: Kombi-Matches (matching 2 or more watched movies!)
+    for (const cand of scoredCandidates) {
+      if (selectedPool.length >= 36) break;
+      if (cand.isComboMatch && canAddCandidate(cand, 99)) {
+        addCandidate(cand);
+      }
+    }
+
+    // Pass 2: Best diverse single-seed & discover candidates (max 1 single-seed per watched movie)
+    for (const cand of scoredCandidates) {
+      if (selectedPool.length >= 36) break;
+      if (selectedPool.some((s) => s.id === cand.id && s.mediaType === cand.mediaType)) continue;
+
+      if (canAddCandidate(cand, 1)) {
+        addCandidate(cand);
+      }
+    }
+
+    // Pass 3: If pool has room, allow up to 2 single-seed matches per watched movie (still strictly max 1 per franchise!)
+    if (selectedPool.length < 36) {
+      for (const cand of scoredCandidates) {
+        if (selectedPool.length >= 36) break;
+        if (selectedPool.some((s) => s.id === cand.id && s.mediaType === cand.mediaType)) continue;
+
+        if (canAddCandidate(cand, 2)) {
+          addCandidate(cand);
+        }
+      }
+    }
+
+    // Pass 4: Fill remaining from discover or whatever is left while still respecting franchise cap!
+    if (selectedPool.length < 36) {
+      for (const cand of scoredCandidates) {
+        if (selectedPool.length >= 36) break;
+        if (selectedPool.some((s) => s.id === cand.id && s.mediaType === cand.mediaType)) continue;
+
+        const fKey = getFranchiseKey(cand.title, cand.raw);
+        if ((franchiseCounts.get(fKey) || 0) >= 1) continue;
+        addCandidate(cand);
+      }
+    }
+
+    // 7. Enrich top pool with exact DE Watch Providers
     const enrichedPool: RecommendedMediaItem[] = await Promise.all(
-      topPool.map(async (cand) => {
+      selectedPool.map(async (cand) => {
         const rawProviders = await fetchDEProviders(cand.mediaType, cand.id);
         const availableProvidersDE = rawProviders.map((p: any) => {
           const norm = normalizeProviderKey(p.provider_name);
@@ -459,7 +618,7 @@ export async function POST(req: Request) {
       })
     );
 
-    // 7. Filter by onlyMySubscriptions if enabled and user has subscriptions configured
+    // 8. Filter by onlyMySubscriptions if enabled and user has subscriptions configured
     let finalResults = enrichedPool;
     if (onlyMySubscriptions && userSubscriptions.length > 0) {
       const subFiltered = enrichedPool.filter((item) =>
@@ -470,12 +629,14 @@ export async function POST(req: Request) {
       }
     }
 
-    // Re-sort so items on user's subscriptions with highest matchScore are first
+    // Re-sort so items on user's subscriptions with highest matchScore are first, preserving Kombi priority
     finalResults.sort((a, b) => {
       const aHasSub = a.availableProvidersDE.some((p) => p.isMySub) ? 1 : 0;
       const bHasSub = b.availableProvidersDE.some((p) => p.isMySub) ? 1 : 0;
       if (onlyMySubscriptions && bHasSub !== aHasSub) return bHasSub - aHasSub;
-      return b.matchScore - a.matchScore || b.voteAverage - a.voteAverage;
+      const aBonus = a.isComboMatch ? 6 : 0;
+      const bBonus = b.isComboMatch ? 6 : 0;
+      return (b.matchScore + bBonus) - (a.matchScore + aBonus) || b.voteAverage - a.voteAverage;
     });
 
     const tasteSummary: TasteSummary = {

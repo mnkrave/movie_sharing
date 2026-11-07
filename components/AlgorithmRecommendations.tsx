@@ -316,9 +316,15 @@ export function AlgorithmRecommendations() {
                     <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
 
                     {/* Match Score Badge Top-Left */}
-                    <div className="absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg bg-emerald-500 text-black font-black text-xs shadow-lg flex items-center gap-1">
-                      <Sparkles className="w-3 h-3 fill-black" />
-                      <span>{item.matchScore}% Match</span>
+                    <div
+                      className={`absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg font-black text-xs shadow-lg flex items-center gap-1 ${
+                        item.isComboMatch
+                          ? "bg-gradient-to-r from-amber-400 via-rose-500 to-purple-500 text-white shadow-rose-500/25 ring-1 ring-white/30"
+                          : "bg-emerald-500 text-black"
+                      }`}
+                    >
+                      <Sparkles className="w-3 h-3 fill-current" />
+                      <span>{item.isComboMatch ? `🔥 ${item.matchScore}% Kombi` : `${item.matchScore}% Match`}</span>
                     </div>
 
                     {/* TMDB Rating Top-Right */}
@@ -369,7 +375,13 @@ export function AlgorithmRecommendations() {
 
                     {/* Explainable Reason */}
                     {item.reasons.length > 0 && (
-                      <p className="text-[11px] text-emerald-300/90 leading-snug line-clamp-2 bg-emerald-950/40 border border-emerald-500/20 rounded-lg p-1.5">
+                      <p
+                        className={`text-[11px] leading-snug line-clamp-2 rounded-lg p-1.5 border ${
+                          item.isComboMatch
+                            ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-semibold"
+                            : "bg-emerald-950/40 border-emerald-500/20 text-emerald-300/90"
+                        }`}
+                      >
                         {item.reasons[0]}
                       </p>
                     )}
