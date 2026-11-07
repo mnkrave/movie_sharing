@@ -13,7 +13,7 @@ interface MediaCardProps {
 }
 
 export function MediaCard({ item, priority = false }: MediaCardProps) {
-  const { openMediaModal, communityData, updateMediaStatus } = useMedia();
+  const { openMediaModal, communityData, updateMediaStatus, openRatingModal } = useMedia();
   const { data: session } = useSession();
 
   // Friends stats for this item
@@ -53,14 +53,14 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
       alert("Bitte logge dich ein, um deine Liste zu speichern!");
       return;
     }
-    updateMediaStatus({
+    openRatingModal({
       tmdbId: item.id,
       mediaType: item.mediaType,
       title: item.title,
       posterPath: item.posterPath,
       releaseYear: item.releaseYear,
-      status: myStatusObj?.status === "WATCHED" ? "NONE" : "WATCHED",
-      rating: 8,
+      currentRating: myStatusObj?.rating,
+      isWatched: myStatusObj?.status === "WATCHED",
     });
   };
 

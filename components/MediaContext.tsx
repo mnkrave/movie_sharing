@@ -5,6 +5,7 @@ import { MediaItem } from "@/lib/tmdb";
 import { MediaModal } from "./MediaModal";
 import { SearchModal } from "./SearchModal";
 import { SubscriptionModal } from "./SubscriptionModal";
+import { QuickRatingModal, RatingTarget } from "./QuickRatingModal";
 import { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
@@ -19,6 +20,7 @@ interface MediaContextType {
   onlyMySubs: boolean;
   setOnlyMySubs: (val: boolean) => void;
   toggleOnlyMySubs: () => void;
+  openRatingModal: (target: RatingTarget) => void;
   communityData: {
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -55,6 +57,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [selectedMedia, setSelectedMedia] = useState<{ id: number; mediaType: "movie" | "tv"; title?: string; posterPath?: string | null } | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSubsOpen, setIsSubsOpen] = useState(false);
+  const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
   const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
   const [communityData, setCommunityData] = useState<{
@@ -194,6 +197,31 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleSaveRating = async (rating?: number) => {
+    if (!ratingTarget) return;
+    await updateMediaStatus({
+      tmdbId: ratingTarget.tmdbId,
+      mediaType: ratingTarget.mediaType,
+      title: ratingTarget.title,
+      posterPath: ratingTarget.posterPath,
+      releaseYear: ratingTarget.releaseYear,
+      status: "WATCHED",
+      rating,
+    });
+    setRatingTarget(null);
+  };
+
+  const handleRemoveWatched = async () => {
+    if (!ratingTarget) return;
+    await updateMediaStatus({
+      tmdbId: ratingTarget.tmdbId,
+      mediaType: ratingTarget.mediaType,
+      title: ratingTarget.title,
+      status: "NONE",
+    });
+    setRatingTarget(null);
+  };
+
   return (
     <MediaContext.Provider
       value={{
@@ -207,6 +235,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         onlyMySubs,
         setOnlyMySubs,
         toggleOnlyMySubs,
+        openRatingModal: (target) => setRatingTarget(target),
         communityData,
         refreshCommunity,
         updateMediaStatus,
@@ -234,6 +263,13 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         onClose={() => setIsSubsOpen(false)}
         selectedSubscriptions={userSubscriptions}
         onSave={setUserSubscriptions}
+      />
+
+      <QuickRatingModal
+        target={ratingTarget}
+        onClose={() => setRatingTarget(null)}
+        onSaveRating={handleSaveRating}
+        onRemoveWatched={handleRemoveWatched}
       />
     </MediaContext.Provider>
   );

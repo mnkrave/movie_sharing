@@ -26,7 +26,7 @@ interface CollectionDetailClientProps {
 
 export function CollectionDetailClient({ collection }: CollectionDetailClientProps) {
   const { data: session } = useSession();
-  const { communityData, updateMediaStatus, openMediaModal } = useMedia();
+  const { communityData, updateMediaStatus, openMediaModal, openRatingModal } = useMedia();
 
   const [filterMode, setFilterMode] = useState<"all" | "unwatched" | "watched">("all");
   const [sortBy, setSortBy] = useState<"year_asc" | "rating_desc">("year_asc");
@@ -89,21 +89,21 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     return list;
   }, [collection.movies, filterMode, sortBy, myWatchedMap]);
 
-  const handleToggleWatched = async (movie: CollectionMovie, e: React.MouseEvent) => {
+  const handleToggleWatched = (movie: CollectionMovie, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session) {
       alert("Bitte logge dich ein, um Filme als gesehen zu markieren!");
       return;
     }
-    const isWatched = myWatchedMap.has(movie.id);
-    await updateMediaStatus({
+    const watchedInfo = myWatchedMap.get(movie.id);
+    openRatingModal({
       tmdbId: movie.id,
       mediaType: "movie",
       title: movie.title,
       posterPath: movie.posterPath,
       releaseYear: movie.releaseYear,
-      status: isWatched ? "NONE" : "WATCHED",
-      rating: isWatched ? undefined : 8,
+      currentRating: watchedInfo?.rating,
+      isWatched: !!watchedInfo,
     });
   };
 

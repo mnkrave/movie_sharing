@@ -23,7 +23,7 @@ import Link from "next/link";
 
 export default function MyListPage() {
   const { data: session } = useSession();
-  const { communityData, openMediaModal, updateMediaStatus, openSearch } = useMedia();
+  const { communityData, openMediaModal, updateMediaStatus, openSearch, openRatingModal } = useMedia();
 
   const [activeTab, setActiveTab] = useState<"WATCHLIST" | "WATCHED">("WATCHLIST");
   const [mediaTypeFilter, setMediaTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
@@ -424,18 +424,18 @@ export default function MyListPage() {
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          updateMediaStatus({
+                          openRatingModal({
                             tmdbId: item.tmdbId,
                             mediaType: item.mediaType,
                             title: item.title,
                             posterPath: item.posterPath,
                             releaseYear: item.releaseYear,
-                            status: "WATCHED",
-                            rating: 8,
+                            currentRating: item.rating,
+                            isWatched: false,
                           });
                         }}
                         className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[10px] font-bold transition"
-                        title="Als gesehen markieren"
+                        title="Als gesehen markieren & bewerten"
                       >
                         <Check className="w-3 h-3" />
                         <span>Gesehen</span>
