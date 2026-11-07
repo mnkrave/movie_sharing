@@ -239,6 +239,37 @@ async function main() {
   if (mcuIdx >= 0) collections[mcuIdx] = mcuUniverse;
   else collections.push(mcuUniverse);
 
+  // 5. Add John Wick
+  console.log("Fetching John Wick...");
+  const wickDefinitions = [
+    { id: 245891, type: "movie", subGroup: "Filme" },
+    { id: 324552, type: "movie", subGroup: "Filme" },
+    { id: 458156, type: "movie", subGroup: "Filme" },
+    { id: 603692, type: "movie", subGroup: "Filme" },
+    { id: 72710, type: "tv", subGroup: "Serie" },
+  ];
+  const wickMovies = [];
+  for (const w of wickDefinitions) {
+    const item = await fetchItem(w.id, w.type);
+    if (item) wickMovies.push({ ...item, subGroup: w.subGroup });
+  }
+  wickMovies.sort((a,b) => (parseInt(a.releaseYear) || 0) - (parseInt(b.releaseYear) || 0));
+
+  const wickUniverse = {
+    id: "john-wick",
+    name: "John Wick Filmreihe",
+    category: "franchise",
+    tagline: "Der Boogeyman kehrt zurück: Gun-Fu in Reinkultur",
+    description: "Von der Rache für einen Welpen bis zum weltweiten Krieg gegen die Hohe Kammer: Keanu Reeves als unaufhaltsamer Auftragskiller John Wick, plus die Prequel-Serie The Continental.",
+    backdropPath: wickMovies[3]?.backdropPath || "/fSwYa5q2xRkBoOOjueLpkLf3N1m.jpg",
+    posterPath: "/k4ue90EztFrXbabTKJmMIPQmhET.jpg",
+    subGroupLabel: "Format",
+    movies: wickMovies
+  };
+  const wickIdx = collections.findIndex(c => c.id === "john-wick");
+  if (wickIdx >= 0) collections[wickIdx] = wickUniverse;
+  else collections.push(wickUniverse);
+
   // Write updated collections.ts
   const outputContent = `// Curated Universes and Franchise/Director Collections for CineCircle
 export interface CollectionMovie {

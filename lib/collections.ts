@@ -2054,6 +2054,78 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "mediaType": "movie"
       }
     ]
+  },
+  {
+    "id": "john-wick",
+    "name": "John Wick Filmreihe",
+    "category": "franchise",
+    "tagline": "Der Boogeyman kehrt zurück: Gun-Fu in Reinkultur",
+    "description": "Von der Rache für einen Welpen bis zum weltweiten Krieg gegen die Hohe Kammer: Keanu Reeves als unaufhaltsamer Auftragskiller John Wick, plus die Prequel-Serie The Continental.",
+    "backdropPath": "/7I6VUdPj6tQECNHdviJkUHD2u89.jpg",
+    "posterPath": "/k4ue90EztFrXbabTKJmMIPQmhET.jpg",
+    "subGroupLabel": "Format",
+    "movies": [
+      {
+        "id": 245891,
+        "title": "John Wick",
+        "originalTitle": "John Wick",
+        "releaseYear": "2014",
+        "posterPath": "/erBsqm9gNvq7pQTPrkXdRpF6CFw.jpg",
+        "backdropPath": "/ff2ti5DkA9UYLzyqhQfI2kZqEuh.jpg",
+        "voteAverage": 7.5,
+        "overview": "John Wick genießt seinen frühen Ruhestand in der Vorstadt. Doch als seine Frau einer tödlichen Krankheit erliegt, verfällt er in Trauer. Nur sein Hund bleibt ihm noch als Gefährte. Als eines Tages jedoch drei russische Gangster in sein Haus einsteigen und seinen treuen Begleiter töten, holt ihn seine finstere Vergangenheit ein, war er doch früher der Top-Auftragskiller an der Ostküste. So tauscht er schließlich die Vorstadtidylle gegen jede Menge Feuerkraft und macht sich, auf Rache sinnend, auf die Suche nach den Einbrechern. Einer von ihnen ist Iosef Tarasov, der Sohn des einflussreichen Verbrecherbosses Viggo Tarasov, für den Wick selbst einmal gearbeitet hatte. Doch für Freundschaft ist kein Platz in dem Rachefeldzug und so hat er bald auch den ehemaligen Kollegen Marcus an seinen Fersen hängen...",
+        "mediaType": "movie",
+        "subGroup": "Filme"
+      },
+      {
+        "id": 324552,
+        "title": "John Wick: Kapitel 2",
+        "originalTitle": "John Wick: Chapter 2",
+        "releaseYear": "2017",
+        "posterPath": "/7JvUTRGuuS6G15OVRCe7AKduTYP.jpg",
+        "backdropPath": "/Aa9Lx6gotP0szl9tlt5SPCN08oF.jpg",
+        "voteAverage": 7.3,
+        "overview": "Nur noch das Auto zurückholen, dann will sich John Wick zurück in den Ruhestand verabschieden. Doch nachdem der Ex-Auftragskiller sein geliebtes Gefährt wieder und sich mit Abram geeinigt hat, dem Bruder seiner Nemesis Viggo Tarassow geht es für Wick erst richtig los. Wicks ehemaliger Kollege Santino steht vor der Tür und gibt ihm eine mit Blut besiegelte Münze. Wie der Einzelkämpfer weiß, steht das Geldstück für ein Versprechen, das Wick einst gab – das Versprechen von Hilfe als Gegenleistung für einen alten Gefallen. Und auch wenn der Killer seine Ruhe haben will, kann er schließlich nicht anders, als seine Zusicherung einzulösen, denn andernfalls droht ihm der Tod. Wick geht nach Rom, wo Santinos Schwester Gianna in die Riege der einflussreichsten Gangsterbosse kommen will...",
+        "mediaType": "movie",
+        "subGroup": "Filme"
+      },
+      {
+        "id": 458156,
+        "title": "John Wick: Kapitel 3",
+        "originalTitle": "John Wick: Chapter 3 - Parabellum",
+        "releaseYear": "2019",
+        "posterPath": "/rXdNL3NhmDZ8w4scJYxUDSpaJz.jpg",
+        "backdropPath": "/vVpEOvdxVBP2aV166j5Xlvb5Cdc.jpg",
+        "voteAverage": 7.4,
+        "overview": "John Wick befindet sich auf der Flucht. Es sind nicht nur 14 Millionen Dollar auf seinen Kopf ausgesetzt, er hat auch die Regel aller Regeln gebrochen: er hat einen anderen Menschen im Bereich des Continental Hotels umgebracht. Eigentlich müsste er deswegen längst tot sein, doch Hotelmanager Winston gewährte ihm für eine Stunde Gnade, bevor alle Folgen eintreten und Wick offiziell aus der Killergemeinschaft ausgeschlossen wird. Wenn John überleben will, muss er sich seinen Weg aus New York City freikämpfen und irgendwo auf der Welt Zuflucht finden. Helfen kann ihm dabei nur seine alte Bekannte Sofia und die Frau, die ihn einst aufgezogen und beschützt hat...",
+        "mediaType": "movie",
+        "subGroup": "Filme"
+      },
+      {
+        "id": 603692,
+        "title": "John Wick: Kapitel 4",
+        "originalTitle": "John Wick: Chapter 4",
+        "releaseYear": "2023",
+        "posterPath": "/uDFv0wYODTdRUvljRMs3LaX9nq3.jpg",
+        "backdropPath": "/7I6VUdPj6tQECNHdviJkUHD2u89.jpg",
+        "voteAverage": 7.7,
+        "overview": "John Wick nimmt es mit seinen bisher tödlichsten Widersachern auf. Während das Kopfgeld auf ihn immer höher wird, zieht Wick in einen weltweiten Kampf gegen die mächtigsten Akteure der Unterwelt – von New York über Paris und Osaka bis nach Berlin …",
+        "mediaType": "movie",
+        "subGroup": "Filme"
+      },
+      {
+        "id": 72710,
+        "title": "The Continental - Aus der Welt von John Wick",
+        "originalTitle": "The Continental: From the World of John Wick",
+        "releaseYear": "2023",
+        "posterPath": "/jtFYRDvDlCFRV6cQpxXeNXK08vy.jpg",
+        "backdropPath": "/1gajPADcRyzmYvfAefbJwhCy4bk.jpg",
+        "voteAverage": 7.4,
+        "overview": "New York, Mitte der 1970er Jahre: Der noch junge Hotelmanager Winston Scott (Colin Woodell) muss sich seiner Vergangenheit stellen, die er glaubte, hinter sich gelassen zu haben. Dabei begibt er sich auf einen tödlichen Weg durch die mysteriöse Unterwelt New Yorks und versucht, das berühmte Continental Hotel in seine Gewalt zu bringen, das als Treffpunkt für die gefährlichsten Verbrecher der Welt dient …",
+        "mediaType": "tv",
+        "subGroup": "Serie"
+      }
+    ]
   }
 ];
 
