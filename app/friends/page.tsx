@@ -204,55 +204,66 @@ export default function FriendsPage() {
           </form>
         )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {friendGroups.map((grp) => (
-            <div
-              key={grp.id}
-              className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col justify-between gap-3"
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2.5">
-                  <span className="text-2xl">{grp.emoji}</span>
-                  <div>
-                    <h4 className="text-sm font-black text-white">{grp.name}</h4>
-                    <p className="text-[11px] text-slate-400">
-                      {grp.memberNames.length} Mitglieder
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => deleteFriendGroup(grp.id)}
-                  title="Gruppe löschen"
-                  className="text-slate-500 hover:text-rose-400 transition p-1"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              <div className="flex flex-wrap gap-1.5">
-                {grp.memberNames.map((mName) => (
-                  <span
-                    key={mName}
-                    className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 font-semibold"
-                  >
-                    @{mName}
-                  </span>
-                ))}
-              </div>
-
-              <Link
-                href={`/profile?prompt=${encodeURIComponent(
-                  `Heute will ich mit ${grp.name} einen Film schauen`
-                )}`}
-                className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition"
+        {friendGroups.length === 0 ? (
+          <div className="p-8 rounded-2xl bg-slate-950/40 border border-dashed border-slate-800 text-center space-y-2">
+            <p className="text-xs font-bold text-slate-300">
+              Noch keine Filmabend-Gruppen angelegt.
+            </p>
+            <p className="text-[11px] text-slate-500 max-w-md mx-auto">
+              Klicke oben auf „+ Gruppe anlegen“, um eigene Gruppen (z. B. deine WG oder Freunde) für gemeinsame KI-Filmberatung zu erstellen.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {friendGroups.map((grp) => (
+              <div
+                key={grp.id}
+                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col justify-between gap-3"
               >
-                <Wand2 className="w-3.5 h-3.5" />
-                <span>Mit @{grp.name} Film matchen</span>
-              </Link>
-            </div>
-          ))}
-        </div>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">{grp.emoji}</span>
+                    <div>
+                      <h4 className="text-sm font-black text-white">{grp.name}</h4>
+                      <p className="text-[11px] text-slate-400">
+                        {grp.memberNames.length} Mitglieder
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => deleteFriendGroup(grp.id)}
+                    title="Gruppe löschen"
+                    className="text-slate-500 hover:text-rose-400 transition p-1"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {grp.memberNames.map((mName) => (
+                    <span
+                      key={mName}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 font-semibold"
+                    >
+                      @{mName}
+                    </span>
+                  ))}
+                </div>
+
+                <Link
+                  href={`/profile?tab=ai&prompt=${encodeURIComponent(
+                    `Heute will ich mit ${grp.name} einen Film schauen`
+                  )}`}
+                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition"
+                >
+                  <Wand2 className="w-3.5 h-3.5" />
+                  <span>Mit @{grp.name} Film matchen</span>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Friends Cards */}

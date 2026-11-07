@@ -16,26 +16,7 @@ export interface FriendGroup {
   memberNames: string[];
 }
 
-const DEFAULT_FRIEND_GROUPS: FriendGroup[] = [
-  {
-    id: "grp_wg_couch",
-    name: "WG-Couch",
-    emoji: "🛋️",
-    memberNames: ["Lukas", "Max", "Sarah"],
-  },
-  {
-    id: "grp_kino_nerds",
-    name: "Kino-Nerds",
-    emoji: "🍿",
-    memberNames: ["Lukas", "Max"],
-  },
-  {
-    id: "grp_date_night",
-    name: "Date Night",
-    emoji: "✨",
-    memberNames: ["Lukas", "Sarah"],
-  },
-];
+const LEGACY_DEFAULT_GROUP_IDS = ["grp_wg_couch", "grp_kino_nerds", "grp_date_night"];
 
 interface MediaContextType {
   openMediaModal: (item: {
@@ -103,7 +84,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
   const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
-  const [friendGroups, setFriendGroupsState] = useState<FriendGroup[]>(DEFAULT_FRIEND_GROUPS);
+  const [friendGroups, setFriendGroupsState] = useState<FriendGroup[]>([]);
   const [communityData, setCommunityData] = useState<{
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -128,8 +109,12 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       const savedGroups = localStorage.getItem("cinecircle_friend_groups");
       if (savedGroups) {
         const parsed = JSON.parse(savedGroups);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setFriendGroupsState(parsed);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter(
+            (g: FriendGroup) => !LEGACY_DEFAULT_GROUP_IDS.includes(g.id)
+          );
+          setFriendGroupsState(cleaned);
+          localStorage.setItem("cinecircle_friend_groups", JSON.stringify(cleaned));
         }
       }
     } catch {
