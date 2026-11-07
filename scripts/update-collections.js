@@ -135,7 +135,7 @@ async function main() {
 
   // 3. Add Mission: Impossible
   console.log("Fetching Mission: Impossible...");
-  const miDefinitions = [954, 955, 956, 56292, 177677, 353081, 575264];
+  const miDefinitions = [954, 955, 956, 56292, 177677, 353081, 575264, 575265];
   const miMovies = [];
   for (const id of miDefinitions) {
     const item = await fetchItem(id, "movie");

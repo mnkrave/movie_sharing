@@ -2112,6 +2112,17 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "voteAverage": 7.5,
         "overview": "Ethan Hunt begibt sich auf seine siebte und bislang unmöglichste Mission: Gemeinsam mit seinem IMF-Team soll er eine neuartige Waffe ausfindig machen, die dazu in der Lage ist, die Menschheit an den Rand des Dritten Weltkriegs zu führen – und sieht sich gleich mit mehreren mächtigen Gegnern konfrontiert. Denn zahlreiche Schurken wollen ebenfalls in den Besitz des Schlüssels gelangen, der ihnen die Kontrolle über die mysteriöse Waffe geben würde. Doch der gefährlichste Feind hat weder einen Namen noch ein Gesicht: eine künstliche Intelligenz, die den Agenten immer einen Schritt voraus ist, aber selbst vollkommen unberechenbar agiert. Ein globaler Wettlauf um das Schicksal des Planeten beginnt – der Ethan Hunt gleichzeitig vor einige folgenschwere persönliche Entscheidungen stellt …",
         "mediaType": "movie"
+      },
+      {
+        "id": 575265,
+        "title": "Mission: Impossible - The Final Reckoning",
+        "originalTitle": "Mission: Impossible - The Final Reckoning",
+        "releaseYear": "2025",
+        "posterPath": "/pon10ZnAfQFSl7FeT2947agNUKL.jpg",
+        "backdropPath": "/xPNDRM50a58uvv1il2GVZrtWjkZ.jpg",
+        "voteAverage": 7.2,
+        "overview": "Die Jagd ist noch nicht vorbei: Ethan Hunt und sein Team von der legendären Impossible Mission Force (IMF) sehen sich weiterhin einer extrem mächtigen und die Welt bedrohenden künstlichen Intelligenz, die nur die „Entität\" genannt wird, gegenüber. Dafür müssen sie das den Namen „Sewastopol“ tragende russische U-Boot finden, dem eine Schlüsselrolle in diesem brodelnden Konflikt zukommt. Doch mit diesem Ziel sind Hunt und sein Team natürlich nicht alleine: Auch Gabriel, letztlich ein Handlanger der Entität, sucht fieberhaft nach der Sewastopol. Denn für ihn ist sie der Schlüssel, der sozusagen das Tor zur Hölle auf Erden öffnet, mit dem die Welt ins Chaos gestürzt werden kann. Gabriel scheint in diesem erbitterten Kampf eine Geheimwaffe in der Hinterhand zu haben, denn er und Hunt haben offenbar eine gemeinsame Vergangenheit, die den IMF-Agenten nun endgültig einholt...",
+        "mediaType": "movie"
       }
     ]
   },
