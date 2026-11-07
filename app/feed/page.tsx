@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -15,24 +15,89 @@ import {
   MessageSquare,
   User,
   Users,
+  Check,
+  RotateCcw,
 } from "lucide-react";
+import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 
 export default function FeedPage() {
   const { data: session } = useSession();
-  const { communityData, upvoteRecommendation, openMediaModal, openSearch } = useMedia();
+  const {
+    communityData,
+    upvoteRecommendation,
+    openMediaModal,
+    openSearch,
+    userSubscriptions,
+  } = useMedia();
 
+  // Filter States: Default is "FRIENDS", "hideWatched = true", "onlyStreamable = true"
   const [filterType, setFilterType] = useState<"ALL" | "movie" | "tv">("ALL");
-  const [authorFilter, setAuthorFilter] = useState<"ALL" | "FRIENDS" | "MINE">("ALL");
+  const [authorFilter, setAuthorFilter] = useState<"ALL" | "FRIENDS" | "MINE">("FRIENDS");
+  const [hideWatched, setHideWatched] = useState<boolean>(true);
+  const [onlyStreamable, setOnlyStreamable] = useState<boolean>(true);
   const [selectedTag, setSelectedTag] = useState<string>("ALL");
 
-  const myUserId = (session?.user as any)?.id || "user_lukas";
+  const [metaMap, setMetaMap] = useState<Record<string, BatchMediaMeta>>({});
+
+  const myUserId = (session?.user as any)?.id;
   const myName = session?.user?.name;
+  const myEmail = session?.user?.email?.toLowerCase();
+
+  const isMe = (userId?: string | null, userName?: string | null, userEmail?: string | null) => {
+    if (myUserId && userId && userId === myUserId) return true;
+    if (myName && userName && userName.toLowerCase() === myName.toLowerCase()) return true;
+    if (myEmail && userEmail && userEmail.toLowerCase() === myEmail) return true;
+    return false;
+  };
+
+  const hasMyWatched = (tmdbId: number, mediaType: "movie" | "tv") => {
+    return communityData.mediaStatuses.some(
+      (m) =>
+        m.tmdbId === tmdbId &&
+        m.mediaType === mediaType &&
+        m.status === "WATCHED" &&
+        isMe(m.userId, m.userName, (m as any).userEmail)
+    );
+  };
+
+  const isStreamableOnMySubs = (tmdbId: number, mediaType: "movie" | "tv") => {
+    const meta = metaMap[`${mediaType}_${tmdbId}`];
+    // If metadata not yet fetched from TMDB, don't hide prematurely
+    if (!meta) return true;
+    if (!meta.providersDE || meta.providersDE.length === 0) return false;
+    if (userSubscriptions.length === 0) return meta.hasFlatrateDE ?? false;
+    return userSubscriptions.some((sub) => meta.providersDE?.includes(sub));
+  };
+
+  // Batch fetch watch providers and genres for all recommendations in feed
+  useEffect(() => {
+    if (communityData.recommendations.length === 0) return;
+
+    const itemsToFetch = communityData.recommendations
+      .filter((r) => !metaMap[`${r.mediaType}_${r.tmdbId}`])
+      .map((r) => ({ id: r.tmdbId, type: r.mediaType }));
+
+    if (itemsToFetch.length === 0) return;
+
+    fetch("/api/tmdb/batch-genres", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items: itemsToFetch }),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.meta) {
+          setMetaMap((prev) => ({ ...prev, ...data.meta }));
+        }
+      })
+      .catch((err) => console.error("Failed to fetch feed metadata:", err));
+  }, [communityData.recommendations, metaMap]);
 
   const movieCount = communityData.recommendations.filter((r) => r.mediaType === "movie").length;
   const tvCount = communityData.recommendations.filter((r) => r.mediaType === "tv").length;
 
-  const myRecCount = communityData.recommendations.filter(
-    (r) => r.userId === myUserId || (myName && r.userName === myName)
+  const myRecCount = communityData.recommendations.filter((r) =>
+    isMe(r.userId, r.userName, (r as any).userEmail)
   ).length;
 
   const friendsRecCount = communityData.recommendations.length - myRecCount;
@@ -62,12 +127,22 @@ export default function FeedPage() {
         return false;
       }
 
-      // 2. Author Filter (Alle / Nur Freunde / Meine Empfehlungen)
-      const isMine = rec.userId === myUserId || (myName && rec.userName === myName);
+      // 2. Author Filter (Standard: Nur Freunde)
+      const isMine = isMe(rec.userId, rec.userName, (rec as any).userEmail);
       if (authorFilter === "MINE" && !isMine) return false;
       if (authorFilter === "FRIENDS" && isMine) return false;
 
-      // 3. Genre / Tag Filter
+      // 3. Watched Filter (Standard: Noch nicht gesehen)
+      if (hideWatched && hasMyWatched(rec.tmdbId, rec.mediaType)) {
+        return false;
+      }
+
+      // 4. Streaming Provider Filter (Standard: Im Abo streambar)
+      if (onlyStreamable && !isStreamableOnMySubs(rec.tmdbId, rec.mediaType)) {
+        return false;
+      }
+
+      // 5. Genre / Tag Filter
       if (selectedTag !== "ALL") {
         const query = selectedTag.toLowerCase();
         const hasTag = rec.tags.some((t) => t.toLowerCase().includes(query));
@@ -77,11 +152,24 @@ export default function FeedPage() {
 
       return true;
     });
-  }, [communityData.recommendations, filterType, authorFilter, selectedTag, myUserId, myName]);
+  }, [
+    communityData.recommendations,
+    filterType,
+    authorFilter,
+    hideWatched,
+    onlyStreamable,
+    selectedTag,
+    myUserId,
+    myName,
+    myEmail,
+    communityData.mediaStatuses,
+    metaMap,
+    userSubscriptions,
+  ]);
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
-      {/* Header with prominent Top-Right Switcher */}
+      {/* Header */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
         <div className="space-y-1 max-w-md">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold uppercase tracking-wider">
@@ -109,9 +197,9 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Filter Bar: Format, Author Switcher & Genre Tags */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
-        {/* Format & Author Switchers */}
+      {/* Filter Bar: Format, Author, Smart Filters & Genre Tags */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 shadow-xl">
+        {/* Row 1: Format & Author Switchers */}
         <div className="flex flex-wrap items-center justify-between gap-3.5">
           <div className="flex flex-wrap items-center gap-3 sm:gap-4">
             {/* Format Filter (Alle vs Filme vs Serien) */}
@@ -160,24 +248,12 @@ export default function FeedPage() {
               </div>
             </div>
 
-            {/* Author Switcher (Alle vs Freunde vs Eigene) */}
+            {/* Author Switcher (Standard: Von Freunden) */}
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
                 Ansicht:
               </span>
               <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setAuthorFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    authorFilter === "ALL"
-                      ? "bg-slate-800 text-white shadow"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Alle ({communityData.recommendations.length})
-                </button>
-
                 <button
                   type="button"
                   onClick={() => setAuthorFilter("FRIENDS")}
@@ -193,6 +269,18 @@ export default function FeedPage() {
 
                 <button
                   type="button"
+                  onClick={() => setAuthorFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    authorFilter === "ALL"
+                      ? "bg-slate-800 text-white shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Alle ({communityData.recommendations.length})
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => setAuthorFilter("MINE")}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                     authorFilter === "MINE"
@@ -201,7 +289,7 @@ export default function FeedPage() {
                   }`}
                 >
                   <User className="w-3.5 h-3.5" />
-                  <span>Meine Empfehlungen ({myRecCount})</span>
+                  <span>Meine ({myRecCount})</span>
                 </button>
               </div>
             </div>
@@ -213,7 +301,55 @@ export default function FeedPage() {
           </div>
         </div>
 
-        {/* Genre & Tag Filter Pills */}
+        {/* Row 2: Standard Smart-Filter (Noch nicht gesehen & Im Abo streambar) */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-800/60">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">
+              Filter:
+            </span>
+
+            {/* Toggle: Noch nicht gesehen */}
+            <button
+              type="button"
+              onClick={() => setHideWatched(!hideWatched)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
+                hideWatched
+                  ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300 shadow-sm"
+                  : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-slate-300"
+              }`}
+              title="Filtert Titel heraus, die du bereits selbst gesehen hast"
+            >
+              <Check className={`w-3.5 h-3.5 ${hideWatched ? "text-emerald-400" : "text-slate-600"}`} />
+              <span>Noch nicht gesehen</span>
+            </button>
+
+            {/* Toggle: Im Abo streambar */}
+            <button
+              type="button"
+              onClick={() => setOnlyStreamable(!onlyStreamable)}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition border ${
+                onlyStreamable
+                  ? "bg-amber-500/15 border-amber-500/40 text-amber-300 shadow-sm"
+                  : "bg-slate-950/60 border-slate-800 text-slate-500 hover:text-slate-300"
+              }`}
+              title="Zeigt nur Empfehlungen, die du mit deinen Streaming-Abos sofort schauen kannst"
+            >
+              <Tv className={`w-3.5 h-3.5 ${onlyStreamable ? "text-amber-400" : "text-slate-600"}`} />
+              <span>
+                Im Abo streambar
+                {userSubscriptions.length > 0 && ` (${userSubscriptions.length} Abos)`}
+              </span>
+            </button>
+          </div>
+
+          {(hideWatched || onlyStreamable) && (
+            <span className="text-[11px] text-slate-500 font-mono">
+              ⚡ Standard-Filter aktiv
+            </span>
+          )}
+        </div>
+
+        {/* Row 3: Genre & Tag Filter Pills */}
         <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-2 border-t border-slate-800/60">
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1 flex-shrink-0">
             Genre / Typ:
@@ -238,8 +374,11 @@ export default function FeedPage() {
       {filteredRecommendations.length > 0 ? (
         <div className="space-y-6">
           {filteredRecommendations.map((rec) => {
-            const isUpvoted = rec.upvoterIds.includes(myUserId);
-            const isMyOwn = rec.userId === myUserId || (myName && rec.userName === myName);
+            const isUpvoted = rec.upvoterIds.includes(myUserId || "");
+            const isMyOwn = isMe(rec.userId, rec.userName, (rec as any).userEmail);
+            const isWatchedByMe = hasMyWatched(rec.tmdbId, rec.mediaType);
+            const itemMeta = metaMap[`${rec.mediaType}_${rec.tmdbId}`];
+
             return (
               <div
                 key={rec.id}
@@ -302,6 +441,11 @@ export default function FeedPage() {
                                 Du
                               </span>
                             )}
+                            {isWatchedByMe && (
+                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-semibold border border-emerald-500/30">
+                                Von dir gesehen ✓
+                              </span>
+                            )}
                           </div>
                           <span className="text-[11px] text-slate-500">
                             {new Date(rec.createdAt).toLocaleDateString("de-DE")}
@@ -343,9 +487,41 @@ export default function FeedPage() {
                       &quot;{rec.comment}&quot;
                     </p>
 
+                    {/* Streaming Availability Badges (direct on card) */}
+                    {itemMeta?.providerLogosDE && itemMeta.providerLogosDE.length > 0 && (
+                      <div className="flex flex-wrap items-center gap-1.5 pt-2">
+                        <span className="text-[11px] text-slate-400 font-medium">Stream:</span>
+                        {itemMeta.providerLogosDE.map((p) => {
+                          const inMySubs = userSubscriptions.includes(p.key);
+                          return (
+                            <span
+                              key={p.key}
+                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-semibold border ${
+                                inMySubs
+                                  ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                                  : "bg-slate-800 border-slate-700 text-slate-300"
+                              }`}
+                            >
+                              {p.logo && (
+                                <Image
+                                  src={`https://image.tmdb.org/t/p/w92${p.logo}`}
+                                  alt={p.name}
+                                  width={14}
+                                  height={14}
+                                  className="rounded"
+                                />
+                              )}
+                              <span>{p.name}</span>
+                              {inMySubs && <span className="text-amber-400 font-bold">✓</span>}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
                     {/* Tags */}
                     {rec.tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3">
+                      <div className="flex flex-wrap gap-1.5 mt-2.5">
                         {rec.tags.map((tag) => (
                           <span
                             key={tag}
@@ -379,14 +555,14 @@ export default function FeedPage() {
                     <button
                       type="button"
                       onClick={() => upvoteRecommendation(rec.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
                         isUpvoted
-                          ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
-                          : "bg-slate-800/60 text-slate-400 hover:text-white"
+                          ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
+                          : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
                       }`}
                     >
-                      <ThumbsUp className="w-3.5 h-3.5" />
-                      <span>Hilfreich ({rec.upvoterIds.length})</span>
+                      <ThumbsUp className={`w-3.5 h-3.5 ${isUpvoted ? "fill-white" : ""}`} />
+                      <span>{rec.upvoterIds.length}</span>
                     </button>
                   </div>
                 </div>
@@ -395,22 +571,61 @@ export default function FeedPage() {
           })}
         </div>
       ) : (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-slate-800 text-slate-400 space-y-4">
-          <MessageSquare className="w-10 h-10 text-slate-600 mx-auto" />
+        /* Empty State with Helpful Context & 1-Click Buttons */
+        <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-slate-800 space-y-4">
+          <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center mx-auto text-slate-500">
+            <MessageSquare className="w-8 h-8" />
+          </div>
           <div>
-            <h3 className="text-lg font-bold text-white">Keine Empfehlungen in dieser Ansicht</h3>
-            <p className="text-xs text-slate-500 mt-1">
-              {authorFilter === "MINE"
-                ? "Du hast noch keine eigenen Empfehlungen verfasst. Klicke auf 'Titel empfehlen', um deinen Freunden einen Tipp zu geben!"
-                : "Keine Empfehlungen für die gewählten Filter gefunden."}
+            <h3 className="text-lg font-bold text-white">
+              {authorFilter === "FRIENDS" && friendsRecCount === 0
+                ? "Noch keine Empfehlungen von deinen Freunden"
+                : "Keine Empfehlungen für diesen Filter"}
+            </h3>
+            <p className="text-sm text-slate-400 max-w-sm mx-auto mt-1">
+              {authorFilter === "FRIENDS" && friendsRecCount === 0
+                ? "Sobald deine Freunde Filme oder Serien empfehlen, erscheinen sie hier. Du kannst auch alle oder deine eigenen Empfehlungen ansehen."
+                : "Passe die Filter an oder deaktiviere 'Noch nicht gesehen' / 'Im Abo streambar', um mehr Titel zu sehen."}
             </p>
           </div>
-          <button
-            onClick={openSearch}
-            className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-xs"
-          >
-            Titel suchen & empfehlen
-          </button>
+
+          <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+            {authorFilter === "FRIENDS" && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setAuthorFilter("ALL")}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold transition"
+                >
+                  Alle Empfehlungen ansehen ({communityData.recommendations.length})
+                </button>
+                {myRecCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAuthorFilter("MINE")}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition"
+                  >
+                    Meine Empfehlungen ansehen ({myRecCount})
+                  </button>
+                )}
+              </>
+            )}
+
+            {(hideWatched || onlyStreamable) && (
+              <button
+                type="button"
+                onClick={() => {
+                  setHideWatched(false);
+                  setOnlyStreamable(false);
+                  setAuthorFilter("ALL");
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-bold transition"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Filter zurücksetzen</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
     </div>

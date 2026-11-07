@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeProviderKey } from "@/lib/tmdb";
 
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf36";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
@@ -11,6 +12,10 @@ export interface BatchMediaMeta {
   actors: string[];
   tmdbVoteAverage: number;
   releaseYear: string;
+  providersDE?: string[];
+  providerNamesDE?: string[];
+  providerLogosDE?: { name: string; logo: string; key: string }[];
+  hasFlatrateDE?: boolean;
 }
 
 // In-memory cache for fast repeated lookups
@@ -40,7 +45,7 @@ export async function POST(req: Request) {
       await Promise.all(
         toFetch.map(async ({ id, type, key }) => {
           try {
-            const url = `${TMDB_BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&language=de-DE&append_to_response=credits`;
+            const url = `${TMDB_BASE_URL}/${type}/${id}?api_key=${TMDB_API_KEY}&language=de-DE&append_to_response=credits,watch/providers`;
             const res = await fetch(url, { next: { revalidate: 86400 } });
             if (res.ok) {
               const data = await res.json();
@@ -73,6 +78,34 @@ export async function POST(req: Request) {
 
               const dateStr = data.release_date || data.first_air_date || "";
 
+              // Watch providers in DE
+              const deProviders = data["watch/providers"]?.results?.DE;
+              const flatrateList = [
+                ...(deProviders?.flatrate || []),
+                ...(deProviders?.free || []),
+              ];
+
+              const providersDE: string[] = [];
+              const providerNamesDE: string[] = [];
+              const providerLogosDE: { name: string; logo: string; key: string }[] = [];
+
+              for (const p of flatrateList) {
+                if (p.provider_name) {
+                  const { key, displayName } = normalizeProviderKey(p.provider_name);
+                  if (!providersDE.includes(key)) {
+                    providersDE.push(key);
+                    providerNamesDE.push(displayName);
+                    providerLogosDE.push({
+                      name: displayName,
+                      logo: p.logo_path,
+                      key,
+                    });
+                  }
+                }
+              }
+
+              const hasFlatrateDE = providersDE.length > 0;
+
               const meta: BatchMediaMeta = {
                 genreNames,
                 genres: rawGenres,
@@ -83,6 +116,10 @@ export async function POST(req: Request) {
                   ? Math.round(data.vote_average * 10) / 10
                   : 0,
                 releaseYear: dateStr ? dateStr.slice(0, 4) : "",
+                providersDE,
+                providerNamesDE,
+                providerLogosDE,
+                hasFlatrateDE,
               };
 
               metaCache.set(key, meta);
