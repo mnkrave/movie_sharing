@@ -24,11 +24,37 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
-const EXAMPLE_PROMPTS = [
-  "Heute will ich mit WG-Couch einen Film schauen der sehr lustig ist und maximal 120 Minuten geht",
-  "/match @WG-Couch max:120min humor:hoch",
-  "Suche einen packenden Mindfuck-Thriller für @Max und mich auf Netflix",
-  "Date Night mit @Sarah: Ein bildgewaltiges Abenteuer ohne Horror",
+const QUICK_SUGGESTIONS = [
+  {
+    icon: "🛋️",
+    label: "WG-Filmabend",
+    tag: "Lustig & Max. 120m",
+    prompt: "Heute will ich mit WG-Couch einen Film schauen der sehr lustig ist und maximal 120 Minuten geht",
+  },
+  {
+    icon: "⚡",
+    label: "Slash-Befehl",
+    tag: "/match @WG-Couch",
+    prompt: "/match @WG-Couch max:120min humor:hoch",
+  },
+  {
+    icon: "🧠",
+    label: "Mindfuck-Thriller",
+    tag: "Netflix & Plottwist",
+    prompt: "Suche einen packenden Mindfuck-Thriller für @Max und mich auf Netflix",
+  },
+  {
+    icon: "🍷",
+    label: "Date Night",
+    tag: "Abenteuer ohne Horror",
+    prompt: "Date Night mit @Sarah: Ein bildgewaltiges Abenteuer ohne Horror",
+  },
+  {
+    icon: "🍿",
+    label: "Popcorn Action",
+    tag: "Sci-Fi & Blockbuster",
+    prompt: "Empfiehl einen bildgewaltigen Sci-Fi-Action-Blockbuster mit Top-Bewertung für heute Abend",
+  },
 ];
 
 export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
@@ -67,6 +93,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
   useEffect(() => {
     if (initialPrompt) {
       setPrompt(initialPrompt);
+      handleAskAi(initialPrompt);
     }
   }, [initialPrompt]);
 
@@ -287,6 +314,43 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
           })}
       </div>
 
+      {/* Quick Vorschläge (Suggestions) Oben */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-[11px]">
+          <span className="font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>Vorschläge zum Ausprobieren:</span>
+          </span>
+          <span className="text-slate-400 text-[10px] hidden sm:inline">
+            1 Klick zum sofortigen Starten
+          </span>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {QUICK_SUGGESTIONS.map((sug) => (
+            <button
+              key={sug.label}
+              type="button"
+              onClick={() => {
+                setPrompt(sug.prompt);
+                handleAskAi(sug.prompt);
+              }}
+              className="group px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-400/50 text-left transition flex items-center gap-2 shadow-sm"
+              title={sug.prompt}
+            >
+              <span className="text-sm">{sug.icon}</span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-200 group-hover:text-white">
+                  {sug.label}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 font-medium border border-purple-500/20">
+                  {sug.tag}
+                </span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Main Prompt Input Box */}
       <form
         onSubmit={(e) => {
@@ -314,24 +378,6 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
             <Wand2 className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
             <span>{loading ? "KI analysiert Profile..." : "KI-Match starten"}</span>
           </button>
-        </div>
-
-        {/* Example Prompts */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-slate-500 mr-1">Beispiele testen:</span>
-          {EXAMPLE_PROMPTS.map((ex) => (
-            <button
-              key={ex}
-              type="button"
-              onClick={() => {
-                setPrompt(ex);
-                handleAskAi(ex);
-              }}
-              className="px-2.5 py-1 rounded-lg bg-slate-900/70 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 hover:text-white transition truncate max-w-xs sm:max-w-md"
-            >
-              „{ex}“
-            </button>
-          ))}
         </div>
       </form>
 
