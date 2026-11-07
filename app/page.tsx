@@ -1,6 +1,6 @@
 import { getTopRatedMovies, getTopRatedTv, getTrendingAll, getOscarWinnersList } from "@/lib/tmdb";
-import { MediaCard } from "@/components/MediaCard";
-import { Sparkles, Award, Film, Tv, Flame, ArrowRight } from "lucide-react";
+import { HomeContentClient } from "@/components/HomeContentClient";
+import { Sparkles, Award, Flame } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -9,7 +9,7 @@ export const revalidate = 3600; // Cache 1 hour
 export default async function HomePage() {
   const [topMovies, topTv, trending] = await Promise.all([
     getTopRatedMovies(2),
-    getTopRatedTv(1),
+    getTopRatedTv(2),
     getTrendingAll(),
   ]);
 
@@ -17,10 +17,10 @@ export default async function HomePage() {
   const heroItem = trending[0] || topMovies[0];
 
   return (
-    <div className="space-y-16 pb-20">
+    <div className="space-y-12 pb-20">
       {/* Hero Showcase Section */}
       {heroItem && (
-        <section className="relative h-[480px] sm:h-[560px] w-full overflow-hidden bg-slate-950">
+        <section className="relative h-[480px] sm:h-[540px] w-full overflow-hidden bg-slate-950">
           {heroItem.backdropPath && (
             <Image
               src={`https://image.tmdb.org/t/p/original${heroItem.backdropPath}`}
@@ -75,150 +75,14 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* Main Content Containers */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-16">
-        {/* ROW 1: Oscar-Gewinner Highlights */}
-        <section className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20">
-                <Award className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  Oscar-Gewinner & Bester Film
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Prämierte Meisterwerke von Oppenheimer bis Parasite – klicke auf einen Film für den weltweiten Streaming-Finder!
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/oscars"
-              className="flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition"
-            >
-              <span>Alle ansehen</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-            {oscarWinners.map((item, idx) => (
-              <MediaCard key={item.id} item={item} priority={idx < 5} />
-            ))}
-          </div>
-        </section>
-
-        {/* ROW 2: Top Filme (IMDb / TMDB) */}
-        <section className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-2xl border border-sky-500/20">
-                <Film className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  Top bewertete Filme (IMDb & TMDB)
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Die ewigen Klassiker & höchstbewerteten Filme aller Zeiten.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/movies"
-              className="flex items-center gap-1 text-xs font-bold text-sky-400 hover:text-sky-300 transition"
-            >
-              <span>Ganze Top 250 ansehen</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-            {topMovies.slice(0, 15).map((item) => (
-              <MediaCard key={item.id} item={item} />
-            ))}
-          </div>
-
-          <div className="flex justify-center pt-2">
-            <Link
-              href="/movies"
-              className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-sky-400 hover:text-sky-300 font-bold text-xs border border-slate-800 hover:border-sky-500/40 transition shadow-md"
-            >
-              <Film className="w-4 h-4" />
-              <span>Ganze Top 250 Liste entdecken</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Link>
-          </div>
-        </section>
-
-        {/* ROW 3: Top Serien */}
-        <section className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20">
-                <Tv className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  Top bewertete Serien
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Meisterhafte TV-Serien mit weltweiten Streaming-Optionen.
-                </p>
-              </div>
-            </div>
-            <Link
-              href="/tv"
-              className="flex items-center gap-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition"
-            >
-              <span>Alle Top-Serien ansehen</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-            {topTv.slice(0, 10).map((item) => (
-              <MediaCard key={item.id} item={item} />
-            ))}
-          </div>
-
-          <div className="flex justify-center pt-2">
-            <Link
-              href="/tv"
-              className="flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-900 hover:bg-slate-800 text-cyan-400 hover:text-cyan-300 font-bold text-xs border border-slate-800 hover:border-cyan-500/40 transition shadow-md"
-            >
-              <Tv className="w-4 h-4" />
-              <span>Alle Top-Serien entdecken</span>
-              <ArrowRight className="w-3.5 h-3.5 ml-1" />
-            </Link>
-          </div>
-        </section>
-
-        {/* ROW 4: Aktuell im Trend */}
-        <section className="space-y-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-2xl border border-rose-500/20">
-                <Flame className="w-6 h-6" />
-              </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
-                  Aktuell im Trend
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-400">
-                  Die meistgesehenen & diskutierten Filme und Serien dieser Woche.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-            {trending.slice(1, 11).map((item) => (
-              <MediaCard key={item.id} item={item} />
-            ))}
-          </div>
-        </section>
+      {/* Main Content with Top-Right Switcher */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <HomeContentClient
+          topMovies={topMovies}
+          topTv={topTv}
+          trending={trending}
+          oscarWinners={oscarWinners}
+        />
       </div>
     </div>
   );
