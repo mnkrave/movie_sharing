@@ -128,6 +128,102 @@ export const POPULAR_SUBSCRIPTIONS = [
   { key: "rtl", label: "RTL+", color: "#E50000" },
 ];
 
+export interface GenreMeta {
+  id: number;
+  name: string;
+  emoji: string;
+  label: string;
+}
+
+// 19 offizielle TMDB Movie Genres (Deutsche Bezeichnungen)
+export const OFFICIAL_MOVIE_GENRES: GenreMeta[] = [
+  { id: 28, name: "Action", emoji: "💥", label: "💥 Action" },
+  { id: 12, name: "Abenteuer", emoji: "🗺️", label: "🗺️ Abenteuer" },
+  { id: 16, name: "Animation", emoji: "✨", label: "✨ Animation" },
+  { id: 35, name: "Komödie", emoji: "😂", label: "😂 Komödie" },
+  { id: 80, name: "Krimi", emoji: "🕵️", label: "🕵️ Krimi" },
+  { id: 99, name: "Dokumentarfilm", emoji: "🎥", label: "🎥 Dokumentarfilm" },
+  { id: 18, name: "Drama", emoji: "🎭", label: "🎭 Drama" },
+  { id: 10751, name: "Familie", emoji: "👨‍👩‍👧‍👦", label: "👨‍👩‍👧‍👦 Familie" },
+  { id: 14, name: "Fantasy", emoji: "🧙‍♂️", label: "🧙‍♂️ Fantasy" },
+  { id: 36, name: "Historie", emoji: "📜", label: "📜 Historie" },
+  { id: 27, name: "Horror", emoji: "🩸", label: "🩸 Horror" },
+  { id: 10402, name: "Musik", emoji: "🎵", label: "🎵 Musik" },
+  { id: 9648, name: "Mystery", emoji: "🔍", label: "🔍 Mystery" },
+  { id: 10749, name: "Liebesfilm", emoji: "❤️", label: "❤️ Liebesfilm" },
+  { id: 878, name: "Science Fiction", emoji: "🚀", label: "🚀 Science Fiction" },
+  { id: 10770, name: "TV-Film", emoji: "📺", label: "📺 TV-Film" },
+  { id: 53, name: "Thriller", emoji: "😱", label: "😱 Thriller" },
+  { id: 10752, name: "Kriegsfilm", emoji: "🪖", label: "🪖 Kriegsfilm" },
+  { id: 37, name: "Western", emoji: "🤠", label: "🤠 Western" },
+];
+
+// 16 offizielle TMDB TV / Serien Genres
+export const OFFICIAL_TV_GENRES: GenreMeta[] = [
+  { id: 10759, name: "Action & Adventure", emoji: "💥", label: "💥 Action & Adventure" },
+  { id: 16, name: "Animation", emoji: "✨", label: "✨ Animation" },
+  { id: 35, name: "Comedy", emoji: "😂", label: "😂 Comedy" },
+  { id: 80, name: "Crime", emoji: "🕵️", label: "🕵️ Crime" },
+  { id: 99, name: "Documentary", emoji: "🎥", label: "🎥 Documentary" },
+  { id: 18, name: "Drama", emoji: "🎭", label: "🎭 Drama" },
+  { id: 10751, name: "Family", emoji: "👨‍👩‍👧‍👦", label: "👨‍👩‍👧‍👦 Family" },
+  { id: 10762, name: "Kids", emoji: "🎈", label: "🎈 Kids" },
+  { id: 9648, name: "Mystery", emoji: "🔍", label: "🔍 Mystery" },
+  { id: 10763, name: "News", emoji: "📰", label: "📰 News" },
+  { id: 10764, name: "Reality", emoji: "🌟", label: "🌟 Reality" },
+  { id: 10765, name: "Sci-Fi & Fantasy", emoji: "🚀", label: "🚀 Sci-Fi & Fantasy" },
+  { id: 10766, name: "Soap", emoji: "💔", label: "💔 Soap" },
+  { id: 10767, name: "Talk", emoji: "🎙️", label: "🎙️ Talk" },
+  { id: 10768, name: "War & Politics", emoji: "🪖", label: "🪖 War & Politics" },
+  { id: 37, name: "Western", emoji: "🤠", label: "🤠 Western" },
+];
+
+export const ALL_GENRES_MAP: Record<number, GenreMeta> = {
+  ...Object.fromEntries(OFFICIAL_MOVIE_GENRES.map((g) => [g.id, g])),
+  ...Object.fromEntries(OFFICIAL_TV_GENRES.map((g) => [g.id, g])),
+};
+
+export function getGenreMeta(id: number, mediaType?: "movie" | "tv"): GenreMeta | undefined {
+  if (mediaType === "tv") {
+    const tv = OFFICIAL_TV_GENRES.find((g) => g.id === id);
+    if (tv) return tv;
+  }
+  return ALL_GENRES_MAP[id];
+}
+
+export function resolveItemGenres(
+  mediaType: "movie" | "tv",
+  genreIds?: number[],
+  genres?: { id: number; name: string }[]
+): { id: number; name: string; emoji: string }[] {
+  if (genres && genres.length > 0) {
+    return genres.map((g) => {
+      const meta = getGenreMeta(g.id, mediaType);
+      return {
+        id: g.id,
+        name: g.name || meta?.name || "Genre",
+        emoji: meta?.emoji || "🎬",
+      };
+    });
+  }
+
+  if (genreIds && genreIds.length > 0) {
+    return genreIds
+      .map((id) => {
+        const meta = getGenreMeta(id, mediaType);
+        if (!meta) return null;
+        return {
+          id: meta.id,
+          name: meta.name,
+          emoji: meta.emoji,
+        };
+      })
+      .filter(Boolean) as { id: number; name: string; emoji: string }[];
+  }
+
+  return [];
+}
+
 export function normalizeProviderKey(name: string): { key: string; displayName: string } {
   const lower = name.toLowerCase();
   if (lower.includes("netflix")) return { key: "netflix", displayName: "Netflix" };

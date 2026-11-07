@@ -10,7 +10,13 @@ import { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
 interface MediaContextType {
-  openMediaModal: (item: { id: number; mediaType: "movie" | "tv"; title?: string; posterPath?: string | null }) => void;
+  openMediaModal: (item: {
+    id: number;
+    mediaType: "movie" | "tv";
+    title?: string;
+    posterPath?: string | null;
+    genreIds?: number[];
+  }) => void;
   closeMediaModal: () => void;
   openSearch: () => void;
   closeSearch: () => void;
@@ -54,7 +60,13 @@ const MediaContext = createContext<MediaContextType | null>(null);
 
 export function MediaProvider({ children }: { children: React.ReactNode }) {
   const { data: session } = useSession();
-  const [selectedMedia, setSelectedMedia] = useState<{ id: number; mediaType: "movie" | "tv"; title?: string; posterPath?: string | null } | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<{
+    id: number;
+    mediaType: "movie" | "tv";
+    title?: string;
+    posterPath?: string | null;
+    genreIds?: number[];
+  } | null>(null);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSubsOpen, setIsSubsOpen] = useState(false);
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);

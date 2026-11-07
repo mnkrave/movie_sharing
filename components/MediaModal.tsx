@@ -6,6 +6,8 @@ import {
   CountryWatchData,
   GlobalProviderVpnMatch,
   normalizeProviderKey,
+  resolveItemGenres,
+  getGenreMeta,
 } from "@/lib/tmdb";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
@@ -36,6 +38,7 @@ interface MediaModalProps {
     mediaType: "movie" | "tv";
     title?: string;
     posterPath?: string | null;
+    genreIds?: number[];
   };
   onClose: () => void;
 }
@@ -108,6 +111,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   const friendsRecommendations = communityData.recommendations.filter(
     (r) => r.tmdbId === media.id && r.mediaType === media.mediaType
   );
+
+  const itemGenres = resolveItemGenres(media.mediaType, media.genreIds, details?.genres);
 
   const myEmail = session?.user?.email?.toLowerCase();
   const myStatusObj = communityData.mediaStatuses.find(
@@ -343,6 +348,21 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 </h2>
                 {details?.tagline && (
                   <p className="text-sm italic text-slate-400 mt-1">&quot;{details.tagline}&quot;</p>
+                )}
+
+                {/* Prominent Genre Badges */}
+                {itemGenres.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                    {itemGenres.map((g) => (
+                      <span
+                        key={g.id || g.name}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-800/90 text-slate-200 border border-slate-700/80 shadow-sm"
+                      >
+                        <span>{g.emoji}</span>
+                        <span>{g.name}</span>
+                      </span>
+                    ))}
+                  </div>
                 )}
 
                 {/* Ratings & Quick Badges */}
@@ -1126,6 +1146,25 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
             {/* Overview & Crew */}
             <div className="border-t border-slate-800 pt-6 pb-8 space-y-4">
+              {itemGenres.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                    Genres
+                  </h4>
+                  <div className="flex flex-wrap gap-2">
+                    {itemGenres.map((g) => (
+                      <span
+                        key={g.id || g.name}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 font-medium"
+                      >
+                        <span className="text-sm">{g.emoji}</span>
+                        <span>{g.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div>
                 <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2">
                   Handlung

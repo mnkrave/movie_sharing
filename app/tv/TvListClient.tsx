@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { MediaItem } from "@/lib/tmdb";
+import { MediaItem, OFFICIAL_TV_GENRES } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
 import { Search, X } from "lucide-react";
 
@@ -16,13 +16,7 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
 
   const TV_GENRES = [
     { id: "ALL", label: "Alle Genres" },
-    { id: 18, label: "🎭 Drama" },
-    { id: 10759, label: "💥 Action & Abenteuer" },
-    { id: 35, label: "😂 Comedy" },
-    { id: 10765, label: "🚀 Sci-Fi & Fantasy" },
-    { id: 80, label: "🕵️ Krimi" },
-    { id: 9648, label: "🔍 Mystery" },
-    { id: 16, label: "✨ Animation" },
+    ...OFFICIAL_TV_GENRES.map((g) => ({ id: g.id, label: g.label })),
   ];
 
   const filteredSeries = useMemo(() => {
@@ -70,8 +64,26 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
             )}
           </div>
 
-          <div className="text-xs text-slate-400">
-            Zeige {displayedSeries.length} von {filteredSeries.length} Top-Serien
+          <div className="flex items-center gap-3 text-xs text-slate-400">
+            <span>
+              Zeige {displayedSeries.length} von {filteredSeries.length} Top-Serien
+              {selectedGenre !== "ALL" && (
+                <span className="ml-1.5 text-cyan-400 font-semibold">
+                  ({TV_GENRES.find((g) => g.id === selectedGenre)?.label})
+                </span>
+              )}
+            </span>
+            {(query || selectedGenre !== "ALL") && (
+              <button
+                onClick={() => {
+                  setQuery("");
+                  setSelectedGenre("ALL");
+                }}
+                className="text-cyan-400 hover:underline font-semibold"
+              >
+                Filter zurücksetzen
+              </button>
+            )}
           </div>
         </div>
 
@@ -104,8 +116,17 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
           ))}
         </div>
       ) : (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/30 border border-slate-800 text-slate-400">
-          Keine Serien gefunden, die zu deiner Suche &quot;{query}&quot; passen.
+        <div className="p-12 text-center rounded-3xl bg-slate-900/30 border border-slate-800 text-slate-400 space-y-4">
+          <p>Keine Serien gefunden, die zu deinen Such- oder Filterkriterien passen.</p>
+          <button
+            onClick={() => {
+              setQuery("");
+              setSelectedGenre("ALL");
+            }}
+            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition shadow"
+          >
+            Alle Filter zurücksetzen
+          </button>
         </div>
       )}
 

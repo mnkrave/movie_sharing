@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { MediaItem } from "@/lib/tmdb";
+import { MediaItem, OFFICIAL_MOVIE_GENRES } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
 import { Search, Filter, X } from "lucide-react";
 
@@ -17,15 +17,7 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
 
   const MOVIE_GENRES = [
     { id: "ALL", label: "Alle Genres" },
-    { id: 28, label: "💥 Action" },
-    { id: 35, label: "😂 Komödie" },
-    { id: 18, label: "🎭 Drama" },
-    { id: 878, label: "🚀 Sci-Fi" },
-    { id: 53, label: "😱 Thriller" },
-    { id: 27, label: "🩸 Horror" },
-    { id: 80, label: "🕵️ Krimi" },
-    { id: 16, label: "✨ Animation" },
-    { id: 12, label: "🗺️ Abenteuer" },
+    ...OFFICIAL_MOVIE_GENRES.map((g) => ({ id: g.id, label: g.label })),
   ];
 
   const filteredMovies = useMemo(() => {
@@ -136,14 +128,20 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
       <div className="flex items-center justify-between text-xs text-slate-400 px-1">
         <span>
           Zeige {displayedMovies.length} von {filteredMovies.length} Filmen
+          {selectedGenre !== "ALL" && (
+            <span className="ml-1.5 text-sky-400 font-semibold">
+              ({MOVIE_GENRES.find((g) => g.id === selectedGenre)?.label})
+            </span>
+          )}
         </span>
-        {query && (
+        {(query || selectedGenre !== "ALL" || selectedDecade !== "ALL") && (
           <button
             onClick={() => {
               setQuery("");
+              setSelectedGenre("ALL");
               setSelectedDecade("ALL");
             }}
-            className="text-sky-400 hover:underline"
+            className="text-sky-400 hover:underline font-semibold"
           >
             Filter zurücksetzen
           </button>
@@ -158,8 +156,18 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
           ))}
         </div>
       ) : (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/30 border border-slate-800 text-slate-400">
-          Keine Filme gefunden, die zu deinen Such- oder Filterkriterien passen.
+        <div className="p-12 text-center rounded-3xl bg-slate-900/30 border border-slate-800 text-slate-400 space-y-4">
+          <p>Keine Filme gefunden, die zu deinen Such- oder Filterkriterien passen.</p>
+          <button
+            onClick={() => {
+              setQuery("");
+              setSelectedGenre("ALL");
+              setSelectedDecade("ALL");
+            }}
+            className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-black text-xs font-bold transition shadow"
+          >
+            Alle Filter zurücksetzen
+          </button>
         </div>
       )}
 
