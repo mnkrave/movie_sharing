@@ -96,55 +96,12 @@ export default function FeedPage() {
           </p>
         </div>
 
-        {/* Top-Right Segmented Switcher & Action */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-          {/* Segmented Switcher Filme vs Serien */}
-          <div className="p-1 rounded-2xl bg-black/60 border border-slate-700/80 backdrop-blur-md flex items-center justify-center shadow-lg">
-            <button
-              onClick={() => setFilterType("movie")}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                filterType === "movie"
-                  ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Film className="w-3.5 h-3.5" />
-              <span>Filme</span>
-              <span className="text-[10px] font-mono opacity-80">({movieCount})</span>
-            </button>
-
-            <button
-              onClick={() => setFilterType("tv")}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold transition ${
-                filterType === "tv"
-                  ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/20"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Tv className="w-3.5 h-3.5" />
-              <span>Serien</span>
-              <span className="text-[10px] font-mono opacity-80">({tvCount})</span>
-            </button>
-
-            <button
-              onClick={() => setFilterType("ALL")}
-              className={`px-3 py-2 rounded-xl text-xs font-bold transition ${
-                filterType === "ALL"
-                  ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <span>Alle</span>
-              <span className="text-[10px] font-mono opacity-80 ml-1">
-                ({communityData.recommendations.length})
-              </span>
-            </button>
-          </div>
-
+        {/* Top-Right Action */}
+        <div className="flex items-center justify-end w-full lg:w-auto">
           <button
             type="button"
             onClick={openSearch}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-bold text-xs transition shadow-lg shadow-rose-500/20 whitespace-nowrap"
+            className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-bold text-xs transition shadow-lg shadow-rose-500/20 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             <span>Titel empfehlen</span>
@@ -152,49 +109,101 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Filter Bar: Author Switcher & Genre Tags */}
+      {/* Filter Bar: Format, Author Switcher & Genre Tags */}
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4">
-        {/* Author Switcher (Alle vs Freunde vs Eigene) */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-              Ansicht:
-            </span>
-            <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
-              <button
-                onClick={() => setAuthorFilter("ALL")}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  authorFilter === "ALL"
-                    ? "bg-slate-800 text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Alle ({communityData.recommendations.length})
-              </button>
+        {/* Format & Author Switchers */}
+        <div className="flex flex-wrap items-center justify-between gap-3.5">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+            {/* Format Filter (Alle vs Filme vs Serien) */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Format:
+              </span>
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setFilterType("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    filterType === "ALL"
+                      ? "bg-rose-500 text-white shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Alle ({communityData.recommendations.length})
+                </button>
 
-              <button
-                onClick={() => setAuthorFilter("FRIENDS")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  authorFilter === "FRIENDS"
-                    ? "bg-rose-500 text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Users className="w-3.5 h-3.5" />
-                <span>Von Freunden ({friendsRecCount})</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterType("movie")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    filterType === "movie"
+                      ? "bg-amber-500 text-black shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Film className="w-3.5 h-3.5" />
+                  <span>Filme ({movieCount})</span>
+                </button>
 
-              <button
-                onClick={() => setAuthorFilter("MINE")}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                  authorFilter === "MINE"
-                    ? "bg-amber-500 text-black shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <User className="w-3.5 h-3.5" />
-                <span>Meine Empfehlungen ({myRecCount})</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterType("tv")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    filterType === "tv"
+                      ? "bg-cyan-500 text-black shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Tv className="w-3.5 h-3.5" />
+                  <span>Serien ({tvCount})</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Author Switcher (Alle vs Freunde vs Eigene) */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+                Ansicht:
+              </span>
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setAuthorFilter("ALL")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    authorFilter === "ALL"
+                      ? "bg-slate-800 text-white shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Alle ({communityData.recommendations.length})
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAuthorFilter("FRIENDS")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    authorFilter === "FRIENDS"
+                      ? "bg-rose-500 text-white shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Von Freunden ({friendsRecCount})</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setAuthorFilter("MINE")}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    authorFilter === "MINE"
+                      ? "bg-amber-500 text-black shadow"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Meine Empfehlungen ({myRecCount})</span>
+                </button>
+              </div>
             </div>
           </div>
 
