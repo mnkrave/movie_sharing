@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
-import { Check, Tv, X } from "lucide-react";
+import { Check, Tv, X, Filter } from "lucide-react";
+import { useMedia } from "./MediaContext";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -18,6 +19,11 @@ export function SubscriptionModal({
   onSave,
 }: SubscriptionModalProps) {
   const [current, setCurrent] = useState<string[]>(selectedSubscriptions);
+  const { onlyMySubs, toggleOnlyMySubs } = useMedia();
+
+  useEffect(() => {
+    setCurrent(selectedSubscriptions);
+  }, [selectedSubscriptions, isOpen]);
 
   if (!isOpen) return null;
 
@@ -55,6 +61,30 @@ export function SubscriptionModal({
               Wähle aus, welche Abos du hast. Wir heben dann Filme hervor, die du kostenlos streamen kannst.
             </p>
           </div>
+        </div>
+
+        {/* Global Filter Switcher */}
+        <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800 my-4">
+          <div className="text-xs pr-2">
+            <p className="font-bold text-white flex items-center gap-1.5">
+              <Filter className="w-3.5 h-3.5 text-amber-400" />
+              Standard-Filter: Nur was ich habe
+            </p>
+            <p className="text-slate-400 mt-0.5">
+              Blendet bei Filmen & Serien automatisch alle Anbieter aus, die du nicht hast.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={toggleOnlyMySubs}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex-shrink-0 ${
+              onlyMySubs
+                ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+            }`}
+          >
+            {onlyMySubs ? "AKTIV (AN)" : "AUS"}
+          </button>
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 my-6 max-h-[60vh] overflow-y-auto pr-1">

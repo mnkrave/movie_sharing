@@ -16,6 +16,9 @@ interface MediaContextType {
   openSubscriptions: () => void;
   userSubscriptions: string[];
   setUserSubscriptions: (subs: string[]) => void;
+  onlyMySubs: boolean;
+  setOnlyMySubs: (val: boolean) => void;
+  toggleOnlyMySubs: () => void;
   communityData: {
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -53,6 +56,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isSubsOpen, setIsSubsOpen] = useState(false);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
+  const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
   const [communityData, setCommunityData] = useState<{
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -63,17 +67,34 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     friends: [],
   });
 
-  // Load subscriptions from localStorage on start
+  // Load subscriptions & onlyMySubs filter from localStorage on start
   useEffect(() => {
     try {
       const saved = localStorage.getItem("cinecircle_subs");
       if (saved) {
         setUserSubscriptionsState(JSON.parse(saved));
       }
+      const savedFilter = localStorage.getItem("cinecircle_only_my_subs");
+      if (savedFilter !== null) {
+        setOnlyMySubsState(savedFilter === "true");
+      }
     } catch {
       // ignore
     }
   }, []);
+
+  const setOnlyMySubs = (val: boolean) => {
+    setOnlyMySubsState(val);
+    try {
+      localStorage.setItem("cinecircle_only_my_subs", String(val));
+    } catch {
+      // ignore
+    }
+  };
+
+  const toggleOnlyMySubs = () => {
+    setOnlyMySubs(!onlyMySubs);
+  };
 
   const refreshCommunity = async () => {
     try {
@@ -183,6 +204,9 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         openSubscriptions: () => setIsSubsOpen(true),
         userSubscriptions,
         setUserSubscriptions,
+        onlyMySubs,
+        setOnlyMySubs,
+        toggleOnlyMySubs,
         communityData,
         refreshCommunity,
         updateMediaStatus,

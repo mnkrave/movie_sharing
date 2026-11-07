@@ -1,7 +1,12 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MediaDetails, CountryWatchData, GlobalProviderVpnMatch } from "@/lib/tmdb";
+import {
+  MediaDetails,
+  CountryWatchData,
+  GlobalProviderVpnMatch,
+  normalizeProviderKey,
+} from "@/lib/tmdb";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -44,13 +49,16 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     upvoteRecommendation,
     userSubscriptions,
     openSubscriptions,
+    onlyMySubs,
+    setOnlyMySubs,
+    toggleOnlyMySubs,
   } = useMedia();
 
   const [details, setDetails] = useState<MediaDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"de" | "vpn" | "friends">("de");
   const [showTrailer, setShowTrailer] = useState(false);
-  const [onlyMySubs, setOnlyMySubs] = useState(false);
+  const [showRentBuyManually, setShowRentBuyManually] = useState(false);
 
   const isTv = media.mediaType === "tv";
   const mediaNoun = isTv ? "die Serie" : "den Film";
@@ -160,11 +168,47 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     }
   };
 
-  // Filter VPN providers based on "onlyMySubs"
-  const displayedVpnProviders = (details?.vpnProviders || []).filter((prov) => {
+  // Helper to check if a provider matches user's active subscriptions
+  const isProviderInSubs = (providerName: string) => {
+    const { key } = normalizeProviderKey(providerName);
+    return userSubscriptions.includes(key);
+  };
+
+  // German Watch Providers
+  const rawFlatrateDE = details?.watchProvidersDE?.flatrate || [];
+  const rawFreeDE = details?.watchProvidersDE?.free || [];
+  const rawRentDE = details?.watchProvidersDE?.rent || [];
+  const rawBuyDE = details?.watchProvidersDE?.buy || [];
+
+  const displayedFlatrateDE = rawFlatrateDE.filter((p) => {
+    if (!onlyMySubs) return true;
+    return isProviderInSubs(p.provider_name);
+  });
+
+  const displayedFreeDE = rawFreeDE.filter((p) => {
+    if (!onlyMySubs) return true;
+    return isProviderInSubs(p.provider_name);
+  });
+
+  const displayedRentDE = onlyMySubs && !showRentBuyManually ? [] : rawRentDE;
+  const displayedBuyDE = onlyMySubs && !showRentBuyManually ? [] : rawBuyDE;
+
+  const hiddenDECount =
+    rawFlatrateDE.length -
+    displayedFlatrateDE.length +
+    (rawFreeDE.length - displayedFreeDE.length) +
+    (onlyMySubs && !showRentBuyManually ? rawRentDE.length + rawBuyDE.length : 0);
+
+  // Global VPN Providers
+  const rawVpnProviders = details?.vpnProviders || [];
+  const displayedVpnProviders = rawVpnProviders.filter((prov) => {
     if (!onlyMySubs) return true;
     return userSubscriptions.includes(prov.normalizedKey);
   });
+
+  const myVpnMatches = rawVpnProviders.filter((prov) =>
+    userSubscriptions.includes(prov.normalizedKey)
+  );
 
   return (
     <div
@@ -530,96 +574,210 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               </form>
             )}
 
-            {/* Content Tabs Switcher */}
-            <div className="flex items-center gap-1 border-b border-slate-800 mb-6">
-              <button
-                onClick={() => setActiveTab("de")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
-                  activeTab === "de"
-                    ? "border-amber-400 text-amber-400"
-                    : "border-transparent text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <span>🇩🇪 Streaming in Deutschland</span>
-              </button>
+            {/* Content Tabs Switcher & Global Filter Toggle */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 mb-6 gap-3">
+              <div className="flex items-center gap-1 overflow-x-auto">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("de")}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+                    activeTab === "de"
+                      ? "border-amber-400 text-amber-400"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <span>🇩🇪 Streaming in Deutschland</span>
+                  {displayedFlatrateDE.length > 0 && (
+                    <span className="text-[11px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded font-bold">
+                      {displayedFlatrateDE.length}
+                    </span>
+                  )}
+                </button>
 
-              <button
-                onClick={() => setActiveTab("vpn")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
-                  activeTab === "vpn"
-                    ? "border-amber-400 text-amber-400"
-                    : "border-transparent text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <Globe2 className="w-4 h-4" />
-                <span>Globaler VPN Streaming-Finder</span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono">
-                  {details?.vpnProviders?.length || 0}
-                </span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("vpn")}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+                    activeTab === "vpn"
+                      ? "border-amber-400 text-amber-400"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <Globe2 className="w-4 h-4" />
+                  <span>Globaler VPN Streaming-Finder</span>
+                  <span className="text-[11px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono font-bold">
+                    {onlyMySubs ? displayedVpnProviders.length : rawVpnProviders.length}
+                  </span>
+                </button>
 
-              <button
-                onClick={() => setActiveTab("friends")}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition ${
-                  activeTab === "friends"
-                    ? "border-rose-400 text-rose-400"
-                    : "border-transparent text-slate-400 hover:text-slate-200"
-                }`}
-              >
-                <MessageSquare className="w-4 h-4" />
-                <span>Freunde & Empfehlungen ({friendsRecommendations.length})</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("friends")}
+                  className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition whitespace-nowrap ${
+                    activeTab === "friends"
+                      ? "border-rose-400 text-rose-400"
+                      : "border-transparent text-slate-400 hover:text-slate-200"
+                  }`}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  <span>Freunde & Empfehlungen ({friendsRecommendations.length})</span>
+                </button>
+              </div>
+
+              {/* Fast Toggle Filter */}
+              {(activeTab === "de" || activeTab === "vpn") && (
+                <div className="flex items-center gap-2.5 pb-2 sm:pb-0 flex-shrink-0">
+                  <button
+                    type="button"
+                    onClick={toggleOnlyMySubs}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold border transition shadow-sm ${
+                      onlyMySubs
+                        ? "bg-amber-500/15 border-amber-500/50 text-amber-300"
+                        : "bg-slate-900 border-slate-700 text-slate-400 hover:text-white"
+                    }`}
+                    title="Schaltet zwischen 'Nur was ich habe' und 'Alle Anbieter' um"
+                  >
+                    <Filter className="w-3.5 h-3.5" />
+                    <span>Nur was ich habe</span>
+                    <span
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-black uppercase ${
+                        onlyMySubs ? "bg-amber-400 text-black" : "bg-slate-800 text-slate-400"
+                      }`}
+                    >
+                      {onlyMySubs ? "AN" : "AUS"}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={openSubscriptions}
+                    className="text-xs text-slate-400 hover:text-amber-400 underline whitespace-nowrap"
+                  >
+                    Abos ({userSubscriptions.length})
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* TAB 1: Deutschland Streaming (Jetzt standardmäßig zuerst!) */}
+            {/* TAB 1: Deutschland Streaming (standardmäßig zuerst) */}
             {activeTab === "de" && (
               <div className="space-y-6 pb-8">
+                {/* Status notice when filter is active */}
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <span>
+                    {onlyMySubs
+                      ? `Filter aktiv: Nur deine hinterlegten Abos (${userSubscriptions.length} gewählt)`
+                      : "Alle in Deutschland verfügbaren Anbieter (Flatrate, Free, Leihen & Kaufen)"}
+                  </span>
+                  {onlyMySubs && hiddenDECount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setOnlyMySubs(false)}
+                      className="text-amber-400 hover:underline font-medium"
+                    >
+                      {hiddenDECount} weitere Anbieter anzeigen
+                    </button>
+                  )}
+                </div>
+
                 {/* Flatrate */}
                 <div>
                   <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
                     Abo-Flatrates (In Deutschland kostenlos streamen)
                   </h4>
-                  {details?.watchProvidersDE?.flatrate &&
-                  details.watchProvidersDE.flatrate.length > 0 ? (
+                  {displayedFlatrateDE.length > 0 ? (
                     <div className="flex flex-wrap gap-3">
-                      {details.watchProvidersDE.flatrate.map((p) => (
-                        <div
-                          key={p.provider_id}
-                          className="flex items-center gap-2.5 p-2 pr-4 rounded-xl bg-slate-900 border border-slate-800 shadow"
-                        >
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
-                            alt={p.provider_name}
-                            width={32}
-                            height={32}
-                            className="rounded-lg"
-                          />
-                          <span className="text-sm font-medium text-white">{p.provider_name}</span>
-                        </div>
-                      ))}
+                      {displayedFlatrateDE.map((p) => {
+                        const inMySubs = isProviderInSubs(p.provider_name);
+                        return (
+                          <div
+                            key={p.provider_id}
+                            className={`flex items-center gap-2.5 p-2 pr-4 rounded-xl border shadow ${
+                              inMySubs
+                                ? "bg-gradient-to-r from-slate-900 to-[#11192e] border-amber-500/40 text-white"
+                                : "bg-slate-900 border-slate-800 text-slate-200"
+                            }`}
+                          >
+                            <Image
+                              src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
+                              alt={p.provider_name}
+                              width={32}
+                              height={32}
+                              className="rounded-lg shadow"
+                            />
+                            <div className="flex flex-col">
+                              <span className="text-sm font-bold leading-tight text-white">{p.provider_name}</span>
+                              {inMySubs && (
+                                <span className="text-[10px] text-amber-400 font-semibold">Dein Abo ✓</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <p className="text-xs text-slate-400 bg-slate-900/40 p-4 rounded-xl border border-slate-800/60">
-                      Aktuell in Deutschland in keinem Streaming-Abo enthalten. Schau im Tab{" "}
-                      <span
-                        className="text-amber-400 font-semibold cursor-pointer underline"
-                        onClick={() => setActiveTab("vpn")}
-                      >
-                        Globaler VPN Streaming-Finder
-                      </span>
-                      , ob {mediaSubject} im Ausland (z. B. Japan oder UK) im Flatrate-Abo läuft!
-                    </p>
+                    <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-3">
+                      <p className="text-xs text-slate-400">
+                        {onlyMySubs
+                          ? `In deinen ausgewählten Streaming-Abos läuft ${mediaNoun} in Deutschland aktuell nicht als Flatrate.`
+                          : `Aktuell in Deutschland in keinem Streaming-Abo enthalten.`}
+                      </p>
+
+                      {/* VPN suggestion banner if available abroad on user's subs */}
+                      {myVpnMatches.length > 0 && (
+                        <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-500/15 via-rose-500/10 to-transparent border border-amber-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-2xl">🌐</span>
+                            <div>
+                              <p className="text-xs font-bold text-amber-300">
+                                Aber per VPN auf deinen Abos streambar!
+                              </p>
+                              <p className="text-[11px] text-slate-300">
+                                Verfügbar auf {myVpnMatches.map((m) => m.providerName).join(", ")} im Ausland (z. B. {myVpnMatches[0]?.countries.slice(0, 3).map((c) => c.flag + " " + c.name).join(", ")}).
+                              </p>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("vpn")}
+                            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition flex-shrink-0"
+                          >
+                            Zum VPN-Finder →
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="flex flex-wrap items-center gap-2 pt-1">
+                        {onlyMySubs && (
+                          <button
+                            type="button"
+                            onClick={() => setOnlyMySubs(false)}
+                            className="text-xs font-semibold text-amber-400 hover:text-amber-300 underline"
+                          >
+                            Alle Anbieter anzeigen (Filter temporär ausschalten)
+                          </button>
+                        )}
+                        <span className="text-slate-600 text-xs">•</span>
+                        <button
+                          type="button"
+                          onClick={openSubscriptions}
+                          className="text-xs text-slate-400 hover:text-white underline"
+                        >
+                          Meine Abos anpassen ({userSubscriptions.length})
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
 
                 {/* Free / Mediatheken */}
-                {details?.watchProvidersDE?.free && details.watchProvidersDE.free.length > 0 && (
+                {displayedFreeDE.length > 0 && (
                   <div>
                     <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
                       Kostenlos mit Werbung / Mediathek
                     </h4>
                     <div className="flex flex-wrap gap-3">
-                      {details.watchProvidersDE.free.map((p) => (
+                      {displayedFreeDE.map((p) => (
                         <div
                           key={p.provider_id}
                           className="flex items-center gap-2.5 p-2 pr-4 rounded-xl bg-slate-900 border border-slate-800 shadow"
@@ -639,36 +797,51 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 )}
 
                 {/* Rent / Buy */}
-                <div>
-                  <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
-                    Leihen & Kaufen
-                  </h4>
-                  {details?.watchProvidersDE?.rent && details.watchProvidersDE.rent.length > 0 ? (
-                    <div className="flex flex-wrap gap-3">
-                      {details.watchProvidersDE.rent.map((p) => (
-                        <div
-                          key={p.provider_id}
-                          className="flex items-center gap-2.5 p-2 pr-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300"
-                        >
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
-                            alt={p.provider_name}
-                            width={24}
-                            height={24}
-                            className="rounded"
-                          />
-                          <span>{p.provider_name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-500">Keine Kauf- oder Leihanbieter gefunden.</p>
-                  )}
-                </div>
+                {(!onlyMySubs || showRentBuyManually) && (
+                  <div className="pt-2 border-t border-slate-800/60">
+                    <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-3">
+                      Leihen & Kaufen
+                    </h4>
+                    {rawRentDE.length > 0 ? (
+                      <div className="flex flex-wrap gap-2.5">
+                        {rawRentDE.map((p) => (
+                          <div
+                            key={p.provider_id}
+                            className="flex items-center gap-2 p-1.5 pr-3 rounded-xl bg-slate-900/60 border border-slate-800 text-xs text-slate-300"
+                          >
+                            <Image
+                              src={`https://image.tmdb.org/t/p/w92${p.logo_path}`}
+                              alt={p.provider_name}
+                              width={22}
+                              height={22}
+                              className="rounded"
+                            />
+                            <span>{p.provider_name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-slate-500">Keine Kauf- oder Leihanbieter gefunden.</p>
+                    )}
+                  </div>
+                )}
+
+                {/* Optional toggle for Rent & Buy when filter is ON */}
+                {onlyMySubs && !showRentBuyManually && (rawRentDE.length > 0 || rawBuyDE.length > 0) && (
+                  <div className="pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowRentBuyManually(true)}
+                      className="text-xs text-slate-400 hover:text-white flex items-center gap-1.5 transition"
+                    >
+                      <span>🛒 {rawRentDE.length + rawBuyDE.length} Kauf- & Leihanbieter anzeigen</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
-            {/* TAB 2: Global VPN Finder (Jetzt als zweiter Tab!) */}
+            {/* TAB 2: Global VPN Finder */}
             {activeTab === "vpn" && (
               <div className="space-y-6 pb-8">
                 {/* Info banner & subscription filter */}
@@ -684,7 +857,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <div className="flex items-center gap-2 flex-shrink-0">
                     <button
                       type="button"
-                      onClick={() => setOnlyMySubs(!onlyMySubs)}
+                      onClick={toggleOnlyMySubs}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition ${
                         onlyMySubs
                           ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
@@ -693,6 +866,9 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     >
                       <Filter className="w-3.5 h-3.5" />
                       <span>Nur meine Abos ({userSubscriptions.length})</span>
+                      <span className={`text-[10px] px-1 rounded font-bold ${onlyMySubs ? "bg-amber-400 text-black" : "bg-slate-700 text-slate-300"}`}>
+                        {onlyMySubs ? "AN" : "AUS"}
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -768,10 +944,28 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     })}
                   </div>
                 ) : (
-                  <div className="p-8 text-center text-slate-500 rounded-2xl bg-slate-900/30 border border-slate-800/50">
-                    {onlyMySubs
-                      ? `In deinen ausgewählten Abos ist ${mediaNoun} aktuell in keinem Land verfügbar.`
-                      : "Für diesen Titel wurden keine globalen Flatrate-Streams gefunden."}
+                  <div className="p-8 text-center text-slate-400 rounded-2xl bg-slate-900/30 border border-slate-800/50 space-y-3">
+                    <p className="text-sm font-semibold text-white">
+                      {onlyMySubs
+                        ? `Kein weltweiter VPN-Stream bei deinen ausgewählten Abos gefunden.`
+                        : "Für diesen Titel wurden keine globalen Flatrate-Streams gefunden."}
+                    </p>
+                    {onlyMySubs && rawVpnProviders.length > 0 && (
+                      <p className="text-xs text-slate-400 max-w-md mx-auto">
+                        {rawVpnProviders.length} andere weltweite Anbieter haben {mediaNoun} im Stream.
+                      </p>
+                    )}
+                    {onlyMySubs && rawVpnProviders.length > 0 && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setOnlyMySubs(false)}
+                          className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow"
+                        >
+                          Alle weltweiten Anbieter anzeigen ({rawVpnProviders.length})
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

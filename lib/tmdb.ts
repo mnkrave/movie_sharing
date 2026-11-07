@@ -124,6 +124,8 @@ export const POPULAR_SUBSCRIPTIONS = [
   { key: "max", label: "Max (HBO)", color: "#7B2CBF" },
   { key: "mubi", label: "MUBI", color: "#001489" },
   { key: "ard_zdf", label: "ARD / ZDF / Arte", color: "#F59E0B" },
+  { key: "joyn", label: "Joyn", color: "#00E0FF" },
+  { key: "rtl", label: "RTL+", color: "#E50000" },
 ];
 
 export function normalizeProviderKey(name: string): { key: string; displayName: string } {
