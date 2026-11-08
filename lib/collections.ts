@@ -757,8 +757,8 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
     "id": "marvel-mcu",
     "name": "Marvel Cinematic Universe (MCU)",
     "category": "franchise",
-    "tagline": "Das komplette Multiversum: Alle Filme & Serien von Phase 1 bis 5",
-    "description": "Von Iron Man und den Avengers bis hin zu Loki, WandaVision und Deadpool & Wolverine. Verfolge deinen Fortschritt durch jede einzelne MCU-Phase!",
+    "tagline": "Das komplette Multiversum: Alle Filme & Serien von Phase 1 bis Phase 6",
+    "description": "Von Iron Man und den Avengers über The Fantastic Four bis hin zu Avengers: Doomsday & Secret Wars. Verfolge deinen Fortschritt durch jede einzelne MCU-Phase!",
     "backdropPath": "/7RyHsO4yDXtBv1zUU3mTpHeQ0d5.jpg",
     "posterPath": "/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
     "subGroupLabel": "MCU Phase",
@@ -1374,6 +1374,66 @@ export const COLLECTIONS_DATA: CollectionUniverse[] = [
         "overview": "Die geniale Erfinderin Riri Williams entwickelt die modernste Rüstung seit Iron Man und wird zu Ironheart.",
         "mediaType": "tv",
         "subGroup": "Phase 5"
+      },
+      {
+        "id": 617126,
+        "title": "The Fantastic 4: First Steps",
+        "originalTitle": "The Fantastic 4: First Steps",
+        "releaseYear": "2025",
+        "posterPath": "/qerflS8AU23XopttgDFBsbe1L0D.jpg",
+        "backdropPath": "/s94NjfKkcSczZ1FembwmQZwsuwY.jpg",
+        "voteAverage": 6.9,
+        "overview": "Reed Richards (Mister Fantastic), Sue Storm (Invisible Woman), Johnny Storm (Human Torch) und Ben Grimm (The Thing) treten als legendäre Marvel-Erstfamilie auf den Plan. Als der kosmische Weltenverschlinger Galactus und die Silver Surfer die Erde bedrohen, müssen die Fantastic Four zusammenhalten, um die Menschheit vor dem Untergang zu bewahren.",
+        "mediaType": "movie",
+        "subGroup": "Phase 6"
+      },
+      {
+        "id": 241388,
+        "title": "Eyes of Wakanda",
+        "originalTitle": "Eyes of Wakanda",
+        "releaseYear": "2025",
+        "posterPath": "/yuOfb1MgnaGPa4guzV0n1IFYVGN.jpg",
+        "backdropPath": "/cWO5NDkKqpOuwxu4vFc4PtL8aNF.jpg",
+        "voteAverage": 6.2,
+        "overview": "Wakandische Krieger der geheimen Hatut Zaraze begeben sich auf gefährliche historische Missionen rund um den Globus, um tödliche Vibranium-Artefakte vor skrupellosen Mächten in Sicherheit zu bringen.",
+        "mediaType": "tv",
+        "subGroup": "Phase 6"
+      },
+      {
+        "id": 198178,
+        "title": "Wonder Man",
+        "originalTitle": "Wonder Man",
+        "releaseYear": "2026",
+        "posterPath": "/6yy9nQlFt2l6UVWzrfhszFCaZ5C.jpg",
+        "backdropPath": "/ldz9THIHaV4orMsUrPT1nlQF51T.jpg",
+        "voteAverage": 7.1,
+        "overview": "Der aufstrebende Hollywood-Schauspieler Simon Williams kämpft darum, seine Karriere in Gang zu bringen. Bei einer zufälligen Begegnung mit Trevor Slattery erfährt Simon, dass eine Neuverfilmung des Superheldenfilms „Wonder Man“ geplant ist. Beide streben verbissen nach Rollen, die ihr Leben verändern könnten.",
+        "mediaType": "tv",
+        "subGroup": "Phase 6"
+      },
+      {
+        "id": 1003596,
+        "title": "Avengers: Doomsday",
+        "originalTitle": "Avengers: Doomsday",
+        "releaseYear": "2026",
+        "posterPath": "/jzPwsojjFStf5lR5Nm07w2hH56G.jpg",
+        "backdropPath": "/rObL4of4eFA8yWaN9pRFo9aOVNi.jpg",
+        "voteAverage": 7.5,
+        "overview": "Die Avengers stehen ihrer bisher gewaltigsten Herausforderung gegenüber: Robert Downey Jr. kehrt als berüchtigter Victor von Doom / Doctor Doom zurück, um das gesamte Multiversum nach seinem Willen zu formen. Geliebte Helden aus verschiedenen Dimensionen müssen sich vereinen, um den absoluten Zusammensturz aller Welten zu verhindern.",
+        "mediaType": "movie",
+        "subGroup": "Phase 6"
+      },
+      {
+        "id": 1003598,
+        "title": "Avengers: Secret Wars",
+        "originalTitle": "Avengers: Secret Wars",
+        "releaseYear": "2027",
+        "posterPath": "/f0YBuh4hyiAheXhh4JnJWoKi9g5.jpg",
+        "backdropPath": "/rytc6Lf4447C0CDncwFa4gxe0vY.jpg",
+        "voteAverage": 7.5,
+        "overview": "Das monumentale Finale der Multiverse-Saga: Alle Dimensionen kollidieren auf Battleworld. Das ultimative Treffen der mächtigsten Helden der Kinogeschichte im finalen Kampf um das Überleben der Realität.",
+        "mediaType": "movie",
+        "subGroup": "Phase 6"
       }
     ]
   },
