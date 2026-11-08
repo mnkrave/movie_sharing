@@ -121,18 +121,32 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
     setLoading(true);
     setError(null);
 
+    const myUserId = (session?.user as any)?.id || "";
+    const myWatchedStatuses = communityData.mediaStatuses.filter(
+      (m) =>
+        m.status === "WATCHED" &&
+        ((myUserId && m.userId === myUserId) ||
+          (myName && m.userName?.toLowerCase() === myName.toLowerCase()))
+    );
+
+    const userWatchedTmdbIds = myWatchedStatuses.map((m) => m.tmdbId);
+    const userWatchedTitles = myWatchedStatuses.map((m) => m.title);
+
     try {
       const res = await fetch("/api/ai/recommend", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: queryToUse,
+          currentUserId: myUserId,
           currentUserName: myName,
           explicitParticipants: selectedFriends,
           friendGroups,
           mediaStatuses: communityData.mediaStatuses,
           friends: communityData.friends,
           userSubscriptions,
+          userWatchedTmdbIds,
+          userWatchedTitles,
         }),
       });
 
@@ -140,9 +154,14 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
       if (!res.ok || data.error) {
         setError(data.error || "Fehler bei der KI-Anfrage.");
       } else {
+        const watchedSet = new Set(userWatchedTmdbIds);
+        const filteredPicks = (data.picks || []).filter(
+          (p: AiRecommendedPick) => !watchedSet.has(p.id)
+        );
+
         setResultSummary(data.aiSummary);
         setParsedIntent(data.parsedIntent);
-        setPicks(data.picks || []);
+        setPicks(filteredPicks);
         setUsedModel(data.usedModel || "gemini-3.8-flash");
       }
     } catch {
@@ -455,12 +474,26 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
               const mySubs = pick.availableProvidersDE.filter((p) => p.isMySub);
               const displayProviders =
                 mySubs.length > 0 ? mySubs : pick.availableProvidersDE.slice(0, 3);
+              const currentUserId = (session?.user as any)?.id;
+              const currentUserName = session?.user?.name;
+              const isMatchUser = (m: any) =>
+                (currentUserId && m.userId === currentUserId) ||
+                (currentUserName && m.userName?.toLowerCase() === currentUserName.toLowerCase());
+
               const isOnWatchlist = communityData.mediaStatuses.some(
                 (m) =>
                   m.tmdbId === pick.id &&
                   m.mediaType === pick.mediaType &&
                   m.status === "WATCHLIST" &&
-                  (m.userId === (session?.user as any)?.id || m.userName === session?.user?.name)
+                  isMatchUser(m)
+              );
+
+              const isWatched = communityData.mediaStatuses.some(
+                (m) =>
+                  m.tmdbId === pick.id &&
+                  m.mediaType === pick.mediaType &&
+                  m.status === "WATCHED" &&
+                  isMatchUser(m)
               );
 
               return (
@@ -594,13 +627,17 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
                           title: pick.title,
                           posterPath: pick.posterPath,
                           releaseYear: pick.releaseYear,
-                          isWatched: false,
+                          isWatched,
                         });
                       }}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl bg-slate-900 hover:bg-emerald-500 hover:text-black text-slate-200 text-xs font-bold border border-slate-800 transition"
+                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-bold border transition ${
+                        isWatched
+                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+                          : "bg-slate-900 hover:bg-emerald-500 hover:text-black text-slate-200 border-slate-800"
+                      }`}
                     >
                       <Check className="w-3.5 h-3.5" />
-                      <span>Gesehen?</span>
+                      <span>{isWatched ? "Gesehen ✓" : "Gesehen?"}</span>
                     </button>
                     <button
                       type="button"

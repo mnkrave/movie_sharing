@@ -50,6 +50,15 @@ export interface AiParsedIntent {
   excludedElements: string[];
 }
 
+function normalizeTitle(t: string): string {
+  return (t || "")
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]/g, "")
+    .trim();
+}
+
 async function callGeminiWithFallback(systemAndUserPrompt: string): Promise<{
   data: any;
   usedModel: string;
@@ -218,13 +227,16 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const userPrompt: string = (body.prompt || "").trim();
-    const currentUserName: string = body.currentUserName || "Lukas";
+    const currentUserName: string = (body.currentUserName || "Lukas").trim();
+    const currentUserId: string = (body.currentUserId || "").trim();
     const explicitParticipants: string[] = body.explicitParticipants || [];
     const friendGroups: { id: string; name: string; emoji: string; memberNames: string[] }[] =
       body.friendGroups || [];
     const allMediaStatuses: any[] = body.mediaStatuses || [];
     const allFriends: any[] = body.friends || [];
     const mySubscriptions: string[] = body.userSubscriptions || [];
+    const callerWatchedTmdbIds: number[] = body.userWatchedTmdbIds || [];
+    const callerWatchedTitles: string[] = body.userWatchedTitles || [];
 
     if (!userPrompt) {
       return NextResponse.json({ error: "Bitte gib eine Anfrage ein." }, { status: 400 });
@@ -252,26 +264,78 @@ export async function POST(req: Request) {
 
     const participants = Array.from(participantSet);
 
-    // 2. Build per-participant taste profiles & collect already-watched titles
-    const allWatchedTitles = new Set<string>();
+    // 2. Build per-participant taste profiles & collect already-watched titles with robust matching
+    const allWatchedTitlesList = new Set<string>(callerWatchedTitles);
+    const watchedNormalizedTitles = new Set<string>(
+      callerWatchedTitles.map(normalizeTitle).filter(Boolean)
+    );
+    const watchedTmdbIds = new Set<string>(callerWatchedTmdbIds.map(String));
+
     const watchlistCounts = new Map<string, string[]>(); // title -> who has it on watchlist
     const combinedSubsSet = new Set<string>(mySubscriptions);
+
+    // Helper to check if a status entry belongs to the current user or one of the active participants
+    const isStatusForParticipant = (m: any, pName?: string) => {
+      const mUserId = (m.userId || "").toLowerCase().trim();
+      const mUserName = (m.userName || "").toLowerCase().trim();
+
+      if (pName) {
+        const pClean = pName.toLowerCase().trim();
+        if (mUserName === pClean) return true;
+        if (mUserName && (mUserName.startsWith(pClean) || pClean.startsWith(mUserName))) return true;
+        if (mUserId && (mUserId === pClean || pClean.includes(mUserId))) return true;
+        return false;
+      }
+
+      // Check current user
+      if (currentUserId && mUserId === currentUserId.toLowerCase()) return true;
+      const myUserClean = currentUserName.toLowerCase();
+      if (myUserClean && (mUserName === myUserClean || mUserName.startsWith(myUserClean) || myUserClean.startsWith(mUserName))) {
+        return true;
+      }
+
+      // Check against any participant
+      for (const p of participants) {
+        const pClean = p.toLowerCase().trim();
+        if (mUserName === pClean || mUserName.startsWith(pClean) || pClean.startsWith(mUserName)) {
+          return true;
+        }
+        if (mUserId && mUserId === pClean) return true;
+      }
+      return false;
+    };
+
+    // Index all watched movies for participants & current user into blacklist sets
+    allMediaStatuses.forEach((m) => {
+      if (m.status === "WATCHED" && isStatusForParticipant(m)) {
+        if (m.title) {
+          allWatchedTitlesList.add(m.title);
+          const norm = normalizeTitle(m.title);
+          if (norm) watchedNormalizedTitles.add(norm);
+        }
+        if (m.tmdbId) {
+          watchedTmdbIds.add(String(m.tmdbId));
+          if (m.mediaType) {
+            watchedTmdbIds.add(`${m.mediaType}_${m.tmdbId}`);
+          }
+        }
+      }
+    });
 
     const participantProfilesText = participants
       .map((pName) => {
         const friendObj = allFriends.find(
-          (f) => f.name?.toLowerCase() === pName.toLowerCase()
+          (f) =>
+            f.name?.toLowerCase() === pName.toLowerCase() ||
+            pName.toLowerCase().startsWith(f.name?.toLowerCase() || "___")
         );
         if (friendObj?.subscriptions) {
           friendObj.subscriptions.forEach((s: string) => combinedSubsSet.add(s));
         }
 
-        const pStatuses = allMediaStatuses.filter(
-          (m) => m.userName?.toLowerCase() === pName.toLowerCase()
-        );
+        const pStatuses = allMediaStatuses.filter((m) => isStatusForParticipant(m, pName));
 
         const watched = pStatuses.filter((m) => m.status === "WATCHED");
-        watched.forEach((w) => allWatchedTitles.add(w.title));
 
         const loved = watched
           .filter((w) => (w.rating || 8) >= 8)
@@ -307,9 +371,11 @@ export async function POST(req: Request) {
       .map((key) => POPULAR_SUBSCRIPTIONS.find((s) => s.key === key)?.label || key)
       .join(", ");
 
+    const watchedForbiddenList = Array.from(allWatchedTitlesList).slice(0, 120);
+
     // 3. Construct prompt for Gemini
-    const fullPrompt = `Du bist "CineBot", der smarte KI-Filmberater von CineCircle.
-Analysiere den Wunsch des Nutzers (egal ob natürliche Umgangssprache oder Slash-Befehl wie /match) und finde die 6 absolut besten Filme oder Serien!
+    const fullPrompt = `Du bist "CineBot", der hochintelligente KI-Filmberater von CineCircle.
+Analysiere den Wunsch des Nutzers und finde die 8 bis 10 besten Vorschläge (Filme oder Serien), damit nach strengem Ausschluss bereits gesehener Titel mindestens 6 absolut neue Treffer übrig bleiben!
 
 NUTZER-EINGABE:
 "${userPrompt}"
@@ -326,17 +392,18 @@ ${sharedWatchlist.length > 0 ? sharedWatchlist.join(", ") : "Keine direkten Übe
 VERFÜGBARE STREAMING-ABOS IN DEUTSCHLAND:
 ${readableSubs || "Netflix, Amazon Prime Video, Disney+"}
 
-BEREITS GESEHENE TITEL (DIESE NICHT EMPFEHLEN!):
-${Array.from(allWatchedTitles).slice(0, 40).join(", ") || "Keine"}
+STRENGSTENS VERBOTEN - BEREITS GESEHENE TITEL (${allWatchedTitlesList.size} Titel):
+Folgende Filme/Serien haben der Nutzer oder die Teilnehmer BEREITS GESEHEN. Du darfst KEINEN EINZIGEN dieser Titel empfehlen (auch keine direkten Prequels/Sequels falls bereits gesehen):
+${watchedForbiddenList.length > 0 ? watchedForbiddenList.join(", ") : "Keine registriert"}
 
 WICHTIGE REGELN:
-1. Extrahiere alle Bedingungen aus dem Satz (z. B. "sehr lustig" -> Komödie/Humor, "maximal 120 Minuten" -> maxRuntimeMinutes: 120, Ausschlüsse wie "kein Horror").
-2. Wenn ein Zeitlimit wie "maximal 120 Minuten" genannt wurde, schlage NUR Filme vor, deren echte Laufzeit <= 120 Minuten beträgt!
-3. Schlage keinen Titel vor, der in "BEREITS GESEHENE TITEL" steht.
+1. ABSOLUTE AUSSCHLUSS-REGEL: Schlage NIEMALS einen Film oder eine Serie vor, der in der Liste "STRENGSTENS VERBOTEN - BEREITS GESEHENE TITEL" steht!
+2. Extrahiere alle Bedingungen aus dem Satz (z. B. "sehr lustig" -> Komödie/Humor, "maximal 120 Minuten" -> maxRuntimeMinutes: 120, Ausschlüsse wie "kein Horror").
+3. Wenn ein Zeitlimit wie "maximal 120 Minuten" genannt wurde, schlage NUR Filme vor, deren echte Laufzeit <= 120 Minuten beträgt!
 4. Bevorzuge Filme/Serien, die in Deutschland auf den genannten Streaming-Abos (${readableSubs}) verfügbar sind.
-5. Gib für JEDEN der 6 Vorschläge in "perPersonReasons" für JEDEN Teilnehmer (${participants.join(", ")}) einen kurzen, persönlichen Satz auf Deutsch an, warum genau diese Person den Film feiern wird!
+5. Gib für JEDEN Vorschlag in "perPersonReasons" für JEDEN Teilnehmer (${participants.join(", ")}) einen kurzen, sympathischen Satz auf Deutsch an, warum genau diese Person den Film feiern wird!
 
-Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
+Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
 {
   "parsedIntent": {
     "detectedGroupName": ${detectedGroupName ? `"${detectedGroupName}"` : "null"},
@@ -361,7 +428,8 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
       ]
     }
   ]
-}`;
+}
+`;
 
     const { data: aiResponse, usedModel } = await callGeminiWithFallback(fullPrompt);
 
@@ -381,10 +449,28 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
 
     const rawPicks: any[] = Array.isArray(aiResponse.picks) ? aiResponse.picks : [];
 
-    // 4. Enrich all AI picks with live TMDB data & DE Watch Providers in parallel
+    // Check function to verify if an item was already watched by user or participants
+    const checkIsWatched = (title: string, origTitle?: string, tmdbId?: number) => {
+      if (tmdbId && watchedTmdbIds.has(String(tmdbId))) return true;
+      const n1 = normalizeTitle(title);
+      const n2 = origTitle ? normalizeTitle(origTitle) : "";
+      if (n1 && watchedNormalizedTitles.has(n1)) return true;
+      if (n2 && watchedNormalizedTitles.has(n2)) return true;
+      for (const w of watchedNormalizedTitles) {
+        if (w.length >= 5 && (n1 === w || n2 === w)) return true;
+      }
+      return false;
+    };
+
+    // Filter out raw picks that match already-watched titles right away
+    const filteredRawPicks = rawPicks.filter(
+      (p) => !checkIsWatched(p.title, p.originalTitle)
+    );
+
+    // 4. Enrich remaining AI picks with live TMDB data & DE Watch Providers in parallel
     const enrichedPicks = (
       await Promise.all(
-        rawPicks.map((p) =>
+        filteredRawPicks.map((p) =>
           lookupTmdbAndEnrich(
             p,
             Array.from(combinedSubsSet),
@@ -394,13 +480,27 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format:
       )
     ).filter(Boolean) as AiRecommendedPick[];
 
+    // 5. Final strict safety filter: ensure NO enriched item matches a watched TMDB ID or title, and deduplicate
+    const seenTmdbIds = new Set<number>();
+    const finalPicks: AiRecommendedPick[] = [];
+
+    for (const p of enrichedPicks) {
+      if (seenTmdbIds.has(p.id)) continue;
+      if (checkIsWatched(p.title, p.originalTitle, p.id)) continue;
+
+      seenTmdbIds.add(p.id);
+      finalPicks.push(p);
+
+      if (finalPicks.length >= 6) break;
+    }
+
     return NextResponse.json({
       usedModel,
       parsedIntent,
       aiSummary:
         aiResponse.aiSummary ||
         `Hier sind die besten Empfehlungen für ${participants.join(" & ")}!`,
-      picks: enrichedPicks,
+      picks: finalPicks,
     });
   } catch (err: any) {
     console.error("AI Recommendation route error:", err);
