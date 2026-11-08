@@ -19,8 +19,23 @@ model User {
   mediaStatuses   MediaStatus[]
   recommendations Recommendation[]
   upvotes         RecommendationUpvote[]
+  sentFriendships     Friendship[] @relation("UserSentFriendships")
+  receivedFriendships Friendship[] @relation("UserReceivedFriendships")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
+}
+
+model Friendship {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation("UserSentFriendships", fields: [userId], references: [id], onDelete: Cascade)
+  friendId    String
+  friend      User     @relation("UserReceivedFriendships", fields: [friendId], references: [id], onDelete: Cascade)
+  status      String   @default("ACCEPTED") // "PENDING" | "ACCEPTED" | "DECLINED"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, friendId])
 }
 
 model WhitelistedEmail {

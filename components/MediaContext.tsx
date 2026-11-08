@@ -10,6 +10,17 @@ import { AvatarPickerModal } from "./AvatarPickerModal";
 import { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
+export interface FriendRequestItem {
+  requestId: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string | null;
+  };
+  createdAt: string;
+}
+
 export interface FriendGroup {
   id: string;
   name: string;
@@ -44,6 +55,10 @@ interface MediaContextType {
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
     friends: any[];
+    friendRequests: {
+      pendingReceived: FriendRequestItem[];
+      pendingSent: FriendRequestItem[];
+    };
   };
   refreshCommunity: () => Promise<void>;
   updateMediaStatus: (params: {
@@ -67,6 +82,11 @@ interface MediaContextType {
     tags: string[];
   }) => Promise<void>;
   upvoteRecommendation: (recommendationId: string) => Promise<void>;
+  sendFriendRequest: (target: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  acceptFriendRequest: (requestId: string) => Promise<{ success: boolean; error?: string }>;
+  declineFriendRequest: (requestId: string) => Promise<{ success: boolean; error?: string }>;
+  removeFriend: (friendUserId: string) => Promise<{ success: boolean; error?: string }>;
+  searchUsers: (query: string) => Promise<any[]>;
   openAvatarPicker: () => void;
   closeAvatarPicker: () => void;
   currentUserAvatar: string | null;
@@ -97,10 +117,18 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
     friends: any[];
+    friendRequests: {
+      pendingReceived: FriendRequestItem[];
+      pendingSent: FriendRequestItem[];
+    };
   }>({
     mediaStatuses: [],
     recommendations: [],
     friends: [],
+    friendRequests: {
+      pendingReceived: [],
+      pendingSent: [],
+    },
   });
 
   // Load subscriptions, onlyMySubs & friendGroups from localStorage on start
@@ -326,6 +354,95 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const sendFriendRequest = async (target: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "friend_request", target }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Fehler beim Senden der Anfrage." };
+      }
+      setCommunityData(data);
+      return { success: true, message: data.actionMessage || "Anfrage gesendet!" };
+    } catch {
+      return { success: false, error: "Netzwerkfehler." };
+    }
+  };
+
+  const acceptFriendRequest = async (requestId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "accept_friend", requestId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Fehler beim Annehmen." };
+      }
+      setCommunityData(data);
+      return { success: true };
+    } catch {
+      return { success: false, error: "Netzwerkfehler." };
+    }
+  };
+
+  const declineFriendRequest = async (requestId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "decline_friend", requestId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Fehler beim Ablehnen." };
+      }
+      setCommunityData(data);
+      return { success: true };
+    } catch {
+      return { success: false, error: "Netzwerkfehler." };
+    }
+  };
+
+  const removeFriend = async (friendUserId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "remove_friend", friendUserId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || "Fehler beim Entfernen." };
+      }
+      setCommunityData(data);
+      return { success: true };
+    } catch {
+      return { success: false, error: "Netzwerkfehler." };
+    }
+  };
+
+  const searchUsers = async (query: string): Promise<any[]> => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "search_users", query }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return data.users || [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  };
+
   useEffect(() => {
     if (session?.user?.image) {
       setCurrentUserAvatar(session.user.image);
@@ -406,6 +523,11 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         updateMediaStatus,
         submitRecommendation,
         upvoteRecommendation,
+        sendFriendRequest,
+        acceptFriendRequest,
+        declineFriendRequest,
+        removeFriend,
+        searchUsers,
         openAvatarPicker: () => setIsAvatarPickerOpen(true),
         closeAvatarPicker: () => setIsAvatarPickerOpen(false),
         currentUserAvatar,

@@ -4,6 +4,12 @@ import { authOptions } from "@/lib/auth";
 import {
   getAllCommunityData,
   getAllFriendsWithStats,
+  getUserFriendRequests,
+  sendFriendRequest,
+  acceptFriendRequest,
+  declineFriendRequest,
+  removeFriendship,
+  searchUsersForFriendship,
   toggleMediaStatus,
   addRecommendation,
   toggleRecommendationUpvote,
@@ -13,13 +19,26 @@ import {
 } from "@/lib/store";
 
 export async function GET() {
-  const [community, friends] = await Promise.all([
-    getAllCommunityData(),
-    getAllFriendsWithStats(),
+  const session = await getServerSession(authOptions);
+  let userId: string | undefined = undefined;
+
+  if (session?.user?.email) {
+    const dbUser = await findUserByEmail(session.user.email);
+    userId = dbUser?.id || (session.user as any)?.id;
+  }
+
+  const [community, friends, friendRequests] = await Promise.all([
+    getAllCommunityData(userId),
+    getAllFriendsWithStats(userId),
+    userId
+      ? getUserFriendRequests(userId)
+      : Promise.resolve({ pendingReceived: [], pendingSent: [] }),
   ]);
+
   return NextResponse.json({
     ...community,
     friends,
+    friendRequests,
   });
 }
 
@@ -27,7 +46,7 @@ export async function POST(req: Request) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) {
     return NextResponse.json(
-      { error: "Bitte logge dich ein, um Filme zu markieren oder zu empfehlen." },
+      { error: "Bitte logge dich ein, um fortzufahren." },
       { status: 401 }
     );
   }
@@ -40,8 +59,38 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const { action } = body;
+    let actionMessage: string | undefined = undefined;
 
-    if (action === "status") {
+    if (action === "search_users") {
+      const users = await searchUsersForFriendship(userId, body.query || "");
+      return NextResponse.json({ users });
+    }
+
+    if (action === "friend_request") {
+      const res = await sendFriendRequest(userId, body.target || "");
+      if (!res.success) {
+        return NextResponse.json({ error: res.error || "Fehler beim Senden der Anfrage." }, { status: 400 });
+      }
+      actionMessage = res.message;
+    } else if (action === "accept_friend") {
+      const res = await acceptFriendRequest(userId, body.requestId);
+      if (!res.success) {
+        return NextResponse.json({ error: res.error || "Fehler beim Annehmen der Anfrage." }, { status: 400 });
+      }
+      actionMessage = "Freundschaftsanfrage angenommen!";
+    } else if (action === "decline_friend") {
+      const res = await declineFriendRequest(userId, body.requestId);
+      if (!res.success) {
+        return NextResponse.json({ error: res.error || "Fehler beim Ablehnen der Anfrage." }, { status: 400 });
+      }
+      actionMessage = "Anfrage abgelehnt.";
+    } else if (action === "remove_friend") {
+      const res = await removeFriendship(userId, body.friendUserId);
+      if (!res.success) {
+        return NextResponse.json({ error: res.error || "Fehler beim Entfernen des Freundes." }, { status: 400 });
+      }
+      actionMessage = "Freundschaft beendet.";
+    } else if (action === "status") {
       await toggleMediaStatus({
         userId,
         userName,
@@ -86,14 +135,17 @@ export async function POST(req: Request) {
       await updateUserImage(userId, body.image ?? null);
     }
 
-    const [community, friends] = await Promise.all([
-      getAllCommunityData(),
-      getAllFriendsWithStats(),
+    const [community, friends, friendRequests] = await Promise.all([
+      getAllCommunityData(userId),
+      getAllFriendsWithStats(userId),
+      getUserFriendRequests(userId),
     ]);
 
     return NextResponse.json({
       ...community,
       friends,
+      friendRequests,
+      actionMessage,
     });
   } catch (err) {
     console.error("Community action error:", err);

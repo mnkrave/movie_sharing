@@ -36,7 +36,9 @@ export function Navbar() {
     userSubscriptions,
     currentUserAvatar,
     openAvatarPicker,
+    communityData,
   } = useMedia();
+  const pendingRequestsCount = communityData.friendRequests?.pendingReceived?.length || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [discoverDropdownOpen, setDiscoverDropdownOpen] = useState(false);
@@ -201,11 +203,13 @@ export function Navbar() {
           {mainNavLinks.map((link) => {
             const Icon = link.icon;
             const active = pathname === link.href;
+            const showBadge = link.href === "/friends" && pendingRequestsCount > 0;
+
             return (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition relative ${
                   active
                     ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                     : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
@@ -213,6 +217,11 @@ export function Navbar() {
               >
                 <Icon className="w-3.5 h-3.5" />
                 <span>{link.label}</span>
+                {showBadge && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black font-black text-[10px] shadow">
+                    {pendingRequestsCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -381,21 +390,31 @@ export function Navbar() {
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pt-3 pb-1">
             Community
           </div>
-          {mainNavLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2 rounded-xl font-semibold transition ${
-                pathname === link.href
-                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "text-slate-300 hover:bg-slate-800/60"
-              }`}
-            >
-              <link.icon className="w-4 h-4" />
-              <span>{link.label}</span>
-            </Link>
-          ))}
+          {mainNavLinks.map((link) => {
+            const showBadge = link.href === "/friends" && pendingRequestsCount > 0;
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                onClick={() => setMobileMenuOpen(false)}
+                className={`flex items-center justify-between px-4 py-2 rounded-xl font-semibold transition ${
+                  pathname === link.href
+                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                    : "text-slate-300 hover:bg-slate-800/60"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <link.icon className="w-4 h-4" />
+                  <span>{link.label}</span>
+                </div>
+                {showBadge && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-500 text-black font-black text-xs">
+                    {pendingRequestsCount} neu
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </div>
       )}
     </nav>
