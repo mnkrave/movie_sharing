@@ -322,6 +322,29 @@ export async function POST(req: Request) {
       }
     });
 
+    // Detect if user prompt targets a specific genre or format
+    const isSitcomOrComedy = /(sitcom|comedy|komödie|lustig|humor|witzig|lachen|gute laune|feel good|albern)/i.test(userPrompt);
+    const isSeriesRequest = /(serie|serien|staffel|folgen|sitcom|episodes)/i.test(userPrompt);
+    const isHorror = /(horror|grusel|schock|spuk|angst|creepy|slasher|zombie)/i.test(userPrompt);
+    const isSciFi = /(sci-fi|science fiction|weltall|zukunft|cyberpunk|dystopie|raumschiff|aliens)/i.test(userPrompt);
+    const isAction = /(action|ballern|adrenalin|kampfsport|explosion|stunt|superheld)/i.test(userPrompt);
+    const isThriller = /(thriller|krimi|spannung|mindfuck|twist|mord|detektiv|psycho|rätsel)/i.test(userPrompt);
+    const isAnimeAnimation = /(anime|animation|trickfilm|zeichentrick|pixar|ghibli|disney)/i.test(userPrompt);
+
+    const detectedGenreFocus = isSitcomOrComedy
+      ? "Sitcom & Komödie"
+      : isHorror
+      ? "Horror & Grusel"
+      : isSciFi
+      ? "Sci-Fi & Weltall"
+      : isAction
+      ? "Action & Adrenalin"
+      : isThriller
+      ? "Thriller & Spannung"
+      : isAnimeAnimation
+      ? "Anime & Animation"
+      : null;
+
     const participantProfilesText = participants
       .map((pName) => {
         const friendObj = allFriends.find(
@@ -334,12 +357,20 @@ export async function POST(req: Request) {
         }
 
         const pStatuses = allMediaStatuses.filter((m) => isStatusForParticipant(m, pName));
-
         const watched = pStatuses.filter((m) => m.status === "WATCHED");
 
-        const loved = watched
+        // Separate TV Series and Movies
+        const watchedTv = watched.filter((w) => w.mediaType === "tv");
+        const watchedMovies = watched.filter((w) => w.mediaType === "movie");
+
+        const lovedTv = watchedTv
           .filter((w) => (w.rating || 8) >= 8)
-          .slice(0, 10)
+          .slice(0, 12)
+          .map((w) => `${w.title} (${w.rating || 8}/10★)`);
+
+        const lovedMovies = watchedMovies
+          .filter((w) => (w.rating || 8) >= 8)
+          .slice(0, 15)
           .map((w) => `${w.title} (${w.rating || 8}/10★)`);
 
         const disliked = watched
@@ -355,12 +386,39 @@ export async function POST(req: Request) {
             return w.title;
           });
 
-        return `- Person "${pName}":
-  • Lieblingsfilme/Serien (8-10★): ${loved.length > 0 ? loved.join(", ") : "Mag spannende & hochwertige Filme"}
-  • Abneigungen/No-Gos (<=5★): ${disliked.length > 0 ? disliked.join(", ") : "Keine"}
-  • Auf der Watchlist: ${watchlist.length > 0 ? watchlist.slice(0, 8).join(", ") : "Keine"}`;
+        let profileLines = [`- Person "${pName}":`];
+        if (isSeriesRequest || isSitcomOrComedy) {
+          profileLines.push(
+            `  • Lieblings-Serien & TV-Shows (8-10★): ${
+              lovedTv.length > 0 ? lovedTv.join(", ") : "Noch keine Serien bewertet"
+            }`
+          );
+          profileLines.push(
+            `  • Lieblings-Filme (8-10★): ${
+              lovedMovies.length > 0 ? lovedMovies.slice(0, 8).join(", ") : "Keine"
+            }`
+          );
+        } else {
+          profileLines.push(
+            `  • Lieblingsfilme (8-10★): ${
+              lovedMovies.length > 0 ? lovedMovies.join(", ") : "Mag packende Filme"
+            }`
+          );
+          if (lovedTv.length > 0) {
+            profileLines.push(`  • Lieblings-Serien (8-10★): ${lovedTv.slice(0, 6).join(", ")}`);
+          }
+        }
+
+        profileLines.push(
+          `  • Abneigungen/No-Gos (<=5★): ${disliked.length > 0 ? disliked.join(", ") : "Keine"}`
+        );
+        profileLines.push(
+          `  • Auf der Watchlist: ${watchlist.length > 0 ? watchlist.slice(0, 8).join(", ") : "Keine"}`
+        );
+
+        return profileLines.join("\n");
       })
-      .join("\n");
+      .join("\n\n");
 
     // Shared watchlist overlaps
     const sharedWatchlist = Array.from(watchlistCounts.entries())
@@ -371,7 +429,7 @@ export async function POST(req: Request) {
       .map((key) => POPULAR_SUBSCRIPTIONS.find((s) => s.key === key)?.label || key)
       .join(", ");
 
-    const watchedForbiddenList = Array.from(allWatchedTitlesList).slice(0, 120);
+    const watchedForbiddenList = Array.from(allWatchedTitlesList).slice(0, 250);
 
     // 3. Construct prompt for Gemini
     const fullPrompt = `Du bist "CineBot", der hochintelligente KI-Filmberater von CineCircle.
@@ -379,6 +437,7 @@ Analysiere den Wunsch des Nutzers und finde die 8 bis 10 besten Vorschläge (Fil
 
 NUTZER-EINGABE:
 "${userPrompt}"
+${detectedGenreFocus ? `\nERKANNTES SPEZIFISCHES THEMA / GENRE: ${detectedGenreFocus}` : ""}
 
 ERKANNTE TEILNEHMER HEUTE ABEND (${participants.length}):
 ${participants.join(", ")}${detectedGroupName ? ` (Gruppe: ${detectedGroupName})` : ""}
@@ -396,9 +455,12 @@ STRENGSTENS VERBOTEN - BEREITS GESEHENE TITEL (${allWatchedTitlesList.size} Tite
 Folgende Filme/Serien haben der Nutzer oder die Teilnehmer BEREITS GESEHEN. Du darfst KEINEN EINZIGEN dieser Titel empfehlen (auch keine direkten Prequels/Sequels falls bereits gesehen):
 ${watchedForbiddenList.length > 0 ? watchedForbiddenList.join(", ") : "Keine registriert"}
 
-WICHTIGE REGELN:
+WICHTIGE REGELN & GENRE-FOKUS:
 1. ABSOLUTE AUSSCHLUSS-REGEL: Schlage NIEMALS einen Film oder eine Serie vor, der in der Liste "STRENGSTENS VERBOTEN - BEREITS GESEHENE TITEL" steht!
-2. Extrahiere alle Bedingungen aus dem Satz (z. B. "sehr lustig" -> Komödie/Humor, "maximal 120 Minuten" -> maxRuntimeMinutes: 120, Ausschlüsse wie "kein Horror").
+2. GENRE-SPEZIFISCHE AUSWERTUNG: Falls der Nutzer nach einem bestimmten Genre oder Format fragt (z. B. Sitcom, Komödie, Horror, Sci-Fi oder Anime):
+   - Analysiere vor allem die bisherigen Lieblingswerke der Teilnehmer aus GENAU DIESEM BEREICH (z.B. bei einer Sitcom-Anfrage die bisherigen Sitcoms & Serien der Teilnehmer, nicht ihre ernsten Thriller oder Actionfilme)!
+   - Leite daraus den bevorzugten Humor-, Ton- oder Subgenre-Stil ab (z.B. sympathische Ensemble-Sitcoms wie Modern Family vs. bissiger Mockumentary/Workplace-Humor vs. schwarzer Humor).
+   - Schlage Treffer vor, die diesen Stil perfekt treffen, statt generische Zufallstitel zu wählen.
 3. Wenn ein Zeitlimit wie "maximal 120 Minuten" genannt wurde, schlage NUR Filme vor, deren echte Laufzeit <= 120 Minuten beträgt!
 4. Bevorzuge Filme/Serien, die in Deutschland auf den genannten Streaming-Abos (${readableSubs}) verfügbar sind.
 5. Gib für JEDEN Vorschlag in "perPersonReasons" für JEDEN Teilnehmer (${participants.join(", ")}) einen kurzen, sympathischen Satz auf Deutsch an, warum genau diese Person den Film feiern wird!
