@@ -28,8 +28,8 @@ const QUICK_SUGGESTIONS = [
   {
     icon: "🛋️",
     label: "WG-Filmabend",
-    tag: "Lustig & Max. 120m",
-    prompt: "Heute will ich mit WG-Couch einen Film schauen der sehr lustig ist und maximal 120 Minuten geht",
+    tag: "Lustig mit Dennis & 120m",
+    prompt: "Heute will ich mit Dennis einen Film schauen der sehr lustig ist und maximal 120 Minuten geht",
   },
   {
     icon: "⚡",
@@ -41,7 +41,7 @@ const QUICK_SUGGESTIONS = [
     icon: "🧠",
     label: "Mindfuck-Thriller",
     tag: "Netflix & Plottwist",
-    prompt: "Suche einen packenden Mindfuck-Thriller für @Max und mich auf Netflix",
+    prompt: "Suche einen packenden Mindfuck-Thriller für @Dennis und mich auf Netflix",
   },
   {
     icon: "🍷",
