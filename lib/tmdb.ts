@@ -20,6 +20,7 @@ export interface MediaItem {
   rank?: number;
   genreIds?: number[];
   oscarInfo?: OscarWinnerMeta;
+  popularity?: number;
 }
 
 export interface WatchProviderItem {
@@ -364,6 +365,7 @@ function mapRawItem(raw: any, forceMediaType?: "movie" | "tv", rank?: number): M
     rank,
     genreIds: raw.genre_ids || (raw.genres ? raw.genres.map((g: any) => g.id) : []),
     oscarInfo,
+    popularity: typeof raw.popularity === "number" ? raw.popularity : undefined,
   };
 }
 
@@ -839,6 +841,35 @@ export interface PersonSearchResult {
   name: string;
   profilePath: string | null;
   knownFor: string;
+  department?: string;
+  popularity?: number;
+}
+
+export interface PersonCastCredit extends MediaItem {
+  character?: string;
+  episodeCount?: number;
+  isSelf?: boolean;
+}
+
+export interface PersonCrewCredit extends MediaItem {
+  job: string;
+  department: string;
+}
+
+export interface PersonDetails {
+  id: number;
+  name: string;
+  biography: string;
+  birthday: string | null;
+  deathday: string | null;
+  placeOfBirth: string | null;
+  profilePath: string | null;
+  knownForDepartment: string;
+  alsoKnownAs: string[];
+  imdbId: string | null;
+  popularity: number;
+  cast: PersonCastCredit[];
+  crew: PersonCrewCredit[];
 }
 
 export async function searchPersons(query: string): Promise<PersonSearchResult[]> {
@@ -848,22 +879,120 @@ export async function searchPersons(query: string): Promise<PersonSearchResult[]
       query: query.trim(),
       include_adult: "false",
     });
-    return (data.results || [])
-      .filter((p) => p.profile_path)
-      .slice(0, 16)
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        profilePath: p.profile_path,
-        knownFor: (p.known_for || [])
-          .map((k: any) => k.title || k.name)
-          .filter(Boolean)
-          .slice(0, 2)
-          .join(", "),
-      }));
+    const results = (data.results || []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      profilePath: p.profile_path || null,
+      department: p.known_for_department || "Acting",
+      popularity: p.popularity || 0,
+      knownFor: (p.known_for || [])
+        .map((k: any) => k.title || k.name)
+        .filter(Boolean)
+        .slice(0, 3)
+        .join(", "),
+    }));
+
+    // Prioritize results with a profile picture, then by popularity
+    return results
+      .sort((a, b) => {
+        if (a.profilePath && !b.profilePath) return -1;
+        if (!a.profilePath && b.profilePath) return 1;
+        return (b.popularity || 0) - (a.popularity || 0);
+      })
+      .slice(0, 16);
   } catch (err) {
     console.error("searchPersons error:", err);
     return [];
+  }
+}
+
+export async function getPersonDetails(id: number): Promise<PersonDetails | null> {
+  if (!id || isNaN(id)) return null;
+  try {
+    const data = await tmdbFetch<any>(`/person/${id}`, {
+      append_to_response: "combined_credits,external_ids",
+    });
+
+    if (!data || !data.id) return null;
+
+    let biography = data.biography || "";
+    if (!biography.trim()) {
+      try {
+        const enData = await tmdbFetch<any>(`/person/${id}`, {
+          language: "en-US",
+        });
+        if (enData?.biography) biography = enData.biography;
+      } catch (err) {
+        // ignore fallback error
+      }
+    }
+
+    // Process Cast Credits
+    const seenCastKeys = new Set<string>();
+    const castCredits: PersonCastCredit[] = [];
+    const rawCast: any[] = data.combined_credits?.cast || [];
+
+    for (const raw of rawCast) {
+      const mediaType: "movie" | "tv" =
+        raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie";
+      const key = `${mediaType}-${raw.id}`;
+      if (seenCastKeys.has(key)) continue;
+      seenCastKeys.add(key);
+
+      const character = (raw.character || "").trim();
+      const isSelf =
+        /^(self|himself|herself|themselves|narrator)/i.test(character) ||
+        (Array.isArray(raw.genre_ids) &&
+          (raw.genre_ids.includes(10767) || raw.genre_ids.includes(10763)));
+
+      const baseItem = mapRawItem(raw, mediaType);
+      castCredits.push({
+        ...baseItem,
+        character: character || undefined,
+        episodeCount: raw.episode_count || undefined,
+        isSelf,
+      });
+    }
+
+    // Process Crew Credits
+    const seenCrewKeys = new Set<string>();
+    const crewCredits: PersonCrewCredit[] = [];
+    const rawCrew: any[] = data.combined_credits?.crew || [];
+
+    for (const raw of rawCrew) {
+      const mediaType: "movie" | "tv" =
+        raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie";
+      const job = raw.job || raw.department || "Crew";
+      const key = `${mediaType}-${raw.id}-${job}`;
+      if (seenCrewKeys.has(key)) continue;
+      seenCrewKeys.add(key);
+
+      const baseItem = mapRawItem(raw, mediaType);
+      crewCredits.push({
+        ...baseItem,
+        job,
+        department: raw.department || "Crew",
+      });
+    }
+
+    return {
+      id: data.id,
+      name: data.name || "Unbekannte Person",
+      biography,
+      birthday: data.birthday || null,
+      deathday: data.deathday || null,
+      placeOfBirth: data.place_of_birth || null,
+      profilePath: data.profile_path || null,
+      knownForDepartment: data.known_for_department || "Acting",
+      alsoKnownAs: data.also_known_as || [],
+      imdbId: data.external_ids?.imdb_id || null,
+      popularity: data.popularity || 0,
+      cast: castCredits,
+      crew: crewCredits,
+    };
+  } catch (err) {
+    console.error(`getPersonDetails(${id}) error:`, err);
+    return null;
   }
 }
 

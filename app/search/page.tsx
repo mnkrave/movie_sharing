@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, Suspense } from "react";
+import Link from "next/link";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { MediaItem, formatGermanReleaseDate } from "@/lib/tmdb";
+import { MediaItem, PersonSearchResult, formatGermanReleaseDate } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
 import {
   SlidersHorizontal,
@@ -18,6 +20,8 @@ import {
   Layers,
   ChevronDown,
   Filter,
+  User,
+  ChevronRight,
 } from "lucide-react";
 
 const EXTENDED_GENRES = [
@@ -116,6 +120,45 @@ function ExtendedSearchContent() {
 
   const [results, setResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [matchingPersons, setMatchingPersons] = useState<PersonSearchResult[]>([]);
+  const [selectedActorPerson, setSelectedActorPerson] = useState<PersonSearchResult | null>(null);
+
+  // Auto-resolve actor profile info when actor filter changes
+  useEffect(() => {
+    if (!actor.trim()) {
+      setSelectedActorPerson(null);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(actor.trim())}`);
+        const data = await res.json();
+        const first = (data.results || data.persons || [])[0];
+        setSelectedActorPerson(first || null);
+      } catch (e) {
+        // ignore
+      }
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [actor]);
+
+  // Auto-search matching persons when main query changes
+  useEffect(() => {
+    if (!query.trim() || query.trim().length < 2) {
+      setMatchingPersons([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(query.trim())}`);
+        const data = await res.json();
+        setMatchingPersons((data.results || data.persons || []).slice(0, 3));
+      } catch (e) {
+        // ignore
+      }
+    }, 280);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Initialize from URL search params if present
   useEffect(() => {
@@ -410,6 +453,45 @@ function ExtendedSearchContent() {
               placeholder="Schauspieler:in suchen (z. B. Leonardo DiCaprio, Cillian Murphy)..."
               className="w-full px-3.5 py-2 bg-slate-950/70 border border-slate-800 rounded-xl text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50 shadow-inner"
             />
+
+            {/* Resolved Actor Spotlight Card with Direct Profile Link */}
+            {selectedActorPerson && (
+              <div className="p-2.5 rounded-xl bg-cyan-950/40 border border-cyan-800/60 flex items-center justify-between gap-3 animate-in fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 relative border border-cyan-500/50 shadow">
+                    {selectedActorPerson.profilePath ? (
+                      <Image
+                        src={`https://image.tmdb.org/t/p/w185${selectedActorPerson.profilePath}`}
+                        alt={selectedActorPerson.name}
+                        fill
+                        sizes="40px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-slate-500">
+                        <User className="w-4 h-4" />
+                      </div>
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-white block truncate">
+                      {selectedActorPerson.name}
+                    </span>
+                    <span className="text-[10px] text-slate-400 block truncate">
+                      {selectedActorPerson.knownFor || "Schauspieler:in"}
+                    </span>
+                  </div>
+                </div>
+
+                <Link
+                  href={`/person/${selectedActorPerson.id}`}
+                  className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 text-xs font-bold transition flex-shrink-0 shadow-sm"
+                >
+                  <span>Profil ansehen</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </Link>
+              </div>
+            )}
             <div className="flex flex-wrap gap-1.5 pt-1">
               {POPULAR_ACTORS.map((name) => {
                 const isSelected = actor.toLowerCase().trim() === name.toLowerCase().trim();
@@ -602,6 +684,68 @@ function ExtendedSearchContent() {
             )}
           </div>
         </div>
+
+        {/* Matching Person Spotlight Banner */}
+        {matchingPersons.length > 0 && (
+          <div className="p-4 rounded-2xl bg-gradient-to-r from-amber-950/30 via-slate-900/80 to-slate-950/80 border border-amber-500/30 shadow-lg space-y-2.5">
+            <div className="flex items-center gap-2 text-xs font-bold text-amber-400 uppercase tracking-wider">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Passende Schauspieler:innen & Filmschaffende gefunden:</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+              {matchingPersons.map((p) => (
+                <div
+                  key={p.id}
+                  className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-amber-500/40 transition"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 relative border border-amber-500/30">
+                      {p.profilePath ? (
+                        <Image
+                          src={`https://image.tmdb.org/t/p/w185${p.profilePath}`}
+                          alt={p.name}
+                          fill
+                          sizes="40px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-500">
+                          <User className="w-4 h-4" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-white block truncate">
+                        {p.name}
+                      </span>
+                      <span className="text-[10px] text-slate-400 block truncate">
+                        {p.knownFor || "Schauspieler:in"}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setActor(p.name)}
+                      className="px-2 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[10px] font-semibold border border-slate-700 transition"
+                      title={`Filme mit ${p.name} filtern`}
+                    >
+                      Filtern
+                    </button>
+                    <Link
+                      href={`/person/${p.id}`}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold transition shadow-sm"
+                    >
+                      <span>Profil</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Results Media Grid */}
         {loading && results.length === 0 ? (

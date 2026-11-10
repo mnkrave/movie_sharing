@@ -1341,8 +1341,16 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               </div>
 
               {details?.director && (
-                <div className="text-xs text-slate-400">
-                  <span className="font-semibold text-slate-300">Regie:</span> {details.director}
+                <div className="text-xs text-slate-400 flex items-center gap-1.5">
+                  <span className="font-semibold text-slate-300">Regie:</span>
+                  <Link
+                    href={`/search?director=${encodeURIComponent(details.director)}`}
+                    onClick={onClose}
+                    className="text-amber-400 hover:underline font-medium"
+                    title={`Weitere Filme von ${details.director} in der Extended Search suchen`}
+                  >
+                    {details.director}
+                  </Link>
                 </div>
               )}
 
@@ -1351,9 +1359,18 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <h5 className="text-xs font-bold text-slate-400 mb-2">Besetzung:</h5>
                   <div className="flex flex-wrap gap-2 text-xs text-slate-300">
                     {details.cast.map((actor) => (
-                      <span key={actor.id} className="bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-800">
-                        {actor.name} <span className="text-slate-500">({actor.character})</span>
-                      </span>
+                      <Link
+                        key={actor.id}
+                        href={`/person/${actor.id}`}
+                        onClick={onClose}
+                        title={`Schauspieler-Profil von ${actor.name} ansehen`}
+                        className="bg-slate-900/90 hover:bg-slate-800 hover:border-amber-500/50 hover:text-amber-300 px-2.5 py-1 rounded-lg border border-slate-800 transition group flex items-center gap-1"
+                      >
+                        <span className="font-medium group-hover:text-amber-400">{actor.name}</span>
+                        {actor.character && (
+                          <span className="text-slate-500">({actor.character})</span>
+                        )}
+                      </Link>
                     ))}
                   </div>
                 </div>

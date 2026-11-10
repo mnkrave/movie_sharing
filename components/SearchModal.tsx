@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { MediaItem, formatGermanReleaseDate } from "@/lib/tmdb";
+import { MediaItem, PersonSearchResult, formatGermanReleaseDate } from "@/lib/tmdb";
 import {
   Search,
   X,
@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Sparkles,
   ChevronRight,
+  User,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -31,6 +32,7 @@ export function SearchModal({
 }: SearchModalProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<MediaItem[]>([]);
+  const [persons, setPersons] = useState<PersonSearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -40,12 +42,14 @@ export function SearchModal({
     } else {
       setQuery("");
       setResults([]);
+      setPersons([]);
     }
   }, [isOpen]);
 
   useEffect(() => {
     if (!query.trim()) {
       setResults([]);
+      setPersons([]);
       setLoading(false);
       return;
     }
@@ -56,6 +60,7 @@ export function SearchModal({
         const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
         const data = await res.json();
         setResults(data.results || []);
+        setPersons(data.persons || []);
       } catch (err) {
         console.error("Search error:", err);
       } finally {
@@ -85,7 +90,7 @@ export function SearchModal({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filme oder Serien suchen (z. B. Inception, Shrek 5, Dune)..."
+            placeholder="Filme, Serien oder Schauspieler suchen (z. B. DiCaprio, Nolan, Inception)..."
             className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base"
           />
           {loading && <Loader2 className="w-5 h-5 text-amber-400 animate-spin flex-shrink-0" />}
@@ -123,6 +128,53 @@ export function SearchModal({
 
         {/* Results List */}
         <div className="overflow-y-auto p-3 divide-y divide-slate-800/50 flex-1">
+          {/* Person / Actor Results */}
+          {persons.length > 0 && (
+            <div className="pb-3 mb-2">
+              <div className="flex items-center gap-1.5 px-1 py-1 text-[11px] font-bold text-amber-400 uppercase tracking-wider mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                <span>Schauspieler:innen & Filmschaffende</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {persons.map((person) => (
+                  <Link
+                    key={person.id}
+                    href={`/person/${person.id}`}
+                    onClick={onClose}
+                    className="flex items-center gap-3 p-2 rounded-xl bg-slate-900/70 hover:bg-slate-800 border border-slate-800/80 hover:border-amber-500/40 transition group shadow-sm"
+                  >
+                    <div className="w-11 h-11 rounded-full overflow-hidden bg-slate-800 flex-shrink-0 relative border border-amber-500/30 group-hover:border-amber-400 group-hover:ring-2 group-hover:ring-amber-400/20 transition-all">
+                      {person.profilePath ? (
+                        <Image
+                          src={`https://image.tmdb.org/t/p/w185${person.profilePath}`}
+                          alt={person.name}
+                          fill
+                          sizes="44px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center text-slate-500">
+                          <User className="w-5 h-5" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-white group-hover:text-amber-400 transition truncate">
+                          {person.name}
+                        </span>
+                        <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 group-hover:translate-x-0.5 transition" />
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate">
+                        {person.knownFor || (person.department === "Directing" ? "Regisseur:in" : "Schauspieler:in")}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+
           {results.length > 0 ? (
             results.map((item) => (
               <button
@@ -199,7 +251,7 @@ export function SearchModal({
               </button>
             ))
           ) : query.trim() ? (
-            !loading && (
+            !loading && persons.length === 0 && (
               <div className="p-8 text-center text-slate-500 text-sm">
                 Keine Ergebnisse für &quot;{query}&quot; gefunden.
                 <div className="mt-3">

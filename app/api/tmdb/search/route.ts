@@ -7,14 +7,21 @@ export async function GET(req: Request) {
   const type = searchParams.get("type");
 
   if (!q.trim()) {
-    return NextResponse.json({ results: [] });
+    return NextResponse.json({ results: [], persons: [] });
   }
 
   if (type === "person") {
     const results = await searchPersons(q);
-    return NextResponse.json({ results });
+    return NextResponse.json({ results, persons: results });
   }
 
-  const results = await searchMultiMedia(q);
-  return NextResponse.json({ results });
+  const [mediaResults, personResults] = await Promise.all([
+    searchMultiMedia(q),
+    searchPersons(q),
+  ]);
+
+  return NextResponse.json({
+    results: mediaResults,
+    persons: personResults.slice(0, 6),
+  });
 }
