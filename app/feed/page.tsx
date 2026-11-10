@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
+import Link from "next/link";
 import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -424,7 +425,11 @@ export default function FeedPage() {
                   <div>
                     {/* User & Rating Header */}
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2.5">
+                      <Link
+                        href={isMyOwn ? "/profile" : `/friends/${encodeURIComponent(rec.userId || rec.userName)}`}
+                        className="flex items-center gap-2.5 group hover:opacity-95 transition-opacity"
+                        title={isMyOwn ? "Dein Profil aufrufen" : `Profil von ${rec.userName} ansehen`}
+                      >
                         {(() => {
                           const authorImg = isMyOwn
                             ? currentUserAvatar || rec.userImage
@@ -434,7 +439,7 @@ export default function FeedPage() {
                               )?.image;
 
                           return authorImg ? (
-                            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-500/40 flex-shrink-0 shadow">
+                            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-500/40 flex-shrink-0 shadow group-hover:border-amber-400 transition-colors">
                               <Image
                                 src={authorImg}
                                 alt={rec.userName}
@@ -445,7 +450,7 @@ export default function FeedPage() {
                             </div>
                           ) : (
                             <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow flex-shrink-0 ${
+                              className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow flex-shrink-0 group-hover:ring-2 group-hover:ring-amber-400 transition-all ${
                                 isMyOwn
                                   ? "bg-amber-400"
                                   : "bg-gradient-to-tr from-amber-500 to-rose-500"
@@ -457,7 +462,9 @@ export default function FeedPage() {
                         })()}
                         <div>
                           <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white">{rec.userName}</span>
+                            <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
+                              {rec.userName}
+                            </span>
                             {isMyOwn && (
                               <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/30">
                                 Du
@@ -473,7 +480,7 @@ export default function FeedPage() {
                             {new Date(rec.createdAt).toLocaleDateString("de-DE")}
                           </span>
                         </div>
-                      </div>
+                      </Link>
 
                       <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-sm">
                         <Star className="w-3.5 h-3.5 fill-amber-400" />

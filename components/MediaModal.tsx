@@ -1144,7 +1144,14 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                             key={fw.id}
                             className="flex items-center justify-between text-sm py-1 border-b border-slate-800/40 last:border-0"
                           >
-                            <span className="text-slate-200 font-medium">{fw.userName}</span>
+                            <Link
+                              href={`/friends/${encodeURIComponent(fw.userId || fw.userName)}`}
+                              onClick={onClose}
+                              className="text-slate-200 hover:text-amber-400 font-medium transition-colors"
+                              title={`Profil von ${fw.userName} aufrufen`}
+                            >
+                              {fw.userName}
+                            </Link>
                             {fw.rating && (
                               <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
                                 {fw.rating}/10 ★
@@ -1177,7 +1184,15 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                             key={fw.id}
                             className="text-sm py-1 border-b border-slate-800/40 last:border-0 text-slate-200"
                           >
-                            {fw.userName} möchte {isTv ? "diese Serie" : "diesen Film"} schauen
+                            <Link
+                              href={`/friends/${encodeURIComponent(fw.userId || fw.userName)}`}
+                              onClick={onClose}
+                              className="text-amber-400 hover:underline font-medium"
+                              title={`Profil von ${fw.userName} aufrufen`}
+                            >
+                              {fw.userName}
+                            </Link>{" "}
+                            möchte {isTv ? "diese Serie" : "diesen Film"} schauen
                           </div>
                         ))}
                       </div>
@@ -1217,12 +1232,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                             }`}
                           >
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 text-black font-bold flex items-center justify-center text-xs">
+                              <Link
+                                href={isMine ? "/profile" : `/friends/${encodeURIComponent(rec.userId || rec.userName)}`}
+                                onClick={onClose}
+                                className="flex items-center gap-2.5 group hover:opacity-90 transition-opacity"
+                                title={isMine ? "Dein Profil aufrufen" : `Profil von ${rec.userName} aufrufen`}
+                              >
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 text-black font-bold flex items-center justify-center text-xs group-hover:ring-2 group-hover:ring-amber-400 transition-all">
                                   {rec.userName.slice(0, 1)}
                                 </div>
                                 <div>
-                                  <span className="text-sm font-bold text-white">{rec.userName}</span>
+                                  <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">{rec.userName}</span>
                                   {isMine && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold ml-1.5 border border-purple-500/30">
                                       Du
@@ -1232,7 +1252,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                     {new Date(rec.createdAt).toLocaleDateString("de-DE")}
                                   </span>
                                 </div>
-                              </div>
+                              </Link>
                               <div className="flex items-center gap-1 text-amber-400 font-extrabold text-sm bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
                                 <Star className="w-3.5 h-3.5 fill-amber-400" />
                                 {rec.rating}/10

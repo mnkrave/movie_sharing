@@ -631,9 +631,12 @@ export default function FriendsPage() {
                   className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-lg space-y-4 relative group"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                    <Link
+                      href={`/friends/${friend.id}`}
+                      className="flex items-center gap-3 min-w-0 group/link hover:opacity-90 transition"
+                    >
                       {friendImg ? (
-                        <div className="relative w-12 h-12 rounded-2xl overflow-hidden border border-amber-500/40 flex-shrink-0 shadow-md">
+                        <div className="relative w-12 h-12 rounded-2xl overflow-hidden border border-amber-500/40 flex-shrink-0 shadow-md group-hover/link:border-amber-400 transition">
                           <Image
                             src={friendImg}
                             alt={friend.name}
@@ -648,7 +651,7 @@ export default function FriendsPage() {
                         </div>
                       )}
                       <div className="min-w-0">
-                        <h3 className="text-lg font-bold text-white flex items-center gap-2 truncate">
+                        <h3 className="text-lg font-bold text-white group-hover/link:text-amber-300 transition flex items-center gap-2 truncate">
                           <span>{friend.name}</span>
                           {friend.role === "ADMIN" && (
                             <span className="text-[10px] bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full font-bold border border-amber-500/30">
@@ -658,20 +661,28 @@ export default function FriendsPage() {
                         </h3>
                         <p className="text-xs text-slate-500 truncate">{friend.email}</p>
                       </div>
-                    </div>
+                    </Link>
 
-                    {!isMe && (
-                      <button
-                        type="button"
-                        disabled={isRemoving}
-                        onClick={() => handleRemoveFriend(friend.id, friend.name)}
-                        className="px-2.5 py-1.5 rounded-xl bg-slate-950/80 hover:bg-rose-950/70 border border-slate-800 hover:border-rose-500/40 text-[11px] font-semibold text-slate-400 hover:text-rose-300 transition flex items-center gap-1.5 flex-shrink-0"
-                        title="Freundschaft beenden"
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <Link
+                        href={`/friends/${friend.id}`}
+                        className="px-3 py-1.5 rounded-xl bg-slate-950 hover:bg-amber-500/15 border border-slate-800 hover:border-amber-500/40 text-[11px] font-bold text-amber-300 transition"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        <span className="hidden sm:inline">Entfernen</span>
-                      </button>
-                    )}
+                        Profil ansehen →
+                      </Link>
+
+                      {!isMe && (
+                        <button
+                          type="button"
+                          disabled={isRemoving}
+                          onClick={() => handleRemoveFriend(friend.id, friend.name)}
+                          className="p-2 rounded-xl bg-slate-950/80 hover:bg-rose-950/70 border border-slate-800 hover:border-rose-500/40 text-slate-400 hover:text-rose-300 transition"
+                          title="Freundschaft beenden"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Stats */}
