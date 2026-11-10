@@ -5,12 +5,15 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
-// Cascade: Try gemini-3.8-flash first as requested, with automatic instant fallback on 503 load spikes
+// Cascade: Try gemini-3.8-flash first as requested, with automatic instant fallback across modern Flash pools
 const GEMINI_MODELS = [
   "gemini-3.8-flash",
+  "gemini-3.7-flash",
   "gemini-3.6-flash",
   "gemini-3.5-flash",
-  "gemini-2.5-flash",
+  "gemini-3.5-flash-lite",
+  "gemini-3-flash-preview",
+  "gemini-flash-lite-latest",
 ];
 
 export interface AiPersonReason {
@@ -96,11 +99,23 @@ async function callGeminiWithFallback(systemAndUserPrompt: string): Promise<{
         const parsed = JSON.parse(rawText);
         return { data: parsed, usedModel: model };
       } else {
-        lastError = `${model}: HTTP ${res.status}`;
+        const errJson = await res.json().catch(() => null);
+        const errMsg = errJson?.error?.message || `HTTP ${res.status}`;
+        lastError = `${model}: ${errMsg}`;
+        // If 503 (temporary high demand spike), give a tiny 300ms pause before trying next capacity pool
+        if (res.status === 503) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
       }
     } catch (err: any) {
       lastError = `${model}: ${err?.message || "Error"}`;
     }
+  }
+
+  if (lastError.includes("503") || lastError.includes("high demand") || lastError.includes("overloaded")) {
+    throw new Error(
+      "Die Google Gemini Server erleben aktuell eine kurzzeitige Lastspitze (503 Service Unavailable). Bitte versuche es in wenigen Sekunden erneut."
+    );
   }
 
   throw new Error(`Alle Gemini-Modelle nicht erreichbar (${lastError})`);
