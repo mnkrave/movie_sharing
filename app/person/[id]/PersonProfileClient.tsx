@@ -9,6 +9,7 @@ import {
   PersonDetails,
   PersonCastCredit,
   PersonCrewCredit,
+  PersonWorkCredit,
   MediaItem,
 } from "@/lib/tmdb";
 import { useMedia } from "@/components/MediaContext";
@@ -65,12 +66,100 @@ export function PersonProfileClient({
     return false;
   };
 
-  // State
-  const defaultTab =
-    initialPerson.knownForDepartment === "Directing" && initialPerson.crew.length > 0
-      ? "crew"
-      : "cast";
-  const [activeTab, setActiveTab] = useState<"cast" | "crew">(defaultTab);
+  // Works consolidation (guaranteeing deduplication of every movie/series)
+  const works: PersonWorkCredit[] = useMemo(() => {
+    if (initialPerson.works && initialPerson.works.length > 0) {
+      return initialPerson.works;
+    }
+    // Fallback synthesize from cast & crew if works array is not provided
+    const map = new Map<string, PersonWorkCredit>();
+    for (const c of initialPerson.cast || []) {
+      const key = `${c.mediaType}-${c.id}`;
+      map.set(key, {
+        ...c,
+        characters: c.character ? [c.character] : [],
+        jobs: [],
+        departments: [],
+        isDirector: false,
+        isWriter: false,
+        isProducer: false,
+        isActor: true,
+        roleSummary: c.character ? `als ${c.character}` : "Schauspiel",
+      });
+    }
+    for (const c of initialPerson.crew || []) {
+      const key = `${c.mediaType}-${c.id}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          ...c,
+          characters: [],
+          jobs: [c.job],
+          departments: [c.department],
+          isDirector: c.job === "Director" || c.department === "Directing",
+          isWriter: c.department === "Writing",
+          isProducer: c.department === "Production",
+          isActor: false,
+          roleSummary: c.job,
+        });
+      } else {
+        const item = map.get(key)!;
+        if (!item.jobs?.includes(c.job)) item.jobs?.push(c.job);
+        if (c.job === "Director" || c.department === "Directing") item.isDirector = true;
+        if (c.department === "Writing") item.isWriter = true;
+        if (c.department === "Production") item.isProducer = true;
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+  }, [initialPerson]);
+
+  const directingWorks = useMemo(() => {
+    return works.filter((w) => w.isDirector);
+  }, [works]);
+
+  const actingWorks = useMemo(() => {
+    return works.filter((w) => w.isActor);
+  }, [works]);
+
+  const crewWorks = useMemo(() => {
+    return works.filter(
+      (w) => w.isWriter || w.isProducer || (w.jobs && w.jobs.length > 0 && !w.isDirector)
+    );
+  }, [works]);
+
+  type TabType = "all" | "directing" | "acting" | "crew";
+
+  const availableTabs = useMemo<{ id: TabType; label: string; count: number }[]>(() => {
+    const tabs: { id: TabType; label: string; count: number }[] = [];
+    const roleCategories =
+      (directingWorks.length > 0 ? 1 : 0) +
+      (actingWorks.length > 0 ? 1 : 0) +
+      (crewWorks.length > 0 ? 1 : 0);
+
+    tabs.push({ id: "all", label: "Alle Werke", count: works.length });
+
+    if (roleCategories > 1) {
+      if (directingWorks.length > 0) {
+        tabs.push({ id: "directing", label: "Regie", count: directingWorks.length });
+      }
+      if (actingWorks.length > 0) {
+        tabs.push({ id: "acting", label: "Schauspiel", count: actingWorks.length });
+      }
+      if (crewWorks.length > 0) {
+        tabs.push({ id: "crew", label: "Drehbuch & Crew", count: crewWorks.length });
+      }
+    }
+
+    return tabs;
+  }, [works.length, directingWorks.length, actingWorks.length, crewWorks.length]);
+
+  const defaultTab = useMemo<TabType>(() => {
+    if (initialPerson.knownForDepartment === "Directing" && directingWorks.length > 0) {
+      return "directing";
+    }
+    return "all";
+  }, [initialPerson.knownForDepartment, directingWorks.length]);
+
+  const [activeTab, setActiveTab] = useState<TabType>(defaultTab);
   const [typeFilter, setTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
   const [statusFilter, setStatusFilter] = useState<"ALL" | "WATCHED" | "UNSEEN" | "WATCHLIST">("ALL");
   const [sortBy, setSortBy] = useState<"popularity" | "release_desc" | "vote_average">("popularity");
@@ -130,24 +219,17 @@ export function PersonProfileClient({
     return map;
   }, [communityData.mediaStatuses, myUserId, myName, myEmail]);
 
-  // Relevant credits for completion calculation (acting roles, excluding talkshow self cameos)
-  const coreActingCredits = useMemo(() => {
-    const list = initialPerson.cast.filter((c) => !c.isSelf);
-    return list.length > 0 ? list : initialPerson.cast;
-  }, [initialPerson.cast]);
-
-  // Directing credits (if director)
-  const coreDirectingCredits = useMemo(() => {
-    return initialPerson.crew.filter((c) => c.job === "Director");
-  }, [initialPerson.crew]);
-
-  // Which list to evaluate for user watch completion
+  // Which list to evaluate for user watch completion (strictly unique entries)
   const evaluationList = useMemo(() => {
-    if (initialPerson.knownForDepartment === "Directing" && coreDirectingCredits.length > 0) {
-      return coreDirectingCredits;
+    if (initialPerson.knownForDepartment === "Directing" && directingWorks.length > 0) {
+      return directingWorks;
     }
-    return coreActingCredits;
-  }, [initialPerson.knownForDepartment, coreDirectingCredits, coreActingCredits]);
+    const cleanActing = actingWorks.filter((c) => !c.isSelf);
+    if (cleanActing.length > 0) {
+      return cleanActing;
+    }
+    return works;
+  }, [initialPerson.knownForDepartment, directingWorks, actingWorks, works]);
 
   // Completion calculation
   const completionStats = useMemo(() => {
@@ -197,14 +279,22 @@ export function PersonProfileClient({
     };
   }, [evaluationList, myStatusMap]);
 
-  // Filtered and sorted credit list for the active tab
+  // Filtered and sorted credit list for the active tab (every title strictly unique)
   const displayCredits = useMemo(() => {
-    let list: (PersonCastCredit | PersonCrewCredit)[] =
-      activeTab === "cast" ? initialPerson.cast : initialPerson.crew;
+    let list: PersonWorkCredit[] = [];
+    if (activeTab === "directing") {
+      list = directingWorks;
+    } else if (activeTab === "acting") {
+      list = actingWorks;
+    } else if (activeTab === "crew") {
+      list = crewWorks;
+    } else {
+      list = works;
+    }
 
-    // Filter out self/talkshows in cast if enabled
-    if (activeTab === "cast" && excludeSelfTalkshows) {
-      list = list.filter((c) => !(c as PersonCastCredit).isSelf);
+    // Filter out self/talkshows in cast if enabled and on acting or all tab
+    if (excludeSelfTalkshows && (activeTab === "acting" || activeTab === "all")) {
+      list = list.filter((c) => !c.isSelf || c.isDirector || c.isWriter);
     }
 
     // Filter by type (movie vs tv)
@@ -229,9 +319,11 @@ export function PersonProfileClient({
       list = list.filter((c) => {
         const titleMatch = c.title.toLowerCase().includes(q);
         const charMatch =
-          "character" in c && c.character?.toLowerCase().includes(q);
-        const jobMatch = "job" in c && c.job.toLowerCase().includes(q);
-        return titleMatch || charMatch || jobMatch;
+          c.characters?.some((ch) => ch.toLowerCase().includes(q)) ||
+          c.character?.toLowerCase().includes(q);
+        const jobMatch = c.jobs?.some((j) => j.toLowerCase().includes(q));
+        const summaryMatch = c.roleSummary?.toLowerCase().includes(q);
+        return titleMatch || charMatch || jobMatch || summaryMatch;
       });
     }
 
@@ -241,8 +333,8 @@ export function PersonProfileClient({
         return (b.popularity || 0) - (a.popularity || 0);
       }
       if (sortBy === "release_desc") {
-        const dateA = a.releaseDate || "";
-        const dateB = b.releaseDate || "";
+        const dateA = a.releaseDate || a.releaseYear || "";
+        const dateB = b.releaseDate || b.releaseYear || "";
         return dateB.localeCompare(dateA);
       }
       if (sortBy === "vote_average") {
@@ -252,8 +344,10 @@ export function PersonProfileClient({
     });
   }, [
     activeTab,
-    initialPerson.cast,
-    initialPerson.crew,
+    works,
+    directingWorks,
+    actingWorks,
+    crewWorks,
     excludeSelfTalkshows,
     typeFilter,
     statusFilter,
@@ -521,42 +615,29 @@ export function PersonProfileClient({
 
         {/* Filmography Section Header & Filters */}
         <div className="space-y-4 pt-2">
-          {/* Tabs: Schauspiel vs Crew */}
+          {/* Deduplicated Role Tabs */}
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setActiveTab("cast")}
-                className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
-                  activeTab === "cast"
-                    ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                    : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
-                }`}
-              >
-                <span>Schauspiel / Besetzung</span>
-                <span className="text-[11px] px-1.5 py-0.2 rounded-md bg-black/20 font-mono">
-                  {initialPerson.cast.length}
-                </span>
-              </button>
-
-              {initialPerson.crew.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {availableTabs.map((tab) => (
                 <button
-                  onClick={() => setActiveTab("crew")}
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
                   className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition flex items-center gap-2 ${
-                    activeTab === "crew"
+                    activeTab === tab.id
                       ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
                       : "bg-slate-900 text-slate-400 hover:text-white border border-slate-800"
                   }`}
                 >
-                  <span>Regie / Produktion / Crew</span>
+                  <span>{tab.label}</span>
                   <span className="text-[11px] px-1.5 py-0.2 rounded-md bg-black/20 font-mono">
-                    {initialPerson.crew.length}
+                    {tab.count}
                   </span>
                 </button>
-              )}
+              ))}
             </div>
 
             {/* Toggle: Exclude self/talkshows for cast */}
-            {activeTab === "cast" && (
+            {(activeTab === "acting" || activeTab === "all") && (
               <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none hover:text-slate-300">
                 <input
                   type="checkbox"
@@ -738,15 +819,18 @@ export function PersonProfileClient({
                           {item.title}
                         </h4>
 
-                        {/* Role / Character name */}
-                        {"character" in item && item.character && (
-                          <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1 italic">
-                            als {item.character}
-                          </p>
-                        )}
-                        {"job" in item && item.job && (
-                          <p className="text-[11px] text-amber-400/90 mt-0.5 line-clamp-1 font-medium">
-                            {item.job}
+                        {/* Deduplicated Role Summary */}
+                        {item.roleSummary && (
+                          <p
+                            className={`text-[11px] mt-0.5 line-clamp-1 font-medium ${
+                              item.isDirector
+                                ? "text-amber-400/90"
+                                : item.isActor
+                                ? "text-slate-300 italic"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            {item.roleSummary}
                           </p>
                         )}
                       </div>

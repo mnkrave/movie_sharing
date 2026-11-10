@@ -856,6 +856,19 @@ export interface PersonCrewCredit extends MediaItem {
   department: string;
 }
 
+export interface PersonWorkCredit extends MediaItem {
+  character?: string;
+  characters?: string[];
+  jobs?: string[];
+  departments?: string[];
+  isDirector?: boolean;
+  isWriter?: boolean;
+  isProducer?: boolean;
+  isActor?: boolean;
+  isSelf?: boolean;
+  roleSummary: string;
+}
+
 export interface PersonDetails {
   id: number;
   name: string;
@@ -870,6 +883,7 @@ export interface PersonDetails {
   popularity: number;
   cast: PersonCastCredit[];
   crew: PersonCrewCredit[];
+  works: PersonWorkCredit[];
 }
 
 export async function searchPersons(query: string): Promise<PersonSearchResult[]> {
@@ -927,7 +941,39 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
       }
     }
 
-    // Process Cast Credits
+    // Helper to translate jobs to German
+    const translateJobName = (job: string): string => {
+      switch (job) {
+        case "Director":
+          return "Regie";
+        case "Screenplay":
+        case "Writer":
+          return "Drehbuch";
+        case "Story":
+          return "Story";
+        case "Producer":
+          return "Produktion";
+        case "Executive Producer":
+          return "Executive Producer";
+        case "Creator":
+          return "Serienschöpfer";
+        case "Director of Photography":
+          return "Kamera";
+        case "Original Music Composer":
+        case "Music":
+          return "Filmmusik";
+        case "Editor":
+          return "Schnitt";
+        case "Costume Design":
+          return "Kostümbild";
+        case "Production Design":
+          return "Szenenbild";
+        default:
+          return job;
+      }
+    };
+
+    // Process Cast Credits (deduplicated by media item)
     const seenCastKeys = new Set<string>();
     const castCredits: PersonCastCredit[] = [];
     const rawCast: any[] = data.combined_credits?.cast || [];
@@ -954,7 +1000,7 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
       });
     }
 
-    // Process Crew Credits
+    // Process Crew Credits (deduplicated per media item, aggregating jobs)
     const seenCrewKeys = new Set<string>();
     const crewCredits: PersonCrewCredit[] = [];
     const rawCrew: any[] = data.combined_credits?.crew || [];
@@ -962,9 +1008,18 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
     for (const raw of rawCrew) {
       const mediaType: "movie" | "tv" =
         raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie";
+      const key = `${mediaType}-${raw.id}`;
       const job = raw.job || raw.department || "Crew";
-      const key = `${mediaType}-${raw.id}-${job}`;
-      if (seenCrewKeys.has(key)) continue;
+
+      if (seenCrewKeys.has(key)) {
+        const existing = crewCredits.find(
+          (c) => c.id === raw.id && c.mediaType === mediaType
+        );
+        if (existing && !existing.job.includes(job)) {
+          existing.job = `${existing.job}, ${job}`;
+        }
+        continue;
+      }
       seenCrewKeys.add(key);
 
       const baseItem = mapRawItem(raw, mediaType);
@@ -974,6 +1029,135 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
         department: raw.department || "Crew",
       });
     }
+
+    // Consolidated & deduplicated works map (every movie & show appears exactly once)
+    const worksMap = new Map<string, PersonWorkCredit>();
+
+    for (const raw of rawCast) {
+      const mediaType: "movie" | "tv" =
+        raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie";
+      const key = `${mediaType}-${raw.id}`;
+      const character = (raw.character || "").trim();
+      const isSelf =
+        /^(self|himself|herself|themselves|narrator)/i.test(character) ||
+        (Array.isArray(raw.genre_ids) &&
+          (raw.genre_ids.includes(10767) || raw.genre_ids.includes(10763)));
+
+      const baseItem = mapRawItem(raw, mediaType);
+
+      if (!worksMap.has(key)) {
+        worksMap.set(key, {
+          ...baseItem,
+          character: character || undefined,
+          characters: character ? [character] : [],
+          jobs: [],
+          departments: [],
+          isDirector: false,
+          isWriter: false,
+          isProducer: false,
+          isActor: true,
+          isSelf,
+          roleSummary: "",
+        });
+      } else {
+        const existing = worksMap.get(key)!;
+        existing.isActor = true;
+        if (character && !existing.characters?.includes(character)) {
+          existing.characters?.push(character);
+        }
+        if (!isSelf) existing.isSelf = false;
+      }
+    }
+
+    for (const raw of rawCrew) {
+      const mediaType: "movie" | "tv" =
+        raw.media_type === "tv" || raw.first_air_date ? "tv" : "movie";
+      const key = `${mediaType}-${raw.id}`;
+      const job = raw.job || raw.department || "Crew";
+      const department = raw.department || "Crew";
+      const isDir = job === "Director" || department === "Directing";
+      const isWri =
+        job === "Writer" ||
+        job === "Screenplay" ||
+        job === "Story" ||
+        department === "Writing";
+      const isProd =
+        job === "Producer" ||
+        job === "Executive Producer" ||
+        department === "Production";
+
+      const baseItem = mapRawItem(raw, mediaType);
+
+      if (!worksMap.has(key)) {
+        worksMap.set(key, {
+          ...baseItem,
+          character: undefined,
+          characters: [],
+          jobs: [job],
+          departments: [department],
+          isDirector: isDir,
+          isWriter: isWri,
+          isProducer: isProd,
+          isActor: false,
+          isSelf: false,
+          roleSummary: "",
+        });
+      } else {
+        const existing = worksMap.get(key)!;
+        if (!existing.jobs?.includes(job)) existing.jobs?.push(job);
+        if (!existing.departments?.includes(department))
+          existing.departments?.push(department);
+        if (isDir) existing.isDirector = true;
+        if (isWri) existing.isWriter = true;
+        if (isProd) existing.isProducer = true;
+      }
+    }
+
+    // Compute unified role summaries (e.g. "Regie, Drehbuch & als Jimmie Dimmick")
+    const works: PersonWorkCredit[] = Array.from(worksMap.values()).map(
+      (item) => {
+        const parts: string[] = [];
+        if (item.isDirector) parts.push("Regie");
+        if (item.isWriter) parts.push("Drehbuch");
+        if (item.isProducer && !item.isDirector && !item.isWriter)
+          parts.push("Produktion");
+
+        const cleanChars = (item.characters || []).filter(
+          (c) => c && !/^(self|himself|herself|themselves)/i.test(c)
+        );
+        if (cleanChars.length > 0) {
+          parts.push(`als ${cleanChars[0]}`);
+        } else if (item.isActor && parts.length === 0) {
+          parts.push(item.isSelf ? "Als er/sie selbst" : "Schauspiel");
+        }
+
+        if (parts.length === 0 && item.jobs && item.jobs.length > 0) {
+          const translated = Array.from(
+            new Set(item.jobs.map(translateJobName))
+          );
+          parts.push(translated.slice(0, 2).join(" & "));
+        }
+
+        let roleSummary = "Beteiligt";
+        if (parts.length === 1) {
+          roleSummary = parts[0];
+        } else if (parts.length === 2) {
+          roleSummary = `${parts[0]} & ${parts[1]}`;
+        } else if (parts.length > 2) {
+          roleSummary = `${parts.slice(0, -1).join(", ")} & ${
+            parts[parts.length - 1]
+          }`;
+        }
+
+        return {
+          ...item,
+          roleSummary,
+        };
+      }
+    );
+
+    // Sort by popularity descending
+    works.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
 
     return {
       id: data.id,
@@ -989,6 +1173,7 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
       popularity: data.popularity || 0,
       cast: castCredits,
       crew: crewCredits,
+      works,
     };
   } catch (err) {
     console.error(`getPersonDetails(${id}) error:`, err);
