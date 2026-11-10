@@ -35,6 +35,7 @@ import {
   User,
   Users,
   Trophy,
+  X,
 } from "lucide-react";
 
 interface PersonProfileClientProps {
@@ -317,12 +318,13 @@ export function PersonProfileClient({
       const q = searchQuery.toLowerCase().trim();
       list = list.filter((c) => {
         const titleMatch = c.title.toLowerCase().includes(q);
+        const origMatch = c.originalTitle?.toLowerCase().includes(q);
         const charMatch =
           c.characters?.some((ch) => ch.toLowerCase().includes(q)) ||
           c.character?.toLowerCase().includes(q);
         const jobMatch = c.jobs?.some((j) => j.toLowerCase().includes(q));
         const summaryMatch = c.roleSummary?.toLowerCase().includes(q);
-        return titleMatch || charMatch || jobMatch || summaryMatch;
+        return titleMatch || origMatch || charMatch || jobMatch || summaryMatch;
       });
     }
 
@@ -658,41 +660,108 @@ export function PersonProfileClient({
           </div>
 
           {/* Filter Bar: Format, Status, Sort & Search */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/50 border border-slate-800">
-            {/* Left: Format Filters (Alle, Filme, Serien) */}
-            <div className="flex flex-wrap items-center gap-1.5">
-              <button
-                onClick={() => setTypeFilter("ALL")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                  typeFilter === "ALL"
-                    ? "bg-slate-800 text-white border border-slate-700"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                Alle Formate
-              </button>
-              <button
-                onClick={() => setTypeFilter("movie")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                  typeFilter === "movie"
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Film className="w-3.5 h-3.5 text-amber-400" />
-                <span>Nur Filme</span>
-              </button>
-              <button
-                onClick={() => setTypeFilter("tv")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                  typeFilter === "tv"
-                    ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                <Tv className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Nur Serien</span>
-              </button>
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/50 border border-slate-800">
+            {/* Left: Format Filters (Alle, Filme, Serien) & Status Quick Pills */}
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Format Pills */}
+              <div className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800/80">
+                <button
+                  onClick={() => setTypeFilter("ALL")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition ${
+                    typeFilter === "ALL"
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Alle
+                </button>
+                <button
+                  onClick={() => setTypeFilter(typeFilter === "movie" ? "ALL" : "movie")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    typeFilter === "movie"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Film className="w-3 h-3 text-amber-400" />
+                  <span>Filme</span>
+                </button>
+                <button
+                  onClick={() => setTypeFilter(typeFilter === "tv" ? "ALL" : "tv")}
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
+                    typeFilter === "tv"
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  <Tv className="w-3 h-3 text-cyan-400" />
+                  <span>Serien</span>
+                </button>
+              </div>
+
+              {/* Status Pills */}
+              <div className="flex items-center gap-1 bg-slate-950/70 p-1 rounded-xl border border-slate-800/80">
+                <button
+                  onClick={() => setStatusFilter("ALL")}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition ${
+                    statusFilter === "ALL"
+                      ? "bg-slate-800 text-white shadow-sm"
+                      : "text-slate-400 hover:text-white"
+                  }`}
+                >
+                  Alle Status
+                </button>
+                <button
+                  onClick={() => setStatusFilter(statusFilter === "WATCHED" ? "ALL" : "WATCHED")}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    statusFilter === "WATCHED"
+                      ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                      : "text-slate-400 hover:text-emerald-300"
+                  }`}
+                >
+                  <Check className="w-3 h-3 text-emerald-400" />
+                  <span>Gesehen</span>
+                </button>
+                <button
+                  onClick={() => setStatusFilter(statusFilter === "UNSEEN" ? "ALL" : "UNSEEN")}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    statusFilter === "UNSEEN"
+                      ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                      : "text-slate-400 hover:text-cyan-300"
+                  }`}
+                >
+                  <Clock className="w-3 h-3 text-cyan-400" />
+                  <span>Ungesehen</span>
+                </button>
+                <button
+                  onClick={() => setStatusFilter(statusFilter === "WATCHLIST" ? "ALL" : "WATCHLIST")}
+                  className={`px-2 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1 ${
+                    statusFilter === "WATCHLIST"
+                      ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                      : "text-slate-400 hover:text-amber-300"
+                  }`}
+                >
+                  <Plus className="w-3 h-3 text-amber-400" />
+                  <span>Merkliste</span>
+                </button>
+              </div>
+
+              {/* Reset Button if any filter active */}
+              {(typeFilter !== "ALL" || statusFilter !== "ALL" || searchQuery.trim() || excludeSelfTalkshows) && (
+                <button
+                  onClick={() => {
+                    setTypeFilter("ALL");
+                    setStatusFilter("ALL");
+                    setSearchQuery("");
+                    setExcludeSelfTalkshows(false);
+                  }}
+                  className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1 transition"
+                  title="Alle Filter zurücksetzen"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Zurücksetzen</span>
+                </button>
+              )}
             </div>
 
             {/* Right: Search & Sort */}
