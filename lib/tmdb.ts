@@ -1113,6 +1113,19 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
       }
     }
 
+    // Helper to format character/appearance
+    const formatCharacterRole = (char: string): string => {
+      const c = char.trim();
+      if (!c) return "Schauspiel";
+      if (/^self\s*-\s*host/i.test(c) || /^host/i.test(c)) return "Host / Moderation";
+      if (/^self\s*-\s*presenter/i.test(c) || /^presenter/i.test(c)) return "Präsentation";
+      if (/^self\s*-\s*guest/i.test(c) || /^guest/i.test(c)) return "Gast";
+      if (/^narrator/i.test(c)) return "Erzähler:in";
+      if (/archive/i.test(c)) return "Archivmaterial";
+      if (/^(self|himself|herself|themselves)/i.test(c)) return "Er/Sie selbst";
+      return `als ${c}`;
+    };
+
     // Compute unified role summaries (e.g. "Regie, Drehbuch & als Jimmie Dimmick")
     const works: PersonWorkCredit[] = Array.from(worksMap.values()).map(
       (item) => {
@@ -1122,13 +1135,11 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
         if (item.isProducer && !item.isDirector && !item.isWriter)
           parts.push("Produktion");
 
-        const cleanChars = (item.characters || []).filter(
-          (c) => c && !/^(self|himself|herself|themselves)/i.test(c)
-        );
-        if (cleanChars.length > 0) {
-          parts.push(`als ${cleanChars[0]}`);
+        const rawChar = (item.characters || [])[0];
+        if (rawChar) {
+          parts.push(formatCharacterRole(rawChar));
         } else if (item.isActor && parts.length === 0) {
-          parts.push(item.isSelf ? "Als er/sie selbst" : "Schauspiel");
+          parts.push("Schauspiel");
         }
 
         if (parts.length === 0 && item.jobs && item.jobs.length > 0) {

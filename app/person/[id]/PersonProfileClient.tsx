@@ -165,7 +165,7 @@ export function PersonProfileClient({
   const [sortBy, setSortBy] = useState<"popularity" | "release_desc" | "vote_average">("popularity");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFullBio, setShowFullBio] = useState(false);
-  const [excludeSelfTalkshows, setExcludeSelfTalkshows] = useState(true);
+  const [excludeSelfTalkshows, setExcludeSelfTalkshows] = useState(false);
 
   // Age calculation
   const ageInfo = useMemo(() => {
@@ -224,9 +224,8 @@ export function PersonProfileClient({
     if (initialPerson.knownForDepartment === "Directing" && directingWorks.length > 0) {
       return directingWorks;
     }
-    const cleanActing = actingWorks.filter((c) => !c.isSelf);
-    if (cleanActing.length > 0) {
-      return cleanActing;
+    if (actingWorks.length > 0) {
+      return actingWorks;
     }
     return works;
   }, [initialPerson.knownForDepartment, directingWorks, actingWorks, works]);
@@ -356,12 +355,20 @@ export function PersonProfileClient({
     myStatusMap,
   ]);
 
-  const roleTitle =
-    initialPerson.knownForDepartment === "Directing"
-      ? "Regisseur:in"
-      : initialPerson.knownForDepartment === "Writing"
-      ? "Drehbuchautor:in"
-      : "Schauspieler:in";
+  const roleTitle = useMemo(() => {
+    const isMainlyHost =
+      works.filter(
+        (w) =>
+          w.characters?.some((c) => /host/i.test(c)) ||
+          w.roleSummary.includes("Host") ||
+          w.roleSummary.includes("Moderation")
+      ).length >= 2;
+    if (isMainlyHost) return "Host & Moderator:in";
+    if (initialPerson.knownForDepartment === "Directing") return "Regisseur:in";
+    if (initialPerson.knownForDepartment === "Writing") return "Drehbuchautor:in";
+    if (initialPerson.knownForDepartment === "Production") return "Produzent:in";
+    return "Schauspieler:in";
+  }, [initialPerson.knownForDepartment, works]);
 
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 pb-24">
@@ -645,7 +652,7 @@ export function PersonProfileClient({
                   onChange={(e) => setExcludeSelfTalkshows(e.target.checked)}
                   className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0 focus:ring-offset-0"
                 />
-                <span>Nur echte Schauspiel-Rollen (ohne Talkshows & Specials)</span>
+                <span>Talkshows & Specials ausblenden</span>
               </label>
             )}
           </div>
