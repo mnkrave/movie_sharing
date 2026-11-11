@@ -86,9 +86,27 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupEmoji, setNewGroupEmoji] = useState("🛋️");
-  const [newGroupMembers, setNewGroupMembers] = useState<string[]>(["Lukas"]);
+  const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
 
-  const myName = session?.user?.name || "Lukas";
+  const myName = session?.user?.name || "Lukas Reinle";
+
+  // Check if a given name refers to the current logged in user (e.g. "Lukas" vs "Lukas Reinle")
+  const isMe = (name: string): boolean => {
+    if (!name) return false;
+    const a = name.toLowerCase().trim();
+    const b = (session?.user?.name || myName).toLowerCase().trim();
+    if (a === b) return true;
+    const aParts = a.split(/\s+/);
+    const bParts = b.split(/\s+/);
+    if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) return true;
+    return a.startsWith(b) || b.startsWith(a);
+  };
+
+  useEffect(() => {
+    if (session?.user?.name && newGroupMembers.length === 0) {
+      setNewGroupMembers([session.user.name]);
+    }
+  }, [session?.user?.name]);
 
   useEffect(() => {
     if (initialPrompt) {
@@ -98,13 +116,14 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
   }, [initialPrompt]);
 
   const toggleFriendChip = (name: string) => {
+    if (isMe(name)) return;
     setSelectedFriends((prev) =>
       prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name]
     );
   };
 
   const applyGroupToPrompt = (groupName: string, memberNames: string[]) => {
-    setSelectedFriends(memberNames.filter((n) => n.toLowerCase() !== myName.toLowerCase()));
+    setSelectedFriends(memberNames.filter((n) => !isMe(n)));
     if (!prompt.toLowerCase().includes(groupName.toLowerCase())) {
       setPrompt((prev) =>
         prev.trim()
@@ -126,11 +145,12 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
       (m) =>
         m.status === "WATCHED" &&
         ((myUserId && m.userId === myUserId) ||
-          (myName && m.userName?.toLowerCase() === myName.toLowerCase()))
+          isMe(m.userName))
     );
 
     const userWatchedTmdbIds = myWatchedStatuses.map((m) => m.tmdbId);
     const userWatchedTitles = myWatchedStatuses.map((m) => m.title);
+    const cleanExplicitParticipants = selectedFriends.filter((n) => !isMe(n));
 
     try {
       const res = await fetch("/api/ai/recommend", {
@@ -139,8 +159,8 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
         body: JSON.stringify({
           prompt: queryToUse,
           currentUserId: myUserId,
-          currentUserName: myName,
-          explicitParticipants: selectedFriends,
+          currentUserName: session?.user?.name || myName,
+          explicitParticipants: cleanExplicitParticipants,
           friendGroups,
           mediaStatuses: communityData.mediaStatuses,
           friends: communityData.friends,
@@ -298,22 +318,25 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
           <span>Gruppen & Freunde einbinden:</span>
         </span>
 
-        {friendGroups.map((grp) => (
-          <button
-            key={grp.id}
-            type="button"
-            onClick={() => applyGroupToPrompt(grp.name, grp.memberNames)}
-            className="px-3 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 text-xs font-bold transition flex items-center gap-1.5"
-            title={`Mitglieder: ${grp.memberNames.join(", ")}`}
-          >
-            <span>{grp.emoji}</span>
-            <span>@{grp.name}</span>
-            <span className="text-[10px] text-purple-400">({grp.memberNames.join(", ")})</span>
-          </button>
-        ))}
+        {friendGroups.map((grp) => {
+          const displayMembers = grp.memberNames.map((m) => (isMe(m) ? "Du" : m));
+          return (
+            <button
+              key={grp.id}
+              type="button"
+              onClick={() => applyGroupToPrompt(grp.name, grp.memberNames)}
+              className="px-3 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 text-xs font-bold transition flex items-center gap-1.5"
+              title={`Mitglieder: ${grp.memberNames.join(", ")}`}
+            >
+              <span>{grp.emoji}</span>
+              <span>@{grp.name}</span>
+              <span className="text-[10px] text-purple-400">({displayMembers.join(", ")})</span>
+            </button>
+          );
+        })}
 
         {communityData.friends
-          .filter((f) => f.name?.toLowerCase() !== myName.toLowerCase())
+          .filter((f) => !isMe(f.name))
           .map((friend) => {
             const active = selectedFriends.includes(friend.name);
             return (

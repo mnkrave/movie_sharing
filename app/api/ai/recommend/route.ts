@@ -62,6 +62,38 @@ function normalizeTitle(t: string): string {
     .trim();
 }
 
+export function isSamePerson(nameA?: string | null, nameB?: string | null): boolean {
+  if (!nameA || !nameB) return false;
+  const a = nameA.toLowerCase().trim();
+  const b = nameB.toLowerCase().trim();
+  if (a === b) return true;
+  const aParts = a.split(/\s+/);
+  const bParts = b.split(/\s+/);
+  // Matches e.g. "Lukas" and "Lukas Reinle", or "Birgit" and "Birgit Reinle"
+  if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) {
+    return true;
+  }
+  return a.startsWith(b) || b.startsWith(a);
+}
+
+export function deduplicateParticipants(rawNames: string[]): string[] {
+  const result: string[] = [];
+  for (const raw of rawNames) {
+    const trimmed = (raw || "").trim();
+    if (!trimmed) continue;
+    const existingIdx = result.findIndex((existing) => isSamePerson(existing, trimmed));
+    if (existingIdx === -1) {
+      result.push(trimmed);
+    } else {
+      // Keep the longer / fuller name (e.g. "Lukas Reinle" instead of "Lukas")
+      if (trimmed.length > result[existingIdx].length) {
+        result[existingIdx] = trimmed;
+      }
+    }
+  }
+  return result;
+}
+
 async function callGeminiWithFallback(systemAndUserPrompt: string): Promise<{
   data: any;
   usedModel: string;
@@ -260,24 +292,25 @@ export async function POST(req: Request) {
     // 1. Pre-detect mentioned groups or friends in natural language or /match syntax
     const lowerPrompt = userPrompt.toLowerCase();
     let detectedGroupName: string | null = null;
-    const participantSet = new Set<string>([currentUserName, ...explicitParticipants]);
+    const rawParticipantList: string[] = [currentUserName, ...explicitParticipants];
 
     for (const grp of friendGroups) {
       const grpClean = grp.name.toLowerCase();
       const grpSpaced = grpClean.replace(/[-_]/g, " ");
       if (lowerPrompt.includes(grpClean) || lowerPrompt.includes(grpSpaced)) {
         detectedGroupName = `${grp.emoji} ${grp.name}`;
-        grp.memberNames.forEach((m) => participantSet.add(m));
+        rawParticipantList.push(...grp.memberNames);
       }
     }
 
     for (const f of allFriends) {
       if (f.name && lowerPrompt.includes(f.name.toLowerCase())) {
-        participantSet.add(f.name);
+        rawParticipantList.push(f.name);
       }
     }
 
-    const participants = Array.from(participantSet);
+    // Deduplicate participants cleanly (e.g. "Lukas" and "Lukas Reinle" are merged into "Lukas Reinle")
+    const participants = deduplicateParticipants(rawParticipantList);
 
     // 2. Build per-participant taste profiles & collect already-watched titles with robust matching
     const allWatchedTitlesList = new Set<string>(callerWatchedTitles);
@@ -292,30 +325,22 @@ export async function POST(req: Request) {
     // Helper to check if a status entry belongs to the current user or one of the active participants
     const isStatusForParticipant = (m: any, pName?: string) => {
       const mUserId = (m.userId || "").toLowerCase().trim();
-      const mUserName = (m.userName || "").toLowerCase().trim();
+      const mUserName = (m.userName || "").trim();
 
       if (pName) {
-        const pClean = pName.toLowerCase().trim();
-        if (mUserName === pClean) return true;
-        if (mUserName && (mUserName.startsWith(pClean) || pClean.startsWith(mUserName))) return true;
-        if (mUserId && (mUserId === pClean || pClean.includes(mUserId))) return true;
+        if (isSamePerson(mUserName, pName)) return true;
+        if (mUserId && (mUserId === pName.toLowerCase() || pName.toLowerCase().includes(mUserId))) return true;
         return false;
       }
 
       // Check current user
       if (currentUserId && mUserId === currentUserId.toLowerCase()) return true;
-      const myUserClean = currentUserName.toLowerCase();
-      if (myUserClean && (mUserName === myUserClean || mUserName.startsWith(myUserClean) || myUserClean.startsWith(mUserName))) {
-        return true;
-      }
+      if (isSamePerson(mUserName, currentUserName)) return true;
 
       // Check against any participant
       for (const p of participants) {
-        const pClean = p.toLowerCase().trim();
-        if (mUserName === pClean || mUserName.startsWith(pClean) || pClean.startsWith(mUserName)) {
-          return true;
-        }
-        if (mUserId && mUserId === pClean) return true;
+        if (isSamePerson(mUserName, p)) return true;
+        if (mUserId && mUserId === p.toLowerCase()) return true;
       }
       return false;
     };
@@ -510,11 +535,17 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
 
     const { data: aiResponse, usedModel } = await callGeminiWithFallback(fullPrompt);
 
+    const returnedParticipants =
+      Array.isArray(aiResponse.parsedIntent?.detectedParticipants) &&
+      aiResponse.parsedIntent.detectedParticipants.length > 0
+        ? aiResponse.parsedIntent.detectedParticipants
+        : participants;
+    const finalCleanParticipants = deduplicateParticipants(returnedParticipants);
+
     const parsedIntent: AiParsedIntent = {
       detectedGroupName:
         aiResponse.parsedIntent?.detectedGroupName || detectedGroupName || null,
-      detectedParticipants:
-        aiResponse.parsedIntent?.detectedParticipants || participants,
+      detectedParticipants: finalCleanParticipants,
       mood: aiResponse.parsedIntent?.mood || "Maßgeschneiderte Auswahl",
       maxRuntimeMinutes:
         typeof aiResponse.parsedIntent?.maxRuntimeMinutes === "number"
