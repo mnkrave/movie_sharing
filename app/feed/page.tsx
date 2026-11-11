@@ -18,6 +18,8 @@ import {
   Users,
   Check,
   RotateCcw,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 import { RecommendationThread } from "@/components/RecommendationThread";
@@ -27,6 +29,7 @@ export default function FeedPage() {
   const {
     communityData,
     upvoteRecommendation,
+    deleteRecommendation,
     openMediaModal,
     openSearch,
     userSubscriptions,
@@ -539,9 +542,44 @@ export default function FeedPage() {
                         </div>
                       </Link>
 
-                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-sm">
-                        <Star className="w-3.5 h-3.5 fill-amber-400" />
-                        <span>{rec.rating}/10</span>
+                      <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-sm">
+                          <Star className="w-3.5 h-3.5 fill-amber-400" />
+                          <span>{rec.rating}/10</span>
+                        </div>
+                        {isMyOwn && (
+                          <div className="flex items-center gap-0.5 ml-1">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                openMediaModal({
+                                  id: rec.tmdbId,
+                                  mediaType: rec.mediaType,
+                                  title: rec.title,
+                                  posterPath: rec.posterPath,
+                                })
+                              }
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+                              title="Empfehlung bearbeiten"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (
+                                  confirm(`Möchtest du deine Empfehlung für „${rec.title}“ wirklich entfernen?`)
+                                ) {
+                                  deleteRecommendation(rec.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
+                              title="Empfehlung entfernen"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
 

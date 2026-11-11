@@ -1850,6 +1850,96 @@ export async function addRecommendation(params: {
   return newRec;
 }
 
+export async function updateRecommendation(params: {
+  recommendationId: string;
+  userId: string;
+  rating: number;
+  comment: string;
+  tags: string[];
+  targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string;
+  targetNames?: string[];
+  targetGroupIds?: string[];
+  targetUserIds?: string[];
+}): Promise<boolean> {
+  const targetType = params.targetType || "ALL";
+  const targetNames = params.targetNames || [];
+  const targetGroupIds = params.targetGroupIds || [];
+  const targetUserIds = params.targetUserIds || [];
+
+  if (await isPostgresAvailable()) {
+    try {
+      const rec = await prisma.recommendation.findUnique({
+        where: { id: params.recommendationId },
+      });
+      if (rec && rec.userId === params.userId) {
+        await (prisma as any).recommendation.update({
+          where: { id: params.recommendationId },
+          data: {
+            rating: params.rating,
+            comment: params.comment.trim(),
+            tags: params.tags.join(","),
+            targetType,
+            targetNames: targetNames.length > 0 ? JSON.stringify(targetNames) : null,
+            targetGroupIds: targetGroupIds.length > 0 ? JSON.stringify(targetGroupIds) : null,
+            targetUserIds: targetUserIds.length > 0 ? JSON.stringify(targetUserIds) : null,
+          },
+        });
+        return true;
+      }
+    } catch (err) {
+      console.warn("Could not update recommendation:", err);
+    }
+  }
+
+  const db = readLocalDb();
+  const rec = db.recommendations.find((r) => r.id === params.recommendationId);
+  if (rec && rec.userId === params.userId) {
+    rec.rating = params.rating;
+    rec.comment = params.comment.trim();
+    rec.tags = params.tags;
+    rec.targetType = targetType;
+    rec.targetNames = targetNames;
+    rec.targetGroupIds = targetGroupIds;
+    rec.targetUserIds = targetUserIds;
+    writeLocalDb(db);
+    return true;
+  }
+  return false;
+}
+
+export async function deleteRecommendation(
+  userId: string,
+  recommendationId: string
+): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    try {
+      const rec = await prisma.recommendation.findUnique({
+        where: { id: recommendationId },
+      });
+      if (rec && rec.userId === userId) {
+        await prisma.recommendation.delete({ where: { id: recommendationId } });
+        return true;
+      }
+    } catch (err) {
+      console.warn("Could not delete recommendation:", err);
+    }
+  }
+
+  const db = readLocalDb();
+  const rec = db.recommendations.find((r) => r.id === recommendationId);
+  if (rec && rec.userId === userId) {
+    db.recommendations = db.recommendations.filter((r) => r.id !== recommendationId);
+    if (db.recommendationReplies) {
+      db.recommendationReplies = db.recommendationReplies.filter(
+        (rep) => rep.recommendationId !== recommendationId
+      );
+    }
+    writeLocalDb(db);
+    return true;
+  }
+  return false;
+}
+
 export async function toggleRecommendationUpvote(userId: string, recommendationId: string) {
   if (await isPostgresAvailable()) {
     const existing = await prisma.recommendationUpvote.findUnique({

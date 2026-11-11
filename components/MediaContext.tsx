@@ -86,6 +86,17 @@ interface MediaContextType {
     targetGroupIds?: string[];
     targetUserIds?: string[];
   }) => Promise<void>;
+  updateRecommendation: (params: {
+    recommendationId: string;
+    rating: number;
+    comment: string;
+    tags: string[];
+    targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
+  }) => Promise<void>;
+  deleteRecommendation: (recommendationId: string) => Promise<void>;
   upvoteRecommendation: (recommendationId: string) => Promise<void>;
   addRecommendationReply: (recommendationId: string, text: string) => Promise<void>;
   deleteRecommendationReply: (replyId: string) => Promise<void>;
@@ -505,6 +516,47 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateRecommendation = async (params: {
+    recommendationId: string;
+    rating: number;
+    comment: string;
+    tags: string[];
+    targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
+  }) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "update_recommendation", ...params }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error updating recommendation:", err);
+    }
+  };
+
+  const deleteRecommendation = async (recommendationId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_recommendation", recommendationId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error deleting recommendation:", err);
+    }
+  };
+
   const upvoteRecommendation = async (recommendationId: string) => {
     try {
       const res = await fetch("/api/community", {
@@ -723,6 +775,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         refreshCommunity,
         updateMediaStatus,
         submitRecommendation,
+        updateRecommendation,
+        deleteRecommendation,
         upvoteRecommendation,
         addRecommendationReply,
         deleteRecommendationReply,

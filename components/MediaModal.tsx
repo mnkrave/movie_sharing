@@ -37,6 +37,8 @@ import {
   Calendar,
   Users,
   User,
+  Pencil,
+  Trash2,
 } from "lucide-react";
 import { RecommendationThread } from "./RecommendationThread";
 
@@ -60,6 +62,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     friendGroups,
     updateMediaStatus,
     submitRecommendation,
+    updateRecommendation,
+    deleteRecommendation,
     upvoteRecommendation,
     userSubscriptions,
     openSubscriptions,
@@ -272,25 +276,80 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     }
 
     setSubmittingRec(true);
-    await submitRecommendation({
-      tmdbId: media.id,
-      mediaType: media.mediaType,
-      title: details?.title || media.title || "Titel",
-      posterPath: details?.posterPath || media.posterPath || null,
-      backdropPath: details?.backdropPath || null,
-      releaseYear: details?.releaseYear || null,
-      rating: recRating,
-      comment: recComment.trim(),
-      tags: recTags,
-      targetType,
-      targetNames,
-      targetGroupIds,
-      targetUserIds,
-    });
+    if (myRec) {
+      await updateRecommendation({
+        recommendationId: myRec.id,
+        rating: recRating,
+        comment: recComment.trim(),
+        tags: recTags,
+        targetType,
+        targetNames,
+        targetGroupIds,
+        targetUserIds,
+      });
+    } else {
+      await submitRecommendation({
+        tmdbId: media.id,
+        mediaType: media.mediaType,
+        title: details?.title || media.title || "Titel",
+        posterPath: details?.posterPath || media.posterPath || null,
+        backdropPath: details?.backdropPath || null,
+        releaseYear: details?.releaseYear || null,
+        rating: recRating,
+        comment: recComment.trim(),
+        tags: recTags,
+        targetType,
+        targetNames,
+        targetGroupIds,
+        targetUserIds,
+      });
+    }
     setSubmittingRec(false);
-    setRecComment("");
     setShowRecForm(false);
     setActiveTab("friends");
+  };
+
+  const handleOpenRecForm = () => {
+    if (myRec) {
+      setRecRating(myRec.rating || 9);
+      setRecComment(myRec.comment || "");
+      setRecTags(myRec.tags && myRec.tags.length > 0 ? myRec.tags : ["🔥 Absolutes Muss"]);
+      if (
+        myRec.targetType &&
+        myRec.targetType !== "ALL" &&
+        ((myRec.targetNames && myRec.targetNames.length > 0) ||
+          (myRec.targetGroupIds && myRec.targetGroupIds.length > 0))
+      ) {
+        setRecAudience("TARGETED");
+        setSelectedTargetGroups(myRec.targetGroupIds || []);
+        const friendsFromRec = (myRec.targetNames || [])
+          .filter((t) => !t.startsWith("@"))
+          .map((name, idx) => ({ id: myRec.targetUserIds?.[idx] || `custom_${idx}`, name }));
+        setSelectedTargetFriends(friendsFromRec);
+      } else {
+        setRecAudience("ALL");
+        setSelectedTargetGroups([]);
+        setSelectedTargetFriends([]);
+      }
+    } else {
+      setRecRating(9);
+      setRecComment("");
+      setRecTags(["🔥 Absolutes Muss"]);
+      setRecAudience("ALL");
+      setSelectedTargetGroups([]);
+      setSelectedTargetFriends([]);
+    }
+    setShowRecForm(true);
+  };
+
+  const handleDeleteMyRec = async () => {
+    if (!myRec) return;
+    if (confirm("Möchtest du deine Empfehlung wirklich entfernen?")) {
+      setSubmittingRec(true);
+      await deleteRecommendation(myRec.id);
+      setSubmittingRec(false);
+      setShowRecForm(false);
+    }
   };
 
   const toggleTag = (tag: string) => {
@@ -653,11 +712,24 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
               <button
                 type="button"
-                onClick={() => setShowRecForm(!showRecForm)}
-                className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black transition shadow-lg shadow-rose-500/20 ml-auto"
+                onClick={handleOpenRecForm}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-lg ml-auto ${
+                  myRec
+                    ? "bg-purple-500/20 text-purple-200 border border-purple-500/40 hover:bg-purple-500/30 shadow-purple-500/10"
+                    : "bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black shadow-rose-500/20"
+                }`}
               >
-                <Sparkles className="w-4 h-4" />
-                <span>Freunden empfehlen</span>
+                {myRec ? (
+                  <>
+                    <Pencil className="w-4 h-4 text-purple-400" />
+                    <span>Empfehlung bearbeiten</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4" />
+                    <span>Freunden empfehlen</span>
+                  </>
+                )}
               </button>
             </div>
 
@@ -710,8 +782,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               >
                 <div className="flex items-center justify-between">
                   <h4 className="text-base font-bold text-white flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-amber-400" />
-                    Empfehlung für {mediaNoun} verfassen
+                    {myRec ? (
+                      <>
+                        <Pencil className="w-4 h-4 text-purple-400" />
+                        Deine Empfehlung für {mediaNoun} bearbeiten
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-4 h-4 text-amber-400" />
+                        Empfehlung für {mediaNoun} verfassen
+                      </>
+                    )}
                   </h4>
                   <button
                     type="button"
@@ -959,40 +1040,58 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowRecForm(false);
-                      setRecAudience("ALL");
-                      setSelectedTargetGroups([]);
-                      setSelectedTargetFriends([]);
-                      setCustomTargetInput("");
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={
-                      submittingRec ||
-                      (recAudience === "TARGETED" &&
-                        selectedTargetGroups.length === 0 &&
-                        selectedTargetFriends.length === 0)
-                    }
-                    className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black transition disabled:opacity-50"
-                  >
-                    {submittingRec
-                      ? "Wird geteilt..."
-                      : recAudience === "TARGETED" && selectedTargetGroups.length > 0 && selectedTargetFriends.length === 0
-                      ? `🎯 An @${friendGroups.find((g) => g.id === selectedTargetGroups[0])?.name || "Gruppe"} empfehlen`
-                      : recAudience === "TARGETED" && selectedTargetFriends.length > 0 && selectedTargetGroups.length === 0
-                      ? `🎯 An ${selectedTargetFriends.length === 1 ? `@${selectedTargetFriends[0].name}` : `${selectedTargetFriends.length} Freunde`} empfehlen`
-                      : recAudience === "TARGETED" && selectedTargetGroups.length + selectedTargetFriends.length > 0
-                      ? `🎯 An Auswahl (${selectedTargetGroups.length + selectedTargetFriends.length}) empfehlen`
-                      : "Jetzt für Freunde teilen"}
-                  </button>
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                  {myRec ? (
+                    <button
+                      type="button"
+                      onClick={handleDeleteMyRec}
+                      disabled={submittingRec}
+                      className="px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/20 transition flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Empfehlung entfernen</span>
+                    </button>
+                  ) : (
+                    <div />
+                  )}
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowRecForm(false);
+                        setRecAudience("ALL");
+                        setSelectedTargetGroups([]);
+                        setSelectedTargetFriends([]);
+                        setCustomTargetInput("");
+                      }}
+                      className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={
+                        submittingRec ||
+                        (recAudience === "TARGETED" &&
+                          selectedTargetGroups.length === 0 &&
+                          selectedTargetFriends.length === 0)
+                      }
+                      className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black transition disabled:opacity-50 shadow-md"
+                    >
+                      {submittingRec
+                        ? "Wird gespeichert..."
+                        : myRec
+                        ? "Änderungen speichern"
+                        : recAudience === "TARGETED" && selectedTargetGroups.length > 0 && selectedTargetFriends.length === 0
+                        ? `🎯 An @${friendGroups.find((g) => g.id === selectedTargetGroups[0])?.name || "Gruppe"} empfehlen`
+                        : recAudience === "TARGETED" && selectedTargetFriends.length > 0 && selectedTargetGroups.length === 0
+                        ? `🎯 An ${selectedTargetFriends.length === 1 ? `@${selectedTargetFriends[0].name}` : `${selectedTargetFriends.length} Freunde`} empfehlen`
+                        : recAudience === "TARGETED" && selectedTargetGroups.length + selectedTargetFriends.length > 0
+                        ? `🎯 An Auswahl (${selectedTargetGroups.length + selectedTargetFriends.length}) empfehlen`
+                        : "Jetzt für Freunde teilen"}
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
@@ -1554,9 +1653,31 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                   </span>
                                 </div>
                               </Link>
-                              <div className="flex items-center gap-1 text-amber-400 font-extrabold text-sm bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
-                                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                                {rec.rating}/10
+                              <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-1 text-amber-400 font-extrabold text-sm bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                                  <Star className="w-3.5 h-3.5 fill-amber-400" />
+                                  {rec.rating}/10
+                                </div>
+                                {isMine && (
+                                  <div className="flex items-center gap-0.5">
+                                    <button
+                                      type="button"
+                                      onClick={handleOpenRecForm}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+                                      title="Empfehlung bearbeiten"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleDeleteMyRec}
+                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
+                                      title="Empfehlung entfernen"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
                               </div>
                             </div>
 

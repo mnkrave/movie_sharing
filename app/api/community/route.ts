@@ -12,6 +12,8 @@ import {
   searchUsersForFriendship,
   toggleMediaStatus,
   addRecommendation,
+  updateRecommendation,
+  deleteRecommendation,
   toggleRecommendationUpvote,
   updateUserSubscriptions,
   updateUserImage,
@@ -132,6 +134,24 @@ export async function POST(req: Request) {
         targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds : [],
         targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds : [],
       });
+    } else if (action === "update_recommendation") {
+      if (body.recommendationId) {
+        await updateRecommendation({
+          recommendationId: body.recommendationId,
+          userId,
+          rating: Number(body.rating) || 9,
+          comment: (body.comment || "").trim(),
+          tags: Array.isArray(body.tags) ? body.tags : [],
+          targetType: body.targetType || "ALL",
+          targetNames: Array.isArray(body.targetNames) ? body.targetNames : [],
+          targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds : [],
+          targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds : [],
+        });
+      }
+    } else if (action === "delete_recommendation") {
+      if (body.recommendationId) {
+        await deleteRecommendation(userId, body.recommendationId);
+      }
     } else if (action === "upvote") {
       await toggleRecommendationUpvote(userId, body.recommendationId);
     } else if (action === "subscriptions") {
