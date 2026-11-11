@@ -45,6 +45,10 @@ export interface AppRecommendation {
   comment: string;
   tags: string[];
   upvoterIds: string[];
+  targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string | null;
+  targetNames?: string[];
+  targetGroupIds?: string[];
+  targetUserIds?: string[];
   createdAt: string;
 }
 
@@ -1401,7 +1405,93 @@ export async function getAllFriendsWithStats(currentUserId?: string) {
 
 // --- Media Statuses & Recommendations ---
 
-export async function getAllCommunityData(currentUserId?: string): Promise<{
+function parseStringList(val: any): string[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.map((x) => String(x).trim()).filter(Boolean);
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) return parsed.map((x) => String(x).trim()).filter(Boolean);
+    } catch {
+      // ignore
+    }
+    return val
+      .split(",")
+      .map((x) => x.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function isRecommendationVisibleToUser(
+  rec: {
+    userId: string;
+    targetType?: string | null;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
+  },
+  currentUserId?: string,
+  currentUserName?: string,
+  myGroupIds?: Set<string>,
+  myGroupNames?: Set<string>
+): boolean {
+  const targetType = rec.targetType || "ALL";
+  const targetNames = rec.targetNames || [];
+  const targetGroupIds = rec.targetGroupIds || [];
+  const targetUserIds = rec.targetUserIds || [];
+
+  const isAll =
+    targetType === "ALL" &&
+    targetNames.length === 0 &&
+    targetGroupIds.length === 0 &&
+    targetUserIds.length === 0;
+
+  if (!currentUserId) {
+    return isAll;
+  }
+
+  // 1. Author always sees their own recommendations
+  if (rec.userId === currentUserId) {
+    return true;
+  }
+
+  // 2. Broadcast to all friends
+  if (isAll) {
+    return true;
+  }
+
+  // 3. User targeted directly by user ID
+  if (targetUserIds.includes(currentUserId)) {
+    return true;
+  }
+
+  // 4. User targeted directly by name or alias
+  if (currentUserName && targetNames.some((t) => isSamePerson(t, currentUserName))) {
+    return true;
+  }
+
+  // 5. Targeted to a group where the user is a member or owner
+  if (myGroupIds && targetGroupIds.some((gid) => myGroupIds.has(gid))) {
+    return true;
+  }
+  if (
+    myGroupNames &&
+    targetNames.some((t) => {
+      const clean = t.replace(/^@/, "").toLowerCase();
+      return myGroupNames.has(clean);
+    })
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export async function getAllCommunityData(
+  currentUserId?: string,
+  currentUserName?: string
+): Promise<{
   mediaStatuses: AppMediaStatus[];
   recommendations: AppRecommendation[];
 }> {
@@ -1409,6 +1499,18 @@ export async function getAllCommunityData(currentUserId?: string): Promise<{
   if (currentUserId) {
     const friendIds = await getAcceptedFriendIds(currentUserId);
     allowedUserIds = new Set([currentUserId, ...friendIds]);
+  }
+
+  let myGroupIds: Set<string> | undefined;
+  let myGroupNames: Set<string> | undefined;
+  if (currentUserId) {
+    try {
+      const myGroups = await getUserFriendGroups(currentUserId, currentUserName);
+      myGroupIds = new Set(myGroups.map((g) => g.id));
+      myGroupNames = new Set(myGroups.map((g) => g.name.toLowerCase()));
+    } catch {
+      // ignore
+    }
   }
 
   if (await isPostgresAvailable()) {
@@ -1425,6 +1527,32 @@ export async function getAllCommunityData(currentUserId?: string): Promise<{
       }),
     ]);
 
+    const mappedRecs: AppRecommendation[] = recs.map((r: any) => ({
+      id: r.id,
+      userId: r.userId,
+      userName: r.user.name,
+      userImage: r.user.image,
+      tmdbId: r.tmdbId,
+      mediaType: r.mediaType as "movie" | "tv",
+      title: r.title,
+      posterPath: r.posterPath,
+      backdropPath: r.backdropPath,
+      releaseYear: r.releaseYear,
+      rating: r.rating,
+      comment: r.comment,
+      tags: r.tags ? r.tags.split(",").filter(Boolean) : [],
+      upvoterIds: r.upvotes.map((u: any) => u.userId),
+      targetType: r.targetType || "ALL",
+      targetNames: parseStringList(r.targetNames),
+      targetGroupIds: parseStringList(r.targetGroupIds),
+      targetUserIds: parseStringList(r.targetUserIds),
+      createdAt: r.createdAt.toISOString(),
+    }));
+
+    const visibleRecs = mappedRecs.filter((r) =>
+      isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
+    );
+
     return {
       mediaStatuses: statuses.map((s) => ({
         id: s.id,
@@ -1440,23 +1568,7 @@ export async function getAllCommunityData(currentUserId?: string): Promise<{
         rating: s.rating,
         updatedAt: s.updatedAt.toISOString(),
       })),
-      recommendations: recs.map((r) => ({
-        id: r.id,
-        userId: r.userId,
-        userName: r.user.name,
-        userImage: r.user.image,
-        tmdbId: r.tmdbId,
-        mediaType: r.mediaType as "movie" | "tv",
-        title: r.title,
-        posterPath: r.posterPath,
-        backdropPath: r.backdropPath,
-        releaseYear: r.releaseYear,
-        rating: r.rating,
-        comment: r.comment,
-        tags: r.tags ? r.tags.split(",").filter(Boolean) : [],
-        upvoterIds: r.upvotes.map((u) => u.userId),
-        createdAt: r.createdAt.toISOString(),
-      })),
+      recommendations: visibleRecs,
     };
   }
 
@@ -1464,13 +1576,25 @@ export async function getAllCommunityData(currentUserId?: string): Promise<{
   const statuses = allowedUserIds
     ? db.mediaStatuses.filter((s) => allowedUserIds.has(s.userId))
     : db.mediaStatuses;
-  const recs = allowedUserIds
+  const rawRecs = allowedUserIds
     ? db.recommendations.filter((r) => allowedUserIds.has(r.userId))
     : db.recommendations;
 
+  const visibleRecs = rawRecs
+    .map((r) => ({
+      ...r,
+      targetType: r.targetType || "ALL",
+      targetNames: parseStringList(r.targetNames),
+      targetGroupIds: parseStringList(r.targetGroupIds),
+      targetUserIds: parseStringList(r.targetUserIds),
+    }))
+    .filter((r) =>
+      isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
+    );
+
   return {
     mediaStatuses: statuses,
-    recommendations: recs,
+    recommendations: visibleRecs,
   };
 }
 
@@ -1578,6 +1702,10 @@ export async function addRecommendation(params: {
   rating: number;
   comment: string;
   tags: string[];
+  targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string;
+  targetNames?: string[];
+  targetGroupIds?: string[];
+  targetUserIds?: string[];
 }) {
   // Also mark as WATCHED automatically when recommending!
   await toggleMediaStatus({
@@ -1593,22 +1721,50 @@ export async function addRecommendation(params: {
     rating: params.rating,
   });
 
+  const targetType = params.targetType || "ALL";
+  const targetNames = params.targetNames || [];
+  const targetGroupIds = params.targetGroupIds || [];
+  const targetUserIds = params.targetUserIds || [];
+
   if (await isPostgresAvailable()) {
-    const created = await prisma.recommendation.create({
-      data: {
-        userId: params.userId,
-        tmdbId: params.tmdbId,
-        mediaType: params.mediaType,
-        title: params.title,
-        posterPath: params.posterPath,
-        backdropPath: params.backdropPath,
-        releaseYear: params.releaseYear,
-        rating: params.rating,
-        comment: params.comment,
-        tags: params.tags.join(","),
-      },
-    });
-    return created;
+    try {
+      const created = await prisma.recommendation.create({
+        data: {
+          userId: params.userId,
+          tmdbId: params.tmdbId,
+          mediaType: params.mediaType,
+          title: params.title,
+          posterPath: params.posterPath,
+          backdropPath: params.backdropPath,
+          releaseYear: params.releaseYear,
+          rating: params.rating,
+          comment: params.comment,
+          tags: params.tags.join(","),
+          targetType,
+          targetNames: targetNames.length > 0 ? JSON.stringify(targetNames) : null,
+          targetGroupIds: targetGroupIds.length > 0 ? JSON.stringify(targetGroupIds) : null,
+          targetUserIds: targetUserIds.length > 0 ? JSON.stringify(targetUserIds) : null,
+        },
+      });
+      return created;
+    } catch (err) {
+      console.warn("Could not save targeted fields to recommendation, falling back:", err);
+      const created = await prisma.recommendation.create({
+        data: {
+          userId: params.userId,
+          tmdbId: params.tmdbId,
+          mediaType: params.mediaType,
+          title: params.title,
+          posterPath: params.posterPath,
+          backdropPath: params.backdropPath,
+          releaseYear: params.releaseYear,
+          rating: params.rating,
+          comment: params.comment,
+          tags: params.tags.join(","),
+        },
+      });
+      return created;
+    }
   }
 
   const db = readLocalDb();
@@ -1627,6 +1783,10 @@ export async function addRecommendation(params: {
     comment: params.comment,
     tags: params.tags,
     upvoterIds: [params.userId],
+    targetType,
+    targetNames,
+    targetGroupIds,
+    targetUserIds,
     createdAt: new Date().toISOString(),
   };
   db.recommendations.unshift(newRec);

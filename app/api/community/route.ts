@@ -34,7 +34,7 @@ export async function GET() {
   const currentUserName = session?.user?.name || undefined;
 
   const [community, friends, friendRequests, friendGroups] = await Promise.all([
-    getAllCommunityData(userId),
+    getAllCommunityData(userId, currentUserName),
     getAllFriendsWithStats(userId),
     userId
       ? getUserFriendRequests(userId)
@@ -125,6 +125,10 @@ export async function POST(req: Request) {
         rating: Number(body.rating) || 9,
         comment: (body.comment || "").trim(),
         tags: Array.isArray(body.tags) ? body.tags : [],
+        targetType: body.targetType || "ALL",
+        targetNames: Array.isArray(body.targetNames) ? body.targetNames : [],
+        targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds : [],
+        targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds : [],
       });
     } else if (action === "upvote") {
       await toggleRecommendationUpvote(userId, body.recommendationId);
@@ -150,7 +154,7 @@ export async function POST(req: Request) {
     }
 
     const [community, friends, friendRequests, friendGroups] = await Promise.all([
-      getAllCommunityData(userId),
+      getAllCommunityData(userId, userName),
       getAllFriendsWithStats(userId),
       getUserFriendRequests(userId),
       getUserFriendGroups(userId, userName),

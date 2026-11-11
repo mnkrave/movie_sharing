@@ -877,6 +877,17 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
                       </div>
                     </div>
 
+                    {rec.targetNames && rec.targetNames.length > 0 && (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-purple-500/15 border border-purple-500/30 text-[10px] text-purple-300 font-bold w-fit">
+                        <Sparkles className="w-3 h-3 text-purple-400" />
+                        <span>
+                          {rec.targetNames.some((t) => t.startsWith("@"))
+                            ? `Für ${rec.targetNames.join(", ")} empfohlen`
+                            : `Speziell für dich empfohlen!`}
+                        </span>
+                      </div>
+                    )}
+
                     {rec.tags && rec.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 pt-1">
                         {rec.tags.map((tag, idx) => (

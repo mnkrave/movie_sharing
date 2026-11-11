@@ -81,6 +81,10 @@ interface MediaContextType {
     rating: number;
     comment: string;
     tags: string[];
+    targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
   }) => Promise<void>;
   upvoteRecommendation: (recommendationId: string) => Promise<void>;
   sendFriendRequest: (target: string) => Promise<{ success: boolean; message?: string; error?: string }>;
@@ -479,6 +483,10 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     rating: number;
     comment: string;
     tags: string[];
+    targetType?: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" | string;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
   }) => {
     try {
       const res = await fetch("/api/community", {

@@ -35,6 +35,8 @@ import {
   Filter,
   Layers,
   Calendar,
+  Users,
+  User,
 } from "lucide-react";
 
 interface MediaModalProps {
@@ -54,6 +56,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     openMediaModal,
     closeMediaModal,
     communityData,
+    friendGroups,
     updateMediaStatus,
     submitRecommendation,
     upvoteRecommendation,
@@ -86,6 +89,35 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   const [recComment, setRecComment] = useState("");
   const [recTags, setRecTags] = useState<string[]>(["🔥 Absolutes Muss"]);
   const [submittingRec, setSubmittingRec] = useState(false);
+
+  // Recommendation audience state (all friends vs specific groups / friends)
+  const [recAudience, setRecAudience] = useState<"ALL" | "TARGETED">("ALL");
+  const [selectedTargetGroups, setSelectedTargetGroups] = useState<string[]>([]);
+  const [selectedTargetFriends, setSelectedTargetFriends] = useState<{ id: string; name: string }[]>([]);
+  const [customTargetInput, setCustomTargetInput] = useState("");
+
+  const toggleTargetGroup = (grp: { id: string; name: string }) => {
+    setSelectedTargetGroups((prev) =>
+      prev.includes(grp.id) ? prev.filter((id) => id !== grp.id) : [...prev, grp.id]
+    );
+  };
+
+  const toggleTargetFriend = (friend: { id: string; name: string }) => {
+    setSelectedTargetFriends((prev) =>
+      prev.some((f) => f.id === friend.id || f.name.toLowerCase() === friend.name.toLowerCase())
+        ? prev.filter((f) => f.id !== friend.id && f.name.toLowerCase() !== friend.name.toLowerCase())
+        : [...prev, friend]
+    );
+  };
+
+  const addCustomTarget = () => {
+    const trimmed = customTargetInput.trim().replace(/^@/, "");
+    if (!trimmed) return;
+    if (!selectedTargetFriends.some((f) => f.name.toLowerCase() === trimmed.toLowerCase())) {
+      setSelectedTargetFriends((prev) => [...prev, { id: `custom_${Date.now()}`, name: trimmed }]);
+    }
+    setCustomTargetInput("");
+  };
 
   // Status rating dialog
   const [userRatingInput, setUserRatingInput] = useState<number>(8);
@@ -151,6 +183,15 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     (r) => !isMe(r.userId, r.userName, (r as any).userEmail)
   );
 
+  const targetedRecForMe = useMemo(() => {
+    return otherFriendsRecs.find((r) => {
+      if (r.targetType === "ALL" && (!r.targetNames || r.targetNames.length === 0)) {
+        return false;
+      }
+      return true;
+    });
+  }, [otherFriendsRecs]);
+
   const itemGenres = resolveItemGenres(media.mediaType, media.genreIds, details?.genres);
 
   const myStatusObj = communityData.mediaStatuses.find(
@@ -184,6 +225,40 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       return;
     }
 
+    const isTargeted =
+      recAudience === "TARGETED" &&
+      (selectedTargetGroups.length > 0 || selectedTargetFriends.length > 0);
+
+    let targetType: "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" = "ALL";
+    const targetNames: string[] = [];
+    const targetGroupIds: string[] = [];
+    const targetUserIds: string[] = [];
+
+    if (isTargeted) {
+      if (selectedTargetGroups.length > 0 && selectedTargetFriends.length === 0) {
+        targetType = "GROUPS";
+      } else if (selectedTargetFriends.length > 0 && selectedTargetGroups.length === 0) {
+        targetType = "FRIENDS";
+      } else {
+        targetType = "CUSTOM";
+      }
+
+      for (const gId of selectedTargetGroups) {
+        const grp = friendGroups.find((g) => g.id === gId);
+        if (grp) {
+          targetGroupIds.push(grp.id);
+          targetNames.push(`@${grp.name}`);
+        }
+      }
+
+      for (const f of selectedTargetFriends) {
+        if (!f.id.startsWith("custom_")) {
+          targetUserIds.push(f.id);
+        }
+        targetNames.push(f.name);
+      }
+    }
+
     setSubmittingRec(true);
     await submitRecommendation({
       tmdbId: media.id,
@@ -195,6 +270,10 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       rating: recRating,
       comment: recComment.trim(),
       tags: recTags,
+      targetType,
+      targetNames,
+      targetGroupIds,
+      targetUserIds,
     });
     setSubmittingRec(false);
     setRecComment("");
@@ -468,6 +547,18 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     </div>
                   )}
 
+                  {/* Targeted Recommendation Badge */}
+                  {targetedRecForMe && (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-amber-500/20 border border-purple-500/40 text-purple-200 text-xs font-bold shadow-sm animate-pulse">
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>
+                        {targetedRecForMe.targetNames?.some((t) => t.startsWith("@"))
+                          ? `Für ${targetedRecForMe.targetNames.find((t) => t.startsWith("@"))} empfohlen!`
+                          : `Tipp speziell für dich von ${targetedRecForMe.userName}!`}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Recommendation Badge */}
                   {(myRec || otherFriendsRecs.length > 0) && (
                     <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs font-semibold">
@@ -641,6 +732,169 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   </div>
                 </div>
 
+                {/* Zielgruppe / Empfänger */}
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-bold text-slate-300">
+                      Wem möchtest du diesen Titel empfehlen?
+                    </label>
+                    <span className="text-[11px] text-amber-400 font-medium">
+                      {recAudience === "ALL"
+                        ? "👥 An alle Freunde"
+                        : selectedTargetGroups.length + selectedTargetFriends.length > 0
+                        ? `🎯 ${selectedTargetGroups.length + selectedTargetFriends.length} gewählt`
+                        : "🎯 Bitte Empfänger wählen"}
+                    </span>
+                  </div>
+
+                  {/* Mode Buttons */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRecAudience("ALL")}
+                      className={`p-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                        recAudience === "ALL"
+                          ? "bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm"
+                          : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                      }`}
+                    >
+                      <Users className="w-3.5 h-3.5" />
+                      <span>Alle Freunde (Feed)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRecAudience("TARGETED")}
+                      className={`p-2 rounded-xl text-xs font-bold border transition flex items-center justify-center gap-1.5 ${
+                        recAudience === "TARGETED"
+                          ? "bg-purple-500/25 text-purple-200 border-purple-400 shadow-sm"
+                          : "bg-slate-950/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                      <span>Gruppe oder Freund(e)</span>
+                    </button>
+                  </div>
+
+                  {/* Targeted Selector Chips */}
+                  {recAudience === "TARGETED" && (
+                    <div className="p-3 rounded-xl bg-slate-950/80 border border-purple-500/30 space-y-3 animate-in fade-in">
+                      {/* CineCrew / Groups */}
+                      {friendGroups.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1">
+                            <span>🛋️ Filmabend-Gruppen (CineCrews):</span>
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {friendGroups.map((grp) => {
+                              const active = selectedTargetGroups.includes(grp.id);
+                              return (
+                                <button
+                                  key={grp.id}
+                                  type="button"
+                                  onClick={() => toggleTargetGroup(grp)}
+                                  className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
+                                    active
+                                      ? "bg-purple-500 text-black border-purple-400 font-extrabold shadow"
+                                      : "bg-slate-900 text-purple-200 border-slate-700 hover:border-purple-400/50"
+                                  }`}
+                                >
+                                  <span>{grp.emoji}</span>
+                                  <span>@{grp.name}</span>
+                                  {active && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Friends */}
+                      {communityData.friends.length > 0 && (
+                        <div className="space-y-1.5">
+                          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center gap-1">
+                            <span>👤 Spezifische Freunde:</span>
+                          </span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {communityData.friends
+                              .filter((f) => !isMe(f.id, f.name, f.email))
+                              .map((f) => {
+                                const active = selectedTargetFriends.some(
+                                  (tf) => tf.id === f.id || tf.name.toLowerCase() === f.name.toLowerCase()
+                                );
+                                return (
+                                  <button
+                                    key={f.id}
+                                    type="button"
+                                    onClick={() => toggleTargetFriend(f)}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
+                                      active
+                                        ? "bg-amber-400 text-black border-amber-300 font-extrabold shadow"
+                                        : "bg-slate-900 text-slate-300 border-slate-700 hover:border-amber-400/50"
+                                    }`}
+                                  >
+                                    <span>@{f.name}</span>
+                                    {active && <Check className="w-3.5 h-3.5 stroke-[3]" />}
+                                  </button>
+                                );
+                              })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Or custom name input */}
+                      <div className="pt-1 flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={customTargetInput}
+                          onChange={(e) => setCustomTargetInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              addCustomTarget();
+                            }
+                          }}
+                          placeholder="Weiteren Freund per Name hinzufügen..."
+                          className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={addCustomTarget}
+                          disabled={!customTargetInput.trim()}
+                          className="px-3 py-1.5 rounded-lg bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 border border-purple-500/40 text-xs font-bold transition disabled:opacity-40"
+                        >
+                          + Hinzufügen
+                        </button>
+                      </div>
+
+                      {/* Selected recipient summary chips */}
+                      {selectedTargetGroups.length + selectedTargetFriends.length > 0 && (
+                        <div className="pt-1 text-[11px] text-slate-300 flex flex-wrap items-center gap-1.5">
+                          <span className="font-semibold text-slate-400">Geht an:</span>
+                          {selectedTargetGroups.map((gId) => {
+                            const grp = friendGroups.find((g) => g.id === gId);
+                            return (
+                              <span
+                                key={gId}
+                                className="px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 border border-purple-500/30 font-bold"
+                              >
+                                {grp?.emoji} @{grp?.name}
+                              </span>
+                            );
+                          })}
+                          {selectedTargetFriends.map((f) => (
+                            <span
+                              key={f.id}
+                              className="px-2 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold"
+                            >
+                              @{f.name}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">
                     Warum müssen deine Freunde {mediaNoun} sehen?{" "}
@@ -696,17 +950,36 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
-                    onClick={() => setShowRecForm(false)}
+                    onClick={() => {
+                      setShowRecForm(false);
+                      setRecAudience("ALL");
+                      setSelectedTargetGroups([]);
+                      setSelectedTargetFriends([]);
+                      setCustomTargetInput("");
+                    }}
                     className="px-4 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white"
                   >
                     Abbrechen
                   </button>
                   <button
                     type="submit"
-                    disabled={submittingRec}
+                    disabled={
+                      submittingRec ||
+                      (recAudience === "TARGETED" &&
+                        selectedTargetGroups.length === 0 &&
+                        selectedTargetFriends.length === 0)
+                    }
                     className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black transition disabled:opacity-50"
                   >
-                    {submittingRec ? "Wird geteilt..." : "Jetzt für Freunde teilen"}
+                    {submittingRec
+                      ? "Wird geteilt..."
+                      : recAudience === "TARGETED" && selectedTargetGroups.length > 0 && selectedTargetFriends.length === 0
+                      ? `🎯 An @${friendGroups.find((g) => g.id === selectedTargetGroups[0])?.name || "Gruppe"} empfehlen`
+                      : recAudience === "TARGETED" && selectedTargetFriends.length > 0 && selectedTargetGroups.length === 0
+                      ? `🎯 An ${selectedTargetFriends.length === 1 ? `@${selectedTargetFriends[0].name}` : `${selectedTargetFriends.length} Freunde`} empfehlen`
+                      : recAudience === "TARGETED" && selectedTargetGroups.length + selectedTargetFriends.length > 0
+                      ? `🎯 An Auswahl (${selectedTargetGroups.length + selectedTargetFriends.length}) empfehlen`
+                      : "Jetzt für Freunde teilen"}
                   </button>
                 </div>
               </form>
@@ -1245,6 +1518,23 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                   {isMine && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold ml-1.5 border border-purple-500/30">
                                       Du
+                                    </span>
+                                  )}
+                                  {rec.targetNames && rec.targetNames.length > 0 ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 ml-1.5">
+                                      <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                      <span>
+                                        {rec.targetNames.some((t) => t.startsWith("@"))
+                                          ? `Für ${rec.targetNames.join(", ")}`
+                                          : isMine
+                                          ? `An ${rec.targetNames.join(", ")}`
+                                          : `Speziell für dich!`}
+                                      </span>
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 ml-1.5">
+                                      <Users className="w-2.5 h-2.5 text-slate-500" />
+                                      <span>Alle Freunde</span>
                                     </span>
                                   )}
                                   <span className="text-[11px] text-slate-500 ml-2">

@@ -63,21 +63,25 @@ model MediaStatus {
 }
 
 model Recommendation {
-  id          String                 @id @default(cuid())
-  userId      String
-  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tmdbId      Int
-  mediaType   String                 // "movie" | "tv"
-  title       String
-  posterPath  String?
-  backdropPath String?
-  releaseYear String?
-  rating      Int                    // 1-10
-  comment     String
-  tags        String?                // Comma-separated tags e.g. "Must-Watch,Mindfuck"
-  upvotes     RecommendationUpvote[]
-  createdAt   DateTime               @default(now())
-  updatedAt   DateTime               @updatedAt
+  id             String                 @id @default(cuid())
+  userId         String
+  user           User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tmdbId         Int
+  mediaType      String                 // "movie" | "tv"
+  title          String
+  posterPath     String?
+  backdropPath   String?
+  releaseYear    String?
+  rating         Int                    // 1-10
+  comment        String
+  tags           String?                // Comma-separated tags e.g. "Must-Watch,Mindfuck"
+  targetType     String?                // "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM"
+  targetNames    String?                // JSON string array e.g. '["@Familie", "Birgit Reinle"]'
+  targetGroupIds String?                // JSON string array e.g. '["grp_123"]'
+  targetUserIds  String?                // JSON string array e.g. '["usr_abc"]'
+  upvotes        RecommendationUpvote[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
 }
 
 model RecommendationUpvote {

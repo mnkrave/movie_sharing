@@ -34,7 +34,7 @@ export default function FeedPage() {
 
   // Filter States: Default is "FRIENDS", "hideWatched = true", "onlyStreamable = true"
   const [filterType, setFilterType] = useState<"ALL" | "movie" | "tv">("ALL");
-  const [authorFilter, setAuthorFilter] = useState<"ALL" | "FRIENDS" | "MINE">("FRIENDS");
+  const [authorFilter, setAuthorFilter] = useState<"ALL" | "FRIENDS" | "TARGETED" | "MINE">("FRIENDS");
   const [hideWatched, setHideWatched] = useState<boolean>(true);
   const [onlyStreamable, setOnlyStreamable] = useState<boolean>(true);
   const [selectedTag, setSelectedTag] = useState<string>("ALL");
@@ -104,6 +104,12 @@ export default function FeedPage() {
 
   const friendsRecCount = communityData.recommendations.length - myRecCount;
 
+  const targetedToMeCount = communityData.recommendations.filter((r) => {
+    const isMine = isMe(r.userId, r.userName, (r as any).userEmail);
+    if (isMine) return false;
+    return r.targetType !== "ALL" && ((r.targetNames && r.targetNames.length > 0) || (r.targetGroupIds && r.targetGroupIds.length > 0));
+  }).length;
+
   const GENRE_TAGS = [
     { key: "ALL", label: "Alle Genres & Tags" },
     { key: "Action", label: "💥 Action" },
@@ -129,10 +135,18 @@ export default function FeedPage() {
         return false;
       }
 
-      // 2. Author Filter (Standard: Nur Freunde)
+      // 2. Author & Target Filter
       const isMine = isMe(rec.userId, rec.userName, (rec as any).userEmail);
       if (authorFilter === "MINE" && !isMine) return false;
       if (authorFilter === "FRIENDS" && isMine) return false;
+      if (authorFilter === "TARGETED") {
+        if (isMine) return false;
+        const hasTarget =
+          rec.targetType !== "ALL" &&
+          ((rec.targetNames && rec.targetNames.length > 0) ||
+            (rec.targetGroupIds && rec.targetGroupIds.length > 0));
+        if (!hasTarget) return false;
+      }
 
       // 3. Watched Filter (Standard: Noch nicht gesehen)
       if (hideWatched && hasMyWatched(rec.tmdbId, rec.mediaType)) {
@@ -268,6 +282,21 @@ export default function FeedPage() {
                   <Users className="w-3.5 h-3.5" />
                   <span>Von Freunden ({friendsRecCount})</span>
                 </button>
+
+                {targetedToMeCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setAuthorFilter("TARGETED")}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                      authorFilter === "TARGETED"
+                        ? "bg-purple-500 text-black shadow font-extrabold"
+                        : "text-purple-300 hover:text-white"
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>An mich & Gruppen ({targetedToMeCount})</span>
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -473,6 +502,23 @@ export default function FeedPage() {
                             {isWatchedByMe && (
                               <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-semibold border border-emerald-500/30">
                                 Von dir gesehen ✓
+                              </span>
+                            )}
+                            {rec.targetNames && rec.targetNames.length > 0 ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-bold border border-purple-500/30">
+                                <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                <span>
+                                  {rec.targetNames.some((t) => t.startsWith("@"))
+                                    ? `Für ${rec.targetNames.join(", ")}`
+                                    : isMyOwn
+                                    ? `An ${rec.targetNames.join(", ")}`
+                                    : `Speziell für dich!`}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium border border-slate-700">
+                                <Users className="w-2.5 h-2.5 text-slate-500" />
+                                <span>Alle Freunde</span>
                               </span>
                             )}
                           </div>
