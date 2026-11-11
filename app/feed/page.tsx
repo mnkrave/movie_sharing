@@ -148,7 +148,7 @@ export default function FeedPage() {
       if (selectedTag !== "ALL") {
         const query = selectedTag.toLowerCase();
         const hasTag = rec.tags.some((t) => t.toLowerCase().includes(query));
-        const inComment = rec.comment.toLowerCase().includes(query);
+        const inComment = rec.comment ? rec.comment.toLowerCase().includes(query) : false;
         if (!hasTag && !inComment) return false;
       }
 
@@ -511,10 +511,12 @@ export default function FeedPage() {
                       </h3>
                     </div>
 
-                    {/* Comment */}
-                    <p className="text-sm text-slate-300 leading-relaxed mt-2 italic">
-                      &quot;{rec.comment}&quot;
-                    </p>
+                    {/* Comment (if provided) */}
+                    {rec.comment ? (
+                      <p className="text-sm text-slate-300 leading-relaxed mt-2 italic">
+                        &quot;{rec.comment}&quot;
+                      </p>
+                    ) : null}
 
                     {/* Streaming Availability Badges (direct on card) */}
                     {itemMeta?.providerLogosDE && itemMeta.providerLogosDE.length > 0 && (

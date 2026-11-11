@@ -869,9 +869,11 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
                           {rec.title}
                         </h3>
 
-                        <p className="text-xs text-slate-300 italic line-clamp-3">
-                          &ldquo;{rec.comment}&rdquo;
-                        </p>
+                        {rec.comment ? (
+                          <p className="text-xs text-slate-300 italic line-clamp-3">
+                            &ldquo;{rec.comment}&rdquo;
+                          </p>
+                        ) : null}
                       </div>
                     </div>
 

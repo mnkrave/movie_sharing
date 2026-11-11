@@ -183,7 +183,6 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       alert("Bitte logge dich ein, um eine Empfehlung abzugeben!");
       return;
     }
-    if (!recComment.trim()) return;
 
     setSubmittingRec(true);
     await submitRecommendation({
@@ -644,7 +643,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
                 <div>
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">
-                    Warum müssen deine Freunde {mediaNoun} sehen?
+                    Warum müssen deine Freunde {mediaNoun} sehen?{" "}
+                    <span className="text-slate-500 font-normal text-[11px]">(optional)</span>
                   </label>
                   <textarea
                     value={recComment}
@@ -652,11 +652,10 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     rows={3}
                     placeholder={
                       isTv
-                        ? "z. B. Überragende Charakterentwicklung und Spannung von Folge zu Folge! Auf Netflix Japan mit VPN verfügbar."
-                        : "z. B. Überragende Schauspieler und ein Twist am Ende, den man nie kommen sieht. Auf Netflix Japan mit VPN verfügbar!"
+                        ? "Optional: z. B. Überragende Charakterentwicklung und Spannung von Folge zu Folge!"
+                        : "Optional: z. B. Überragende Schauspieler und ein Twist am Ende, den man nie kommen sieht!"
                     }
                     className="w-full bg-slate-950/80 border border-slate-700 rounded-xl p-3 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-                    required
                   />
                 </div>
 
@@ -704,7 +703,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   </button>
                   <button
                     type="submit"
-                    disabled={submittingRec || !recComment.trim()}
+                    disabled={submittingRec}
                     className="px-5 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black transition disabled:opacity-50"
                   >
                     {submittingRec ? "Wird geteilt..." : "Jetzt für Freunde teilen"}
@@ -1259,7 +1258,9 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                               </div>
                             </div>
 
-                            <p className="text-sm text-slate-200 leading-relaxed">{rec.comment}</p>
+                            {rec.comment ? (
+                              <p className="text-sm text-slate-200 leading-relaxed">{rec.comment}</p>
+                            ) : null}
 
                             {rec.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1.5 pt-1">

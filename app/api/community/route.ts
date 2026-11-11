@@ -104,12 +104,6 @@ export async function POST(req: Request) {
         rating: body.rating ? Number(body.rating) : undefined,
       });
     } else if (action === "recommend") {
-      if (!body.comment || !body.comment.trim()) {
-        return NextResponse.json(
-          { error: "Bitte schreibe einen kurzen Empfehlungs-Kommentar für deine Freunde." },
-          { status: 400 }
-        );
-      }
       await addRecommendation({
         userId,
         userName,
@@ -121,7 +115,7 @@ export async function POST(req: Request) {
         backdropPath: body.backdropPath || null,
         releaseYear: body.releaseYear || null,
         rating: Number(body.rating) || 9,
-        comment: body.comment.trim(),
+        comment: (body.comment || "").trim(),
         tags: Array.isArray(body.tags) ? body.tags : [],
       });
     } else if (action === "upvote") {
