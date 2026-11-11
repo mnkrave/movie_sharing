@@ -87,6 +87,8 @@ interface MediaContextType {
     targetUserIds?: string[];
   }) => Promise<void>;
   upvoteRecommendation: (recommendationId: string) => Promise<void>;
+  addRecommendationReply: (recommendationId: string, text: string) => Promise<void>;
+  deleteRecommendationReply: (replyId: string) => Promise<void>;
   sendFriendRequest: (target: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   acceptFriendRequest: (requestId: string) => Promise<{ success: boolean; error?: string }>;
   declineFriendRequest: (requestId: string) => Promise<{ success: boolean; error?: string }>;
@@ -519,6 +521,39 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const addRecommendationReply = async (recommendationId: string, text: string) => {
+    if (!text.trim()) return;
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "add_reply", recommendationId, text: text.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error adding recommendation reply:", err);
+    }
+  };
+
+  const deleteRecommendationReply = async (replyId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_reply", replyId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error deleting recommendation reply:", err);
+    }
+  };
+
   const sendFriendRequest = async (target: string) => {
     try {
       const res = await fetch("/api/community", {
@@ -689,6 +724,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         updateMediaStatus,
         submitRecommendation,
         upvoteRecommendation,
+        addRecommendationReply,
+        deleteRecommendationReply,
         sendFriendRequest,
         acceptFriendRequest,
         declineFriendRequest,

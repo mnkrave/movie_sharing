@@ -20,6 +20,8 @@ import {
   saveFriendGroup,
   deleteFriendGroup,
   syncUserFriendGroups,
+  addRecommendationReply,
+  deleteRecommendationReply,
 } from "@/lib/store";
 
 export async function GET() {
@@ -151,6 +153,20 @@ export async function POST(req: Request) {
       await deleteFriendGroup(userId, userName, body.groupId);
     } else if (action === "avatar" || action === "profile_image") {
       await updateUserImage(userId, body.image ?? null);
+    } else if (action === "add_reply") {
+      if (body.recommendationId && body.text) {
+        await addRecommendationReply({
+          recommendationId: body.recommendationId,
+          userId,
+          userName,
+          userImage,
+          text: body.text,
+        });
+      }
+    } else if (action === "delete_reply") {
+      if (body.replyId) {
+        await deleteRecommendationReply(userId, body.replyId);
+      }
     }
 
     const [community, friends, friendRequests, friendGroups] = await Promise.all([

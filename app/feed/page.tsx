@@ -20,6 +20,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
+import { RecommendationThread } from "@/components/RecommendationThread";
 
 export default function FeedPage() {
   const { data: session } = useSession();
@@ -38,6 +39,16 @@ export default function FeedPage() {
   const [hideWatched, setHideWatched] = useState<boolean>(true);
   const [onlyStreamable, setOnlyStreamable] = useState<boolean>(true);
   const [selectedTag, setSelectedTag] = useState<string>("ALL");
+  const [openThreadIds, setOpenThreadIds] = useState<Set<string>>(new Set());
+
+  const toggleThread = (recId: string) => {
+    setOpenThreadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(recId)) next.delete(recId);
+      else next.add(recId);
+      return next;
+    });
+  };
 
   const [metaMap, setMetaMap] = useState<Record<string, BatchMediaMeta>>({});
 
@@ -611,8 +622,8 @@ export default function FeedPage() {
                     )}
                   </div>
 
-                  {/* Actions (Upvote + Check Streaming Button) */}
-                  <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
+                  {/* Actions (Upvote + Thread Button + Check Streaming Button) */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-slate-800/80">
                     <button
                       type="button"
                       onClick={() =>
@@ -629,19 +640,50 @@ export default function FeedPage() {
                       <span>Wo streamen? (DE & VPN prüfen)</span>
                     </button>
 
-                    <button
-                      type="button"
-                      onClick={() => upvoteRecommendation(rec.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
-                        isUpvoted
-                          ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
-                          : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
-                      }`}
-                    >
-                      <ThumbsUp className={`w-3.5 h-3.5 ${isUpvoted ? "fill-white" : ""}`} />
-                      <span>{rec.upvoterIds.length}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => toggleThread(rec.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                          (rec.replies && rec.replies.length > 0) || openThreadIds.has(rec.id)
+                            ? "bg-purple-500/20 text-purple-300 border border-purple-500/35 hover:bg-purple-500/30"
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                        }`}
+                        title="Diskussion / Antworten anzeigen"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>
+                          {rec.replies && rec.replies.length > 0
+                            ? `${rec.replies.length} ${rec.replies.length === 1 ? "Antwort" : "Antworten"}`
+                            : "Antworten"}
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => upvoteRecommendation(rec.id)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                          isUpvoted
+                            ? "bg-rose-500 text-white shadow-lg shadow-rose-500/20"
+                            : "bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white"
+                        }`}
+                      >
+                        <ThumbsUp className={`w-3.5 h-3.5 ${isUpvoted ? "fill-white" : ""}`} />
+                        <span>{rec.upvoterIds.length}</span>
+                      </button>
+                    </div>
                   </div>
+
+                  {/* Expandable Thread */}
+                  {openThreadIds.has(rec.id) && (
+                    <RecommendationThread
+                      recommendationId={rec.id}
+                      recAuthorName={rec.userName}
+                      recAuthorId={rec.userId}
+                      replies={rec.replies}
+                      onClose={() => toggleThread(rec.id)}
+                    />
+                  )}
                 </div>
               </div>
             );

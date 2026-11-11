@@ -38,6 +38,7 @@ import {
   Users,
   User,
 } from "lucide-react";
+import { RecommendationThread } from "./RecommendationThread";
 
 interface MediaModalProps {
   media: {
@@ -122,6 +123,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   // Status rating dialog
   const [userRatingInput, setUserRatingInput] = useState<number>(8);
   const [showRatingSelector, setShowRatingSelector] = useState(false);
+
+  // Thread dialogs in Modal
+  const [openModalThreadIds, setOpenModalThreadIds] = useState<Set<string>>(new Set());
+  const toggleModalThread = (recId: string) => {
+    setOpenModalThreadIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(recId)) next.delete(recId);
+      else next.add(recId);
+      return next;
+    });
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -1565,7 +1577,24 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                               </div>
                             )}
 
-                            <div className="flex items-center justify-end pt-2 border-t border-slate-800/60">
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
+                              <button
+                                type="button"
+                                onClick={() => toggleModalThread(rec.id)}
+                                className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                                  (rec.replies && rec.replies.length > 0) || openModalThreadIds.has(rec.id)
+                                    ? "bg-purple-500/20 text-purple-300 border border-purple-500/35"
+                                    : "bg-slate-800/60 text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                <MessageSquare className="w-3.5 h-3.5" />
+                                <span>
+                                  {rec.replies && rec.replies.length > 0
+                                    ? `${rec.replies.length} ${rec.replies.length === 1 ? "Antwort" : "Antworten"}`
+                                    : "Antworten"}
+                                </span>
+                              </button>
+
                               <button
                                 type="button"
                                 onClick={() => upvoteRecommendation(rec.id)}
@@ -1579,6 +1608,16 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                 <span>Hilfreich ({rec.upvoterIds.length})</span>
                               </button>
                             </div>
+
+                            {openModalThreadIds.has(rec.id) && (
+                              <RecommendationThread
+                                recommendationId={rec.id}
+                                recAuthorName={rec.userName}
+                                recAuthorId={rec.userId}
+                                replies={rec.replies}
+                                onClose={() => toggleModalThread(rec.id)}
+                              />
+                            )}
                           </div>
                         );
                       })}

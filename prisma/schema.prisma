@@ -20,6 +20,7 @@ model User {
   mediaStatuses   MediaStatus[]
   recommendations Recommendation[]
   upvotes         RecommendationUpvote[]
+  recommendationReplies RecommendationReply[]
   sentFriendships     Friendship[] @relation("UserSentFriendships")
   receivedFriendships Friendship[] @relation("UserReceivedFriendships")
   createdAt       DateTime         @default(now())
@@ -80,8 +81,22 @@ model Recommendation {
   targetGroupIds String?                // JSON string array e.g. '["grp_123"]'
   targetUserIds  String?                // JSON string array e.g. '["usr_abc"]'
   upvotes        RecommendationUpvote[]
+  replies        RecommendationReply[]
   createdAt      DateTime               @default(now())
   updatedAt      DateTime               @updatedAt
+}
+
+model RecommendationReply {
+  id               String         @id @default(cuid())
+  recommendationId String
+  recommendation   Recommendation @relation(fields: [recommendationId], references: [id], onDelete: Cascade)
+  userId           String
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userName         String
+  userImage        String?
+  text             String
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 }
 
 model RecommendationUpvote {

@@ -49,6 +49,17 @@ export interface AppRecommendation {
   targetNames?: string[];
   targetGroupIds?: string[];
   targetUserIds?: string[];
+  replies?: AppRecommendationReply[];
+  createdAt: string;
+}
+
+export interface AppRecommendationReply {
+  id: string;
+  recommendationId: string;
+  userId: string;
+  userName: string;
+  userImage?: string | null;
+  text: string;
   createdAt: string;
 }
 
@@ -93,6 +104,7 @@ interface LocalDbFile {
   recommendations: AppRecommendation[];
   friendships: AppFriendship[];
   friendGroups?: AppFriendGroup[];
+  recommendationReplies?: AppRecommendationReply[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -347,6 +359,9 @@ function readLocalDb(): LocalDbFile {
           },
         ];
         writeLocalDb(parsed);
+      }
+      if (!parsed.recommendationReplies) {
+        parsed.recommendationReplies = [];
       }
       return parsed;
     }
@@ -1514,18 +1529,35 @@ export async function getAllCommunityData(
   }
 
   if (await isPostgresAvailable()) {
-    const [statuses, recs] = await Promise.all([
-      prisma.mediaStatus.findMany({
-        where: allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : undefined,
-        include: { user: true },
-        orderBy: { updatedAt: "desc" },
-      }),
-      prisma.recommendation.findMany({
-        where: allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : undefined,
-        include: { user: true, upvotes: true },
-        orderBy: { createdAt: "desc" },
-      }),
-    ]);
+    let statuses: any[] = [];
+    let recs: any[] = [];
+    try {
+      [statuses, recs] = await Promise.all([
+        prisma.mediaStatus.findMany({
+          where: allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : undefined,
+          include: { user: true },
+          orderBy: { updatedAt: "desc" },
+        }),
+        (prisma as any).recommendation.findMany({
+          where: allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : undefined,
+          include: { user: true, upvotes: true, replies: true },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+    } catch {
+      [statuses, recs] = await Promise.all([
+        prisma.mediaStatus.findMany({
+          where: allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : undefined,
+          include: { user: true },
+          orderBy: { updatedAt: "desc" },
+        }),
+        prisma.recommendation.findMany({
+          where: allowedUserIds ? { userId: { in: Array.from(allowedUserIds) } } : undefined,
+          include: { user: true, upvotes: true },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+    }
 
     const mappedRecs: AppRecommendation[] = recs.map((r: any) => ({
       id: r.id,
@@ -1541,11 +1573,28 @@ export async function getAllCommunityData(
       rating: r.rating,
       comment: r.comment,
       tags: r.tags ? r.tags.split(",").filter(Boolean) : [],
-      upvoterIds: r.upvotes.map((u: any) => u.userId),
+      upvoterIds: r.upvotes ? r.upvotes.map((u: any) => u.userId) : [],
       targetType: r.targetType || "ALL",
       targetNames: parseStringList(r.targetNames),
       targetGroupIds: parseStringList(r.targetGroupIds),
       targetUserIds: parseStringList(r.targetUserIds),
+      replies: Array.isArray(r.replies)
+        ? r.replies
+            .map((rep: any) => ({
+              id: rep.id,
+              recommendationId: rep.recommendationId,
+              userId: rep.userId,
+              userName: rep.userName,
+              userImage: rep.userImage,
+              text: rep.text,
+              createdAt:
+                rep.createdAt instanceof Date ? rep.createdAt.toISOString() : String(rep.createdAt),
+            }))
+            .sort(
+              (a: any, b: any) =>
+                new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+            )
+        : [],
       createdAt: r.createdAt.toISOString(),
     }));
 
@@ -1573,6 +1622,7 @@ export async function getAllCommunityData(
   }
 
   const db = readLocalDb();
+  const allReplies = db.recommendationReplies || [];
   const statuses = allowedUserIds
     ? db.mediaStatuses.filter((s) => allowedUserIds.has(s.userId))
     : db.mediaStatuses;
@@ -1587,6 +1637,12 @@ export async function getAllCommunityData(
       targetNames: parseStringList(r.targetNames),
       targetGroupIds: parseStringList(r.targetGroupIds),
       targetUserIds: parseStringList(r.targetUserIds),
+      replies: allReplies
+        .filter((rep) => rep.recommendationId === r.id)
+        .sort(
+          (a, b) =>
+            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+        ),
     }))
     .filter((r) =>
       isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
@@ -1825,4 +1881,83 @@ export async function toggleRecommendationUpvote(userId: string, recommendationI
     writeLocalDb(db);
     return { upvoted: true };
   }
+}
+
+export async function addRecommendationReply(params: {
+  recommendationId: string;
+  userId: string;
+  userName: string;
+  userImage?: string | null;
+  text: string;
+}): Promise<AppRecommendationReply> {
+  const cleanText = params.text.trim();
+  if (!cleanText) throw new Error("Reply text cannot be empty");
+
+  if (await isPostgresAvailable()) {
+    try {
+      const created = await (prisma as any).recommendationReply.create({
+        data: {
+          recommendationId: params.recommendationId,
+          userId: params.userId,
+          userName: params.userName,
+          userImage: params.userImage || null,
+          text: cleanText,
+        },
+      });
+      return {
+        id: created.id,
+        recommendationId: created.recommendationId,
+        userId: created.userId,
+        userName: created.userName,
+        userImage: created.userImage,
+        text: created.text,
+        createdAt: created.createdAt.toISOString(),
+      };
+    } catch (err) {
+      console.warn("Could not save to recommendationReply table, falling back to local DB:", err);
+    }
+  }
+
+  const db = readLocalDb();
+  if (!db.recommendationReplies) db.recommendationReplies = [];
+  const newReply: AppRecommendationReply = {
+    id: `reply_${Date.now()}`,
+    recommendationId: params.recommendationId,
+    userId: params.userId,
+    userName: params.userName,
+    userImage: params.userImage || null,
+    text: cleanText,
+    createdAt: new Date().toISOString(),
+  };
+  db.recommendationReplies.push(newReply);
+  writeLocalDb(db);
+  return newReply;
+}
+
+export async function deleteRecommendationReply(
+  userId: string,
+  replyId: string
+): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    try {
+      const rep = await (prisma as any).recommendationReply.findUnique({
+        where: { id: replyId },
+      });
+      if (rep && rep.userId === userId) {
+        await (prisma as any).recommendationReply.delete({ where: { id: replyId } });
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const db = readLocalDb();
+  if (db.recommendationReplies) {
+    db.recommendationReplies = db.recommendationReplies.filter(
+      (r) => !(r.id === replyId && r.userId === userId)
+    );
+    writeLocalDb(db);
+  }
+  return true;
 }
