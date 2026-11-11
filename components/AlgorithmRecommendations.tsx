@@ -257,13 +257,25 @@ export function AlgorithmRecommendations() {
                   key={`${lm.mediaType}-${lm.tmdbId}`}
                   className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 flex gap-3 items-center group hover:border-slate-700 transition relative overflow-hidden"
                 >
-                  <div className="w-14 h-20 rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 relative shadow">
+                  <div
+                    onClick={() =>
+                      openRatingModal({
+                        tmdbId: lm.tmdbId,
+                        mediaType: lm.mediaType,
+                        title: lm.title,
+                        posterPath: lm.posterPath,
+                        releaseYear: lm.year,
+                      })
+                    }
+                    className="w-14 h-20 rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 relative shadow cursor-pointer hover:opacity-90 transition group/poster"
+                    title="Klicken für komplette Punkteauswahl (1-10)"
+                  >
                     <Image
                       src={`https://image.tmdb.org/t/p/w185${lm.posterPath}`}
                       alt={lm.title}
                       fill
                       sizes="56px"
-                      className="object-cover"
+                      className="object-cover group-hover/poster:scale-105 transition duration-200"
                     />
                   </div>
 
@@ -281,12 +293,24 @@ export function AlgorithmRecommendations() {
                       </button>
                     </div>
 
-                    <h4 className="text-xs font-bold text-white truncate" title={lm.title}>
+                    <h4
+                      onClick={() =>
+                        openRatingModal({
+                          tmdbId: lm.tmdbId,
+                          mediaType: lm.mediaType,
+                          title: lm.title,
+                          posterPath: lm.posterPath,
+                          releaseYear: lm.year,
+                        })
+                      }
+                      className="text-xs font-bold text-white truncate cursor-pointer hover:text-amber-400 transition"
+                      title={`${lm.title} (Klicken für komplette Note 1-10)`}
+                    >
                       {lm.genreEmoji} {lm.title}
                     </h4>
 
-                    {/* Quick 1-Click Rating Buttons */}
-                    <div className="flex items-center gap-1 pt-0.5">
+                    {/* Quick 1-Click Rating Buttons & Full 1-10 Points Button */}
+                    <div className="flex items-center gap-1 pt-0.5 flex-wrap">
                       <button
                         onClick={() => handleQuickRate(lm, 10)}
                         title="10★ Meisterwerk"
@@ -314,6 +338,22 @@ export function AlgorithmRecommendations() {
                         className="px-1.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500 hover:text-white border border-rose-500/30 text-rose-300 text-[10px] font-extrabold transition"
                       >
                         👎
+                      </button>
+                      <button
+                        onClick={() =>
+                          openRatingModal({
+                            tmdbId: lm.tmdbId,
+                            mediaType: lm.mediaType,
+                            title: lm.title,
+                            posterPath: lm.posterPath,
+                            releaseYear: lm.year,
+                          })
+                        }
+                        title="Komplette Note wählen (1 bis 10 Punkte)"
+                        className="px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500 hover:text-white border border-indigo-500/40 text-indigo-300 text-[10px] font-extrabold transition flex items-center gap-0.5 shadow-sm"
+                      >
+                        <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                        <span>1-10</span>
                       </button>
                     </div>
                   </div>
@@ -388,13 +428,25 @@ export function AlgorithmRecommendations() {
                 key={`${lm.mediaType}-${lm.tmdbId}`}
                 className="bg-slate-900/70 border border-slate-800 rounded-xl p-2.5 flex gap-2.5 items-center group"
               >
-                <div className="w-12 h-16 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0 relative shadow">
+                <div
+                  onClick={() =>
+                    openRatingModal({
+                      tmdbId: lm.tmdbId,
+                      mediaType: lm.mediaType,
+                      title: lm.title,
+                      posterPath: lm.posterPath,
+                      releaseYear: lm.year,
+                    })
+                  }
+                  className="w-12 h-16 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0 relative shadow cursor-pointer hover:opacity-90 transition group/poster"
+                  title="Klicken für komplette Note (1-10)"
+                >
                   <Image
                     src={`https://image.tmdb.org/t/p/w185${lm.posterPath}`}
                     alt={lm.title}
                     fill
                     sizes="48px"
-                    className="object-cover"
+                    className="object-cover group-hover/poster:scale-105 transition duration-200"
                   />
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
@@ -410,8 +462,22 @@ export function AlgorithmRecommendations() {
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                  <h5 className="text-xs font-bold text-white truncate">{lm.genreEmoji} {lm.title}</h5>
-                  <div className="flex items-center gap-1 pt-0.5">
+                  <h5
+                    onClick={() =>
+                      openRatingModal({
+                        tmdbId: lm.tmdbId,
+                        mediaType: lm.mediaType,
+                        title: lm.title,
+                        posterPath: lm.posterPath,
+                        releaseYear: lm.year,
+                      })
+                    }
+                    className="text-xs font-bold text-white truncate cursor-pointer hover:text-amber-400 transition"
+                    title={`${lm.title} (Klicken für 1-10)`}
+                  >
+                    {lm.genreEmoji} {lm.title}
+                  </h5>
+                  <div className="flex items-center gap-1 pt-0.5 flex-wrap">
                     <button
                       onClick={() => handleQuickRate(lm, 10)}
                       className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-black text-emerald-300 text-[10px] font-bold"
@@ -435,6 +501,22 @@ export function AlgorithmRecommendations() {
                       className="px-1 py-0.5 rounded bg-rose-500/15 hover:bg-rose-500 text-rose-300 text-[10px]"
                     >
                       👎
+                    </button>
+                    <button
+                      onClick={() =>
+                        openRatingModal({
+                          tmdbId: lm.tmdbId,
+                          mediaType: lm.mediaType,
+                          title: lm.title,
+                          posterPath: lm.posterPath,
+                          releaseYear: lm.year,
+                        })
+                      }
+                      title="Komplette Note wählen (1-10)"
+                      className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500 hover:text-white border border-indigo-500/40 text-indigo-300 text-[10px] font-bold flex items-center gap-0.5 shadow-sm"
+                    >
+                      <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                      <span>1-10</span>
                     </button>
                   </div>
                 </div>
