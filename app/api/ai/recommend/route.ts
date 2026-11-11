@@ -8,15 +8,14 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
-// Cascade: Try gemini-3.8-flash first as requested, with automatic instant fallback across modern Flash pools
+// Ordered by availability, low latency and throughput (fastest, high-capacity models first)
 const GEMINI_MODELS = [
-  "gemini-3.8-flash",
-  "gemini-3.7-flash",
-  "gemini-3.6-flash",
-  "gemini-3.5-flash",
+  "gemini-3.1-flash-lite",
   "gemini-3.5-flash-lite",
-  "gemini-3-flash-preview",
+  "gemini-3.5-flash",
   "gemini-flash-lite-latest",
+  "gemini-3.6-flash",
+  "gemini-3.8-flash",
 ];
 
 export interface AiPersonReason {
@@ -114,6 +113,7 @@ async function callGeminiWithFallback(systemAndUserPrompt: string): Promise<{
       const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(9000), // Max 9s per model to prevent gateway timeouts
         body: JSON.stringify({
           contents: [
             {
@@ -137,8 +137,12 @@ async function callGeminiWithFallback(systemAndUserPrompt: string): Promise<{
         const errJson = await res.json().catch(() => null);
         const errMsg = errJson?.error?.message || `HTTP ${res.status}`;
         lastError = `${model}: ${errMsg}`;
-        // If 503 (temporary high demand spike), give a tiny 300ms pause before trying next capacity pool
-        if (res.status === 503) {
+        // If 429 (rate limit) or 503 (high demand), short pause to prevent rapid rate exhaustion
+        if (res.status === 429) {
+          console.warn(`[Gemini API] 429 Quota/RateLimit on ${model}: ${errMsg}`);
+          await new Promise((r) => setTimeout(r, 600));
+        } else if (res.status === 503) {
+          console.warn(`[Gemini API] 503 High Demand on ${model}: ${errMsg}`);
           await new Promise((r) => setTimeout(r, 300));
         }
       }
@@ -147,7 +151,22 @@ async function callGeminiWithFallback(systemAndUserPrompt: string): Promise<{
     }
   }
 
-  if (lastError.includes("503") || lastError.includes("high demand") || lastError.includes("overloaded")) {
+  if (
+    lastError.includes("429") ||
+    lastError.includes("RESOURCE_EXHAUSTED") ||
+    lastError.includes("Quota") ||
+    lastError.includes("rate limit")
+  ) {
+    throw new Error(
+      "Das Gemini API-Anfragelimit wurde kurzzeitig erreicht (429 Too Many Requests). Bitte warte ca. 30 bis 60 Sekunden, bevor du eine neue Anfrage startest."
+    );
+  }
+
+  if (
+    lastError.includes("503") ||
+    lastError.includes("high demand") ||
+    lastError.includes("overloaded")
+  ) {
     throw new Error(
       "Die Google Gemini Server erleben aktuell eine kurzzeitige Lastspitze (503 Service Unavailable). Bitte versuche es in wenigen Sekunden erneut."
     );

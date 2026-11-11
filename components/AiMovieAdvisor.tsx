@@ -170,9 +170,21 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok || data.error) {
-        setError(data.error || "Fehler bei der KI-Anfrage.");
+      let data: any = null;
+      try {
+        const text = await res.text();
+        data = text ? JSON.parse(text) : null;
+      } catch {
+        data = null;
+      }
+
+      if (!res.ok || !data || data.error) {
+        setError(
+          data?.error ||
+            (res.status === 504 || res.status === 502
+              ? "Die KI-Anfrage hat zu lange gedauert (Gateway Timeout). Bitte versuche es noch einmal."
+              : `Fehler bei der KI-Anfrage (HTTP ${res.status}). Bitte versuche es kurz erneut.`)
+        );
       } else {
         const watchedSet = new Set(userWatchedTmdbIds);
         const filteredPicks = (data.picks || []).filter(
@@ -182,10 +194,14 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
         setResultSummary(data.aiSummary);
         setParsedIntent(data.parsedIntent);
         setPicks(filteredPicks);
-        setUsedModel(data.usedModel || "gemini-3.8-flash");
+        setUsedModel(data.usedModel || "gemini-3.1-flash-lite");
       }
-    } catch {
-      setError("Netzwerkfehler bei der Verbindung zum KI-Filmberater.");
+    } catch (err: any) {
+      setError(
+        err?.message?.includes("aborted")
+          ? "Die Verbindung zum Server wurde abgebrochen. Bitte versuche es erneut."
+          : "Netzwerkfehler bei der Verbindung zum KI-Filmberater. Bitte überprüfe deine Verbindung oder versuche es gleich erneut."
+      );
     } finally {
       setLoading(false);
     }
