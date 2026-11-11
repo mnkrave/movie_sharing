@@ -8,8 +8,9 @@ const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
-// Ordered by availability, low latency and throughput (modern 3.5+ generation)
+// Ordered by availability, low latency and throughput (fastest, most reliable first)
 const GEMINI_MODELS = [
+  "gemini-3.1-flash-lite",
   "gemini-3.5-flash-lite",
   "gemini-3.5-flash",
   "gemini-3.6-flash",

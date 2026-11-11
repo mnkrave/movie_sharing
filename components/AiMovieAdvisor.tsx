@@ -194,7 +194,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
         setResultSummary(data.aiSummary);
         setParsedIntent(data.parsedIntent);
         setPicks(filteredPicks);
-        setUsedModel(data.usedModel || "gemini-3.5-flash");
+        setUsedModel(data.usedModel || "gemini-3.1-flash-lite");
       }
     } catch (err: any) {
       setError(
