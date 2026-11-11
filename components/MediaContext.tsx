@@ -159,13 +159,96 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Normalize user aliases in friendGroups whenever session user name is loaded
+  useEffect(() => {
+    const currentName = session?.user?.name;
+    if (!currentName) return;
+
+    setFriendGroupsState((prev) => {
+      let changed = false;
+      const updated = prev.map((g) => {
+        const normalized = g.memberNames.map((m) => {
+          const a = m.toLowerCase().trim();
+          const b = currentName.toLowerCase().trim();
+          const aParts = a.split(/\s+/);
+          const bParts = b.split(/\s+/);
+          const isSame =
+            a === b ||
+            (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) ||
+            a.startsWith(b) ||
+            b.startsWith(a);
+
+          if (isSame && m !== currentName) {
+            changed = true;
+            return currentName;
+          }
+          return m;
+        });
+
+        // Deduplicate
+        const deduped: string[] = [];
+        for (const n of normalized) {
+          if (!deduped.some((d) => d.toLowerCase() === n.toLowerCase())) {
+            deduped.push(n);
+          } else {
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          return { ...g, memberNames: deduped };
+        }
+        return g;
+      });
+
+      if (changed) {
+        try {
+          localStorage.setItem("cinecircle_friend_groups", JSON.stringify(updated));
+        } catch {
+          // ignore
+        }
+        return updated;
+      }
+      return prev;
+    });
+  }, [session?.user?.name]);
+
+  const sanitizeMemberNames = (names: string[]): string[] => {
+    const currentName = session?.user?.name;
+    const clean: string[] = [];
+    for (const raw of names) {
+      const trimmed = (raw || "").trim().replace(/^@/, "");
+      if (!trimmed) continue;
+      let finalName = trimmed;
+      if (currentName) {
+        const a = trimmed.toLowerCase();
+        const b = currentName.toLowerCase();
+        const aParts = a.split(/\s+/);
+        const bParts = b.split(/\s+/);
+        if (
+          a === b ||
+          (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) ||
+          a.startsWith(b) ||
+          b.startsWith(a)
+        ) {
+          finalName = currentName;
+        }
+      }
+      if (!clean.some((existing) => existing.toLowerCase() === finalName.toLowerCase())) {
+        clean.push(finalName);
+      }
+    }
+    return clean;
+  };
+
   const addFriendGroup = (name: string, emoji: string, memberNames: string[]) => {
-    if (!name.trim() || memberNames.length === 0) return;
+    const cleanMembers = sanitizeMemberNames(memberNames);
+    if (!name.trim() || cleanMembers.length === 0) return;
     const newGroup: FriendGroup = {
       id: `grp_${Date.now()}`,
       name: name.trim(),
       emoji: emoji || "🍿",
-      memberNames,
+      memberNames: cleanMembers,
     };
     const updated = [...friendGroups, newGroup];
     setFriendGroupsState(updated);
@@ -177,10 +260,11 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   };
 
   const updateFriendGroup = (id: string, name: string, emoji: string, memberNames: string[]) => {
-    if (!name.trim() || memberNames.length === 0) return;
+    const cleanMembers = sanitizeMemberNames(memberNames);
+    if (!name.trim() || cleanMembers.length === 0) return;
     const updated = friendGroups.map((g) =>
       g.id === id
-        ? { ...g, name: name.trim(), emoji: emoji || "🍿", memberNames }
+        ? { ...g, name: name.trim(), emoji: emoji || "🍿", memberNames: cleanMembers }
         : g
     );
     setFriendGroupsState(updated);

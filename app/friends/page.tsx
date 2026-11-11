@@ -42,6 +42,19 @@ export default function FriendsPage() {
 
   const myName = session?.user?.name || "Ich";
 
+  // Check if a name is an alias of the current user (e.g. "Lukas" vs "Lukas Reinle")
+  const isMe = (name?: string | null): boolean => {
+    if (!name) return false;
+    const a = name.toLowerCase().trim().replace(/^@/, "");
+    const b = (session?.user?.name || myName).toLowerCase().trim().replace(/^@/, "");
+    if (!a || !b) return false;
+    if (a === b) return true;
+    const aParts = a.split(/\s+/);
+    const bParts = b.split(/\s+/);
+    if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) return true;
+    return a.startsWith(b) || b.startsWith(a);
+  };
+
   // CineCrews state
   const [showGroupCreator, setShowGroupCreator] = useState(false);
   const [groupName, setGroupName] = useState("");
@@ -157,17 +170,29 @@ export default function FriendsPage() {
   };
 
   const toggleMember = (name: string) => {
-    setSelectedMembers((prev) =>
-      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
-    );
+    const isTargetMe = isMe(name);
+    const canonicalSelf = session?.user?.name || myName;
+    setSelectedMembers((prev) => {
+      if (isTargetMe) {
+        const hasMe = prev.some((m) => isMe(m));
+        return hasMe ? prev.filter((m) => !isMe(m)) : [...prev, canonicalSelf];
+      }
+      return prev.some((m) => m.toLowerCase() === name.toLowerCase())
+        ? prev.filter((m) => m.toLowerCase() !== name.toLowerCase())
+        : [...prev, name];
+    });
   };
 
   const handleAddNewCustomMember = () => {
     const trimmed = newCustomMemberInput.trim().replace(/^@/, "");
     if (!trimmed) return;
-    if (!selectedMembers.includes(trimmed)) {
-      setSelectedMembers((prev) => [...prev, trimmed]);
-    }
+    const isTargetMe = isMe(trimmed);
+    const canonical = isTargetMe && session?.user?.name ? session.user.name : trimmed;
+    setSelectedMembers((prev) => {
+      if (isTargetMe && prev.some((m) => isMe(m))) return prev;
+      if (prev.some((m) => m.toLowerCase() === canonical.toLowerCase())) return prev;
+      return [...prev, canonical];
+    });
     setNewCustomMemberInput("");
   };
 
@@ -189,7 +214,21 @@ export default function FriendsPage() {
     setEditingGroup(grp);
     setEditGroupName(grp.name);
     setEditGroupEmoji(grp.emoji || "🛋️");
-    setEditSelectedMembers([...grp.memberNames]);
+    const currentUserName = session?.user?.name || myName;
+    const normalized: string[] = [];
+    for (const m of grp.memberNames) {
+      const canonical = isMe(m) && currentUserName ? currentUserName : m;
+      if (
+        !normalized.some(
+          (existing) =>
+            (isMe(existing) && isMe(canonical)) ||
+            existing.toLowerCase() === canonical.toLowerCase()
+        )
+      ) {
+        normalized.push(canonical);
+      }
+    }
+    setEditSelectedMembers(normalized);
     setEditCustomMemberInput("");
   };
 
@@ -199,17 +238,30 @@ export default function FriendsPage() {
   };
 
   const toggleEditMember = (name: string) => {
-    setEditSelectedMembers((prev) =>
-      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
-    );
+    const isTargetMe = isMe(name);
+    const currentUserName = session?.user?.name || myName;
+    setEditSelectedMembers((prev) => {
+      if (isTargetMe) {
+        const hasMe = prev.some((m) => isMe(m));
+        return hasMe ? prev.filter((m) => !isMe(m)) : [...prev, currentUserName];
+      }
+      return prev.some((m) => m.toLowerCase() === name.toLowerCase())
+        ? prev.filter((m) => m.toLowerCase() !== name.toLowerCase())
+        : [...prev, name];
+    });
   };
 
   const handleAddEditCustomMember = () => {
     const trimmed = editCustomMemberInput.trim().replace(/^@/, "");
     if (!trimmed) return;
-    if (!editSelectedMembers.includes(trimmed)) {
-      setEditSelectedMembers((prev) => [...prev, trimmed]);
-    }
+    const isTargetMe = isMe(trimmed);
+    const currentUserName = session?.user?.name || myName;
+    const canonical = isTargetMe && currentUserName ? currentUserName : trimmed;
+    setEditSelectedMembers((prev) => {
+      if (isTargetMe && prev.some((m) => isMe(m))) return prev;
+      if (prev.some((m) => m.toLowerCase() === canonical.toLowerCase())) return prev;
+      return [...prev, canonical];
+    });
     setEditCustomMemberInput("");
   };
 
@@ -575,22 +627,30 @@ export default function FriendsPage() {
               {/* Selected chips */}
               {selectedMembers.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800 mb-2.5">
-                  {selectedMembers.map((m) => (
-                    <span
-                      key={m}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold"
-                    >
-                      <span>@{m}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleMember(m)}
-                        className="hover:text-rose-400 transition"
-                        title="Entfernen"
+                  {selectedMembers.map((m) => {
+                    const isUser = isMe(m);
+                    const displayLabel = isUser ? `${session?.user?.name || m} (Du)` : m;
+                    return (
+                      <span
+                        key={m}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg text-xs font-bold border ${
+                          isUser
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                            : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                        }`}
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
+                        <span>@{displayLabel}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleMember(m)}
+                          className="hover:text-rose-400 transition"
+                          title="Entfernen"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
                 </div>
               )}
 
@@ -601,37 +661,41 @@ export default function FriendsPage() {
                     type="button"
                     onClick={() => toggleMember(myName)}
                     className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
-                      selectedMembers.includes(myName)
-                        ? "bg-emerald-500 text-black border-emerald-400"
+                      selectedMembers.some((m) => isMe(m))
+                        ? "bg-emerald-500 text-black border-emerald-400 font-extrabold shadow-sm"
                         : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
                     }`}
                   >
                     <Check
                       className={`w-3.5 h-3.5 ${
-                        selectedMembers.includes(myName) ? "opacity-100" : "opacity-0"
+                        selectedMembers.some((m) => isMe(m)) ? "opacity-100" : "opacity-0"
                       }`}
                     />
-                    <span>@{myName} (Du)</span>
+                    <span>@{session?.user?.name || myName} (Du)</span>
                   </button>
                 )}
-                {myFriends.map((f) => {
-                  const active = selectedMembers.includes(f.name);
-                  return (
-                    <button
-                      key={f.id}
-                      type="button"
-                      onClick={() => toggleMember(f.name)}
-                      className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
-                        active
-                          ? "bg-emerald-500 text-black border-emerald-400"
-                          : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
-                      }`}
-                    >
-                      <Check className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-0"}`} />
-                      <span>@{f.name}</span>
-                    </button>
-                  );
-                })}
+                {myFriends
+                  .filter((f) => !isMe(f.name))
+                  .map((f) => {
+                    const active = selectedMembers.some(
+                      (m) => m.toLowerCase() === f.name.toLowerCase()
+                    );
+                    return (
+                      <button
+                        key={f.id}
+                        type="button"
+                        onClick={() => toggleMember(f.name)}
+                        className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
+                          active
+                            ? "bg-emerald-500 text-black border-emerald-400 font-extrabold shadow-sm"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        <Check className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-0"}`} />
+                        <span>@{f.name}</span>
+                      </button>
+                    );
+                  })}
               </div>
 
               {/* Add custom member input */}
@@ -731,14 +795,21 @@ export default function FriendsPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
-                  {grp.memberNames.map((mName) => (
-                    <span
-                      key={mName}
-                      className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 font-semibold"
-                    >
-                      @{mName}
-                    </span>
-                  ))}
+                  {grp.memberNames.map((mName) => {
+                    const isCurrentUser = isMe(mName);
+                    return (
+                      <span
+                        key={mName}
+                        className={`px-2 py-0.5 rounded-lg text-xs font-semibold ${
+                          isCurrentUser
+                            ? "bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold"
+                            : "bg-slate-900 border border-slate-800 text-slate-200"
+                        }`}
+                      >
+                        @{isCurrentUser ? `${session?.user?.name || mName} (Du)` : mName}
+                      </span>
+                    );
+                  })}
                 </div>
 
                 <Link
@@ -840,22 +911,30 @@ export default function FriendsPage() {
 
                 {/* Selected Member Chips */}
                 <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 min-h-[44px]">
-                  {editSelectedMembers.map((m) => (
-                    <span
-                      key={m}
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold"
-                    >
-                      <span>@{m}</span>
-                      <button
-                        type="button"
-                        onClick={() => toggleEditMember(m)}
-                        className="hover:text-rose-400 transition"
-                        title="Entfernen"
+                  {editSelectedMembers.map((m) => {
+                    const isUser = isMe(m);
+                    const displayLabel = isUser ? `${session?.user?.name || m} (Du)` : m;
+                    return (
+                      <span
+                        key={m}
+                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                          isUser
+                            ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                            : "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                        }`}
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
+                        <span>@{displayLabel}</span>
+                        <button
+                          type="button"
+                          onClick={() => toggleEditMember(m)}
+                          className="hover:text-rose-400 transition"
+                          title="Entfernen"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    );
+                  })}
                   {editSelectedMembers.length === 0 && (
                     <span className="text-xs text-slate-500 italic py-1">
                       Noch keine Mitglieder ausgewählt.
@@ -869,44 +948,48 @@ export default function FriendsPage() {
                     Aus deinen Kontakten hinzufügen / entfernen:
                   </span>
                   <div className="flex flex-wrap gap-1.5">
-                    {/* Self option if not in list */}
+                    {/* Self option */}
                     {myName && (
                       <button
                         type="button"
                         onClick={() => toggleEditMember(myName)}
                         className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${
-                          editSelectedMembers.includes(myName)
-                            ? "bg-emerald-500 text-black border-emerald-400"
+                          editSelectedMembers.some((m) => isMe(m))
+                            ? "bg-emerald-500 text-black border-emerald-400 font-extrabold shadow-sm"
                             : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
                         }`}
                       >
                         <Check
                           className={`w-3 h-3 ${
-                            editSelectedMembers.includes(myName) ? "opacity-100" : "opacity-0"
+                            editSelectedMembers.some((m) => isMe(m)) ? "opacity-100" : "opacity-0"
                           }`}
                         />
-                        <span>@{myName} (Du)</span>
+                        <span>@{session?.user?.name || myName} (Du)</span>
                       </button>
                     )}
 
-                    {myFriends.map((f) => {
-                      const active = editSelectedMembers.includes(f.name);
-                      return (
-                        <button
-                          key={f.id}
-                          type="button"
-                          onClick={() => toggleEditMember(f.name)}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${
-                            active
-                              ? "bg-emerald-500 text-black border-emerald-400"
-                              : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
-                          }`}
-                        >
-                          <Check className={`w-3 h-3 ${active ? "opacity-100" : "opacity-0"}`} />
-                          <span>@{f.name}</span>
-                        </button>
-                      );
-                    })}
+                    {myFriends
+                      .filter((f) => !isMe(f.name))
+                      .map((f) => {
+                        const active = editSelectedMembers.some(
+                          (m) => m.toLowerCase() === f.name.toLowerCase()
+                        );
+                        return (
+                          <button
+                            key={f.id}
+                            type="button"
+                            onClick={() => toggleEditMember(f.name)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${
+                              active
+                                ? "bg-emerald-500 text-black border-emerald-400 font-extrabold shadow-sm"
+                                : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                            }`}
+                          >
+                            <Check className={`w-3 h-3 ${active ? "opacity-100" : "opacity-0"}`} />
+                            <span>@{f.name}</span>
+                          </button>
+                        );
+                      })}
                   </div>
                 </div>
 
