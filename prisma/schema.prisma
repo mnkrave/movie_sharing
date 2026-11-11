@@ -90,3 +90,14 @@ model RecommendationUpvote {
 
   @@unique([userId, recommendationId])
 }
+
+model FriendGroup {
+  id          String   @id @default(cuid())
+  name        String
+  emoji       String   @default("🛋️")
+  ownerId     String
+  ownerName   String?
+  memberNames String   // JSON array of strings e.g. '["Lukas Reinle", "Birgit Reinle", "Ralf Reinle"]'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

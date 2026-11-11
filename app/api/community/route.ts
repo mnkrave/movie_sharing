@@ -14,10 +14,12 @@ import {
   addRecommendation,
   toggleRecommendationUpvote,
   updateUserSubscriptions,
-  updateUserFriendGroups,
-  getUserFriendGroups,
   updateUserImage,
   findUserByEmail,
+  getUserFriendGroups,
+  saveFriendGroup,
+  deleteFriendGroup,
+  syncUserFriendGroups,
 } from "@/lib/store";
 
 export async function GET() {
@@ -29,13 +31,15 @@ export async function GET() {
     userId = dbUser?.id || (session.user as any)?.id;
   }
 
+  const currentUserName = session?.user?.name || undefined;
+
   const [community, friends, friendRequests, friendGroups] = await Promise.all([
     getAllCommunityData(userId),
     getAllFriendsWithStats(userId),
     userId
       ? getUserFriendRequests(userId)
       : Promise.resolve({ pendingReceived: [], pendingSent: [] }),
-    userId ? getUserFriendGroups(userId) : Promise.resolve([]),
+    userId ? getUserFriendGroups(userId, currentUserName) : Promise.resolve([]),
   ]);
 
   return NextResponse.json({
@@ -130,10 +134,17 @@ export async function POST(req: Request) {
         Array.isArray(body.subscriptions) ? body.subscriptions : []
       );
     } else if (action === "friend_groups") {
-      await updateUserFriendGroups(
+      await syncUserFriendGroups(
         userId,
+        userName,
         Array.isArray(body.friendGroups) ? body.friendGroups : []
       );
+    } else if (action === "save_friend_group") {
+      if (body.group) {
+        await saveFriendGroup(userId, userName, body.group);
+      }
+    } else if (action === "delete_friend_group") {
+      await deleteFriendGroup(userId, userName, body.groupId);
     } else if (action === "avatar" || action === "profile_image") {
       await updateUserImage(userId, body.image ?? null);
     }
@@ -142,7 +153,7 @@ export async function POST(req: Request) {
       getAllCommunityData(userId),
       getAllFriendsWithStats(userId),
       getUserFriendRequests(userId),
-      getUserFriendGroups(userId),
+      getUserFriendGroups(userId, userName),
     ]);
 
     return NextResponse.json({

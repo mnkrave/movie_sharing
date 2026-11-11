@@ -268,16 +268,21 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    syncGroupsToDb(updated);
+    if (session?.user) {
+      fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_friend_group", group: newGroup }),
+      }).catch(console.error);
+    }
   };
 
   const updateFriendGroup = (id: string, name: string, emoji: string, memberNames: string[]) => {
     const cleanMembers = sanitizeMemberNames(memberNames);
     if (!name.trim() || cleanMembers.length === 0) return;
+    const updatedGroup = { id, name: name.trim(), emoji: emoji || "🍿", memberNames: cleanMembers };
     const updated = friendGroups.map((g) =>
-      g.id === id
-        ? { ...g, name: name.trim(), emoji: emoji || "🍿", memberNames: cleanMembers }
-        : g
+      g.id === id ? { ...g, ...updatedGroup } : g
     );
     setFriendGroupsState(updated);
     try {
@@ -285,7 +290,13 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    syncGroupsToDb(updated);
+    if (session?.user) {
+      fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_friend_group", group: updatedGroup }),
+      }).catch(console.error);
+    }
   };
 
   const deleteFriendGroup = (id: string) => {
@@ -296,7 +307,13 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
-    syncGroupsToDb(updated);
+    if (session?.user) {
+      fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_friend_group", groupId: id }),
+      }).catch(console.error);
+    }
   };
 
   const setOnlyMySubs = (val: boolean) => {

@@ -48,6 +48,31 @@ export interface AppRecommendation {
   createdAt: string;
 }
 
+export interface AppFriendGroup {
+  id: string;
+  name: string;
+  emoji: string;
+  ownerId?: string;
+  ownerName?: string | null;
+  memberNames: string[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export function isSamePerson(nameA?: string | null, nameB?: string | null): boolean {
+  if (!nameA || !nameB) return false;
+  const a = nameA.toLowerCase().trim().replace(/^@/, "");
+  const b = nameB.toLowerCase().trim().replace(/^@/, "");
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const aParts = a.split(/\s+/);
+  const bParts = b.split(/\s+/);
+  if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) {
+    return true;
+  }
+  return a.startsWith(b) || b.startsWith(a);
+}
+
 export interface AppFriendship {
   id: string;
   userId: string;
@@ -63,6 +88,7 @@ interface LocalDbFile {
   mediaStatuses: AppMediaStatus[];
   recommendations: AppRecommendation[];
   friendships: AppFriendship[];
+  friendGroups?: AppFriendGroup[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -71,6 +97,7 @@ function getSeedLocalDb(): LocalDbFile {
   const defaultPass = bcrypt.hashSync("freunde123", 10);
   const now = new Date().toISOString();
   return {
+    friendGroups: [],
     users: [
       {
         id: "user_lukas",
@@ -527,36 +554,278 @@ export async function updateUserSubscriptions(userId: string, subscriptions: str
   return subscriptions;
 }
 
-export async function updateUserFriendGroups(
-  userId: string,
-  friendGroups: { id: string; name: string; emoji: string; memberNames: string[] }[]
-): Promise<{ id: string; name: string; emoji: string; memberNames: string[] }[]> {
-  if (await isPostgresAvailable()) {
-    await prisma.user.update({
-      where: { id: userId },
-      data: { friendGroups: JSON.stringify(friendGroups) },
-    });
-    return friendGroups;
+export function parseMemberNames(val: any): string[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.map((s) => String(s).trim().replace(/^@/, "")).filter(Boolean);
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      if (Array.isArray(parsed)) {
+        return parsed.map((s) => String(s).trim().replace(/^@/, "")).filter(Boolean);
+      }
+    } catch {
+      // ignore
+    }
+    return val.split(",").map((s) => s.trim().replace(/^@/, "")).filter(Boolean);
   }
-  const db = readLocalDb();
-  const u = db.users.find((x) => x.id === userId);
-  if (u) {
-    u.friendGroups = friendGroups;
-    writeLocalDb(db);
-  }
-  return friendGroups;
+  return [];
 }
 
 export async function getUserFriendGroups(
-  userId: string
-): Promise<{ id: string; name: string; emoji: string; memberNames: string[] }[]> {
-  if (await isPostgresAvailable()) {
-    const u = await prisma.user.findUnique({ where: { id: userId } });
-    return parseFriendGroups(u?.friendGroups);
+  userId: string,
+  userName?: string
+): Promise<AppFriendGroup[]> {
+  let targetName = userName;
+  if (!targetName) {
+    const u = await findUserById(userId);
+    targetName = u?.name;
   }
+
+  const belongs = (grp: AppFriendGroup) => {
+    if (grp.ownerId && grp.ownerId === userId) return true;
+    if (targetName && grp.memberNames.some((m) => isSamePerson(m, targetName))) return true;
+    return false;
+  };
+
+  if (await isPostgresAvailable()) {
+    try {
+      // 1. Try Prisma FriendGroup table (global shared groups)
+      const allDbGroups = await (prisma as any).friendGroup.findMany({
+        orderBy: { updatedAt: "desc" },
+      });
+      const mapped: AppFriendGroup[] = allDbGroups.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        emoji: g.emoji || "🛋️",
+        ownerId: g.ownerId,
+        ownerName: g.ownerName,
+        memberNames: parseMemberNames(g.memberNames),
+        createdAt: g.createdAt?.toISOString?.() || g.createdAt,
+        updatedAt: g.updatedAt?.toISOString?.() || g.updatedAt,
+      }));
+
+      const userGroups = mapped.filter(belongs);
+
+      // 2. Also check User.friendGroups on this user and migrate if any are missing
+      const userRecord = await prisma.user.findUnique({ where: { id: userId } });
+      const legacy = parseFriendGroups(userRecord?.friendGroups);
+      for (const leg of legacy) {
+        if (!mapped.some((m) => m.id === leg.id || (m.name.toLowerCase() === leg.name.toLowerCase() && m.ownerId === userId))) {
+          try {
+            const created = await (prisma as any).friendGroup.create({
+              data: {
+                id: leg.id.startsWith("grp_") ? leg.id : `grp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                name: leg.name,
+                emoji: leg.emoji || "🛋️",
+                ownerId: userId,
+                ownerName: targetName || "Benutzer",
+                memberNames: JSON.stringify(leg.memberNames),
+              },
+            });
+            userGroups.push({
+              id: created.id,
+              name: created.name,
+              emoji: created.emoji,
+              ownerId: created.ownerId,
+              ownerName: created.ownerName,
+              memberNames: parseMemberNames(created.memberNames),
+            });
+          } catch {
+            // ignore
+          }
+        }
+      }
+
+      return userGroups;
+    } catch (err) {
+      console.warn("FriendGroup table query failed, falling back to all User.friendGroups:", err);
+      // Fallback: check all users' friendGroups column
+      const allUsers = await prisma.user.findMany({ select: { id: true, name: true, friendGroups: true } });
+      const collected: AppFriendGroup[] = [];
+      for (const u of allUsers) {
+        const grps = parseFriendGroups(u.friendGroups);
+        for (const g of grps) {
+          const withOwner: AppFriendGroup = {
+            ...g,
+            ownerId: (g as any).ownerId || u.id,
+            ownerName: (g as any).ownerName || u.name,
+          };
+          if (belongs(withOwner) && !collected.some((c) => c.id === withOwner.id)) {
+            collected.push(withOwner);
+          }
+        }
+      }
+      return collected;
+    }
+  }
+
+  // Local DB fallback
   const db = readLocalDb();
-  const u = db.users.find((x) => x.id === userId);
-  return parseFriendGroups(u?.friendGroups);
+  if (!db.friendGroups) db.friendGroups = [];
+
+  // Migrate legacy users[].friendGroups to db.friendGroups if needed
+  for (const u of db.users) {
+    if (u.friendGroups && Array.isArray(u.friendGroups)) {
+      for (const g of u.friendGroups) {
+        if (!db.friendGroups.some((existing) => existing.id === g.id)) {
+          db.friendGroups.push({
+            ...g,
+            ownerId: (g as any).ownerId || u.id,
+            ownerName: (g as any).ownerName || u.name,
+          });
+        }
+      }
+    }
+  }
+
+  return db.friendGroups.filter(belongs);
+}
+
+export async function saveFriendGroup(
+  userId: string,
+  userName: string,
+  groupData: { id?: string; name: string; emoji: string; memberNames: string[] }
+): Promise<AppFriendGroup> {
+  const groupId = groupData.id && groupData.id.startsWith("grp_") ? groupData.id : `grp_${Date.now()}`;
+  const cleanMembers = groupData.memberNames.map((s) => s.trim().replace(/^@/, "")).filter(Boolean);
+
+  if (!cleanMembers.some((m) => isSamePerson(m, userName))) {
+    cleanMembers.unshift(userName);
+  }
+
+  const groupObj: AppFriendGroup = {
+    id: groupId,
+    name: groupData.name.trim(),
+    emoji: groupData.emoji || "🛋️",
+    ownerId: userId,
+    ownerName: userName,
+    memberNames: cleanMembers,
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (await isPostgresAvailable()) {
+    try {
+      const existing = await (prisma as any).friendGroup.findUnique({ where: { id: groupId } });
+      if (existing) {
+        await (prisma as any).friendGroup.update({
+          where: { id: groupId },
+          data: {
+            name: groupObj.name,
+            emoji: groupObj.emoji,
+            memberNames: JSON.stringify(groupObj.memberNames),
+          },
+        });
+      } else {
+        await (prisma as any).friendGroup.create({
+          data: {
+            id: groupId,
+            name: groupObj.name,
+            emoji: groupObj.emoji,
+            ownerId: userId,
+            ownerName: userName,
+            memberNames: JSON.stringify(groupObj.memberNames),
+          },
+        });
+      }
+    } catch (err) {
+      console.warn("Could not save to FriendGroup table, saving to User.friendGroups:", err);
+      const u = await prisma.user.findUnique({ where: { id: userId } });
+      const current = parseFriendGroups(u?.friendGroups);
+      const next = current.some((g) => g.id === groupId)
+        ? current.map((g) => (g.id === groupId ? groupObj : g))
+        : [...current, groupObj];
+      await prisma.user.update({
+        where: { id: userId },
+        data: { friendGroups: JSON.stringify(next) },
+      });
+    }
+    return groupObj;
+  }
+
+  const db = readLocalDb();
+  if (!db.friendGroups) db.friendGroups = [];
+  const idx = db.friendGroups.findIndex((g) => g.id === groupId);
+  if (idx !== -1) {
+    db.friendGroups[idx] = { ...db.friendGroups[idx], ...groupObj };
+  } else {
+    db.friendGroups.push(groupObj);
+  }
+  writeLocalDb(db);
+  return groupObj;
+}
+
+export async function deleteFriendGroup(
+  userId: string,
+  userName: string,
+  groupId: string
+): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    try {
+      const grp = await (prisma as any).friendGroup.findUnique({ where: { id: groupId } });
+      if (grp) {
+        if (grp.ownerId === userId) {
+          await (prisma as any).friendGroup.delete({ where: { id: groupId } });
+        } else {
+          // If a member who is not the owner leaves/deletes
+          const currentMembers = parseMemberNames(grp.memberNames);
+          const nextMembers = currentMembers.filter((m) => !isSamePerson(m, userName));
+          if (nextMembers.length === 0) {
+            await (prisma as any).friendGroup.delete({ where: { id: groupId } });
+          } else {
+            await (prisma as any).friendGroup.update({
+              where: { id: groupId },
+              data: { memberNames: JSON.stringify(nextMembers) },
+            });
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    // Also remove from user's friendGroups if present
+    try {
+      const u = await prisma.user.findUnique({ where: { id: userId } });
+      const current = parseFriendGroups(u?.friendGroups);
+      if (current.some((g) => g.id === groupId)) {
+        await prisma.user.update({
+          where: { id: userId },
+          data: { friendGroups: JSON.stringify(current.filter((g) => g.id !== groupId)) },
+        });
+      }
+    } catch {
+      // ignore
+    }
+    return true;
+  }
+
+  const db = readLocalDb();
+  if (db.friendGroups) {
+    const grp = db.friendGroups.find((g) => g.id === groupId);
+    if (grp) {
+      if (grp.ownerId === userId) {
+        db.friendGroups = db.friendGroups.filter((g) => g.id !== groupId);
+      } else {
+        grp.memberNames = grp.memberNames.filter((m) => !isSamePerson(m, userName));
+        if (grp.memberNames.length === 0) {
+          db.friendGroups = db.friendGroups.filter((g) => g.id !== groupId);
+        }
+      }
+      writeLocalDb(db);
+    }
+  }
+  return true;
+}
+
+export async function syncUserFriendGroups(
+  userId: string,
+  userName: string,
+  groups: { id?: string; name: string; emoji: string; memberNames: string[] }[]
+): Promise<AppFriendGroup[]> {
+  for (const grp of groups) {
+    await saveFriendGroup(userId, userName, grp);
+  }
+  return getUserFriendGroups(userId, userName);
 }
 
 export async function updateUserImage(userId: string, image: string | null): Promise<string | null> {
