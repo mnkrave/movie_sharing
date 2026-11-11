@@ -16,6 +16,7 @@ model User {
   image           String?
   role            String           @default("USER") // "USER" or "ADMIN"
   subscriptions   String?          // JSON array of streaming provider names (e.g. ["Netflix", "Amazon Prime Video", "Disney Plus"])
+  friendGroups    String?          // JSON array of friend groups (e.g. [{ id, name, emoji, memberNames }])
   mediaStatuses   MediaStatus[]
   recommendations Recommendation[]
   upvotes         RecommendationUpvote[]

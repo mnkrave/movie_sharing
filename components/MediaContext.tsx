@@ -207,11 +207,22 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         } catch {
           // ignore
         }
+        syncGroupsToDb(updated);
         return updated;
       }
       return prev;
     });
   }, [session?.user?.name]);
+
+  const syncGroupsToDb = (groups: FriendGroup[]) => {
+    if (session?.user) {
+      fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "friend_groups", friendGroups: groups }),
+      }).catch(console.error);
+    }
+  };
 
   const sanitizeMemberNames = (names: string[]): string[] => {
     const currentName = session?.user?.name;
@@ -257,6 +268,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    syncGroupsToDb(updated);
   };
 
   const updateFriendGroup = (id: string, name: string, emoji: string, memberNames: string[]) => {
@@ -273,6 +285,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    syncGroupsToDb(updated);
   };
 
   const deleteFriendGroup = (id: string) => {
@@ -283,6 +296,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore
     }
+    syncGroupsToDb(updated);
   };
 
   const setOnlyMySubs = (val: boolean) => {
@@ -304,6 +318,32 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setCommunityData(data);
+
+        // Synchronize friendGroups from Database <-> localStorage
+        if (Array.isArray(data.friendGroups)) {
+          if (data.friendGroups.length > 0) {
+            setFriendGroupsState(data.friendGroups);
+            try {
+              localStorage.setItem("cinecircle_friend_groups", JSON.stringify(data.friendGroups));
+            } catch {
+              // ignore
+            }
+          } else {
+            // DB has no groups yet, but local device may have groups (e.g. created on laptop)
+            const local = localStorage.getItem("cinecircle_friend_groups");
+            if (local) {
+              try {
+                const parsed = JSON.parse(local);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  // Push local groups to DB so PC and all devices receive them!
+                  syncGroupsToDb(parsed);
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to fetch community data:", err);

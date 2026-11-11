@@ -14,6 +14,8 @@ import {
   addRecommendation,
   toggleRecommendationUpvote,
   updateUserSubscriptions,
+  updateUserFriendGroups,
+  getUserFriendGroups,
   updateUserImage,
   findUserByEmail,
 } from "@/lib/store";
@@ -27,18 +29,20 @@ export async function GET() {
     userId = dbUser?.id || (session.user as any)?.id;
   }
 
-  const [community, friends, friendRequests] = await Promise.all([
+  const [community, friends, friendRequests, friendGroups] = await Promise.all([
     getAllCommunityData(userId),
     getAllFriendsWithStats(userId),
     userId
       ? getUserFriendRequests(userId)
       : Promise.resolve({ pendingReceived: [], pendingSent: [] }),
+    userId ? getUserFriendGroups(userId) : Promise.resolve([]),
   ]);
 
   return NextResponse.json({
     ...community,
     friends,
     friendRequests,
+    friendGroups,
   });
 }
 
@@ -125,20 +129,27 @@ export async function POST(req: Request) {
         userId,
         Array.isArray(body.subscriptions) ? body.subscriptions : []
       );
+    } else if (action === "friend_groups") {
+      await updateUserFriendGroups(
+        userId,
+        Array.isArray(body.friendGroups) ? body.friendGroups : []
+      );
     } else if (action === "avatar" || action === "profile_image") {
       await updateUserImage(userId, body.image ?? null);
     }
 
-    const [community, friends, friendRequests] = await Promise.all([
+    const [community, friends, friendRequests, friendGroups] = await Promise.all([
       getAllCommunityData(userId),
       getAllFriendsWithStats(userId),
       getUserFriendRequests(userId),
+      getUserFriendGroups(userId),
     ]);
 
     return NextResponse.json({
       ...community,
       friends,
       friendRequests,
+      friendGroups,
       actionMessage,
     });
   } catch (err) {

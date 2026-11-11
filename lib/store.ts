@@ -11,6 +11,7 @@ export interface AppUser {
   image?: string | null;
   role: string;
   subscriptions: string[];
+  friendGroups?: { id: string; name: string; emoji: string; memberNames: string[] }[];
   createdAt: string;
 }
 
@@ -368,6 +369,20 @@ function parseSubscriptions(subStr?: string | null): string[] {
   return subStr.split(",").filter(Boolean);
 }
 
+function parseFriendGroups(val?: any): { id: string; name: string; emoji: string; memberNames: string[] }[] {
+  if (!val) return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string") {
+    try {
+      const parsed = JSON.parse(val);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 // --- User & Whitelist Operations ---
 
 export async function findUserByEmail(email: string): Promise<AppUser | null> {
@@ -383,6 +398,7 @@ export async function findUserByEmail(email: string): Promise<AppUser | null> {
       image: u.image,
       role: u.role,
       subscriptions: parseSubscriptions(u.subscriptions),
+      friendGroups: parseFriendGroups(u.friendGroups),
       createdAt: u.createdAt.toISOString(),
     };
   }
@@ -402,6 +418,7 @@ export async function findUserById(id: string): Promise<AppUser | null> {
       image: u.image,
       role: u.role,
       subscriptions: parseSubscriptions(u.subscriptions),
+      friendGroups: parseFriendGroups(u.friendGroups),
       createdAt: u.createdAt.toISOString(),
     };
   }
@@ -440,6 +457,7 @@ export async function createOrUpdateUser(data: {
         image: updated.image,
         role: updated.role,
         subscriptions: parseSubscriptions(updated.subscriptions),
+        friendGroups: parseFriendGroups(updated.friendGroups),
         createdAt: updated.createdAt.toISOString(),
       };
     }
@@ -461,6 +479,7 @@ export async function createOrUpdateUser(data: {
       image: created.image,
       role: created.role,
       subscriptions: parseSubscriptions(created.subscriptions),
+      friendGroups: parseFriendGroups(created.friendGroups),
       createdAt: created.createdAt.toISOString(),
     };
   }
@@ -506,6 +525,38 @@ export async function updateUserSubscriptions(userId: string, subscriptions: str
     writeLocalDb(db);
   }
   return subscriptions;
+}
+
+export async function updateUserFriendGroups(
+  userId: string,
+  friendGroups: { id: string; name: string; emoji: string; memberNames: string[] }[]
+): Promise<{ id: string; name: string; emoji: string; memberNames: string[] }[]> {
+  if (await isPostgresAvailable()) {
+    await prisma.user.update({
+      where: { id: userId },
+      data: { friendGroups: JSON.stringify(friendGroups) },
+    });
+    return friendGroups;
+  }
+  const db = readLocalDb();
+  const u = db.users.find((x) => x.id === userId);
+  if (u) {
+    u.friendGroups = friendGroups;
+    writeLocalDb(db);
+  }
+  return friendGroups;
+}
+
+export async function getUserFriendGroups(
+  userId: string
+): Promise<{ id: string; name: string; emoji: string; memberNames: string[] }[]> {
+  if (await isPostgresAvailable()) {
+    const u = await prisma.user.findUnique({ where: { id: userId } });
+    return parseFriendGroups(u?.friendGroups);
+  }
+  const db = readLocalDb();
+  const u = db.users.find((x) => x.id === userId);
+  return parseFriendGroups(u?.friendGroups);
 }
 
 export async function updateUserImage(userId: string, image: string | null): Promise<string | null> {
