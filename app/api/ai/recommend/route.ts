@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { normalizeProviderKey, resolveItemGenres, POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 
+// Allow up to 60 seconds execution time on Vercel for complex AI reasoning & TMDB lookups
+export const maxDuration = 60;
+
 const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf36";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
