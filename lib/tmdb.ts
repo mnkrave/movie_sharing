@@ -866,6 +866,7 @@ export interface PersonWorkCredit extends MediaItem {
   isProducer?: boolean;
   isActor?: boolean;
   isSelf?: boolean;
+  isTalkShow?: boolean;
   roleSummary: string;
 }
 
@@ -884,6 +885,58 @@ export interface PersonDetails {
   cast: PersonCastCredit[];
   crew: PersonCrewCredit[];
   works: PersonWorkCredit[];
+}
+
+export function isTalkShowOrVariety(item: {
+  mediaType: "movie" | "tv";
+  genreIds?: number[];
+  title?: string;
+  originalTitle?: string;
+  character?: string;
+}): boolean {
+  if (item.mediaType !== "tv") return false;
+
+  const gIds = item.genreIds || [];
+  if (gIds.includes(10767)) return true; // Talk
+  if (gIds.includes(10763) && !gIds.includes(35)) return true; // News without scripted Comedy
+
+  const char = (item.character || "").toLowerCase();
+  if (gIds.includes(10764) && /self|guest|himself|herself|er selbst|sie selbst|gast/i.test(char)) {
+    return true;
+  }
+
+  const title = (item.title || item.originalTitle || "").toLowerCase();
+  const talkPatterns = [
+    /tonight show/i,
+    /late night/i,
+    /late show/i,
+    /late late show/i,
+    /daily show/i,
+    /graham norton/i,
+    /jimmy kimmel/i,
+    /el hormiguero/i,
+    /jennifer hudson/i,
+    /cbs news sunday/i,
+    /cbs morning/i,
+    /good morning america/i,
+    /today show|today with|^today\b/i,
+    /kelly clarkson/i,
+    /ellen degeneres/i,
+    /conan/i,
+    /jeopardy/i,
+    /wheel of fortune/i,
+    /talk show/i,
+    /the view/i,
+    /live with kelly/i,
+    /last week tonight/i,
+    /colbert/i,
+    /letterman/i,
+    /ferguson/i,
+    /seth meyers/i,
+    /chelsea lately/i,
+  ];
+
+  return talkPatterns.some((pattern) => pattern.test(title));
 }
 
 export async function searchPersons(query: string): Promise<PersonSearchResult[]> {
@@ -1042,6 +1095,13 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
         /^(self|himself|herself|themselves|narrator)/i.test(character) ||
         (Array.isArray(raw.genre_ids) &&
           (raw.genre_ids.includes(10767) || raw.genre_ids.includes(10763)));
+      const isTalk = isTalkShowOrVariety({
+        mediaType,
+        genreIds: raw.genre_ids,
+        title: raw.title || raw.name,
+        originalTitle: raw.original_title || raw.original_name,
+        character,
+      });
 
       const baseItem = mapRawItem(raw, mediaType);
 
@@ -1057,6 +1117,7 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
           isProducer: false,
           isActor: true,
           isSelf,
+          isTalkShow: isTalk,
           roleSummary: "",
         });
       } else {
@@ -1066,6 +1127,7 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
           existing.characters?.push(character);
         }
         if (!isSelf) existing.isSelf = false;
+        if (!isTalk) existing.isTalkShow = false;
       }
     }
 
@@ -1085,6 +1147,12 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
         job === "Producer" ||
         job === "Executive Producer" ||
         department === "Production";
+      const isTalk = isTalkShowOrVariety({
+        mediaType,
+        genreIds: raw.genre_ids,
+        title: raw.title || raw.name,
+        originalTitle: raw.original_title || raw.original_name,
+      });
 
       const baseItem = mapRawItem(raw, mediaType);
 
@@ -1100,6 +1168,7 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
           isProducer: isProd,
           isActor: false,
           isSelf: false,
+          isTalkShow: isTalk,
           roleSummary: "",
         });
       } else {

@@ -113,19 +113,34 @@ export function PersonProfileClient({
     return Array.from(map.values()).sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
   }, [initialPerson]);
 
-  const directingWorks = useMemo(() => {
-    return works.filter((w) => w.isDirector);
+  // Count talk show / interview variety credits
+  const talkShowsCount = useMemo(() => {
+    return works.filter((w) => w.isTalkShow).length;
   }, [works]);
+
+  // Toggle state: default is FALSE (talk shows are filtered out by default as requested!)
+  const [showTalkShows, setShowTalkShows] = useState(false);
+
+  // Effective works: clean filmography without talk shows (unless toggled on, or fallback if only talk shows exist)
+  const effectiveWorks = useMemo(() => {
+    if (showTalkShows) return works;
+    const clean = works.filter((w) => !w.isTalkShow);
+    return clean.length > 0 ? clean : works;
+  }, [works, showTalkShows]);
+
+  const directingWorks = useMemo(() => {
+    return effectiveWorks.filter((w) => w.isDirector);
+  }, [effectiveWorks]);
 
   const actingWorks = useMemo(() => {
-    return works.filter((w) => w.isActor);
-  }, [works]);
+    return effectiveWorks.filter((w) => w.isActor);
+  }, [effectiveWorks]);
 
   const crewWorks = useMemo(() => {
-    return works.filter(
+    return effectiveWorks.filter(
       (w) => w.isWriter || w.isProducer || (w.jobs && w.jobs.length > 0 && !w.isDirector)
     );
-  }, [works]);
+  }, [effectiveWorks]);
 
   type TabType = "all" | "directing" | "acting" | "crew";
 
@@ -136,7 +151,7 @@ export function PersonProfileClient({
       (actingWorks.length > 0 ? 1 : 0) +
       (crewWorks.length > 0 ? 1 : 0);
 
-    tabs.push({ id: "all", label: "Alle Werke", count: works.length });
+    tabs.push({ id: "all", label: "Alle Werke", count: effectiveWorks.length });
 
     if (roleCategories > 1) {
       if (directingWorks.length > 0) {
@@ -151,7 +166,7 @@ export function PersonProfileClient({
     }
 
     return tabs;
-  }, [works.length, directingWorks.length, actingWorks.length, crewWorks.length]);
+  }, [effectiveWorks.length, directingWorks.length, actingWorks.length, crewWorks.length]);
 
   const defaultTab = useMemo<TabType>(() => {
     if (initialPerson.knownForDepartment === "Directing" && directingWorks.length > 0) {
@@ -166,7 +181,6 @@ export function PersonProfileClient({
   const [sortBy, setSortBy] = useState<"popularity" | "release_desc" | "vote_average">("popularity");
   const [searchQuery, setSearchQuery] = useState("");
   const [showFullBio, setShowFullBio] = useState(false);
-  const [excludeSelfTalkshows, setExcludeSelfTalkshows] = useState(false);
 
   // Age calculation
   const ageInfo = useMemo(() => {
@@ -220,7 +234,7 @@ export function PersonProfileClient({
     return map;
   }, [communityData.mediaStatuses, myUserId, myName, myEmail]);
 
-  // Which list to evaluate for user watch completion (strictly unique entries)
+  // Which list to evaluate for user watch completion (strictly unique entries, clean filmography)
   const evaluationList = useMemo(() => {
     if (initialPerson.knownForDepartment === "Directing" && directingWorks.length > 0) {
       return directingWorks;
@@ -228,8 +242,8 @@ export function PersonProfileClient({
     if (actingWorks.length > 0) {
       return actingWorks;
     }
-    return works;
-  }, [initialPerson.knownForDepartment, directingWorks, actingWorks, works]);
+    return effectiveWorks;
+  }, [initialPerson.knownForDepartment, directingWorks, actingWorks, effectiveWorks]);
 
   // Completion calculation
   const completionStats = useMemo(() => {
@@ -289,12 +303,7 @@ export function PersonProfileClient({
     } else if (activeTab === "crew") {
       list = crewWorks;
     } else {
-      list = works;
-    }
-
-    // Filter out self/talkshows in cast if enabled and on acting or all tab
-    if (excludeSelfTalkshows && (activeTab === "acting" || activeTab === "all")) {
-      list = list.filter((c) => !c.isSelf || c.isDirector || c.isWriter);
+      list = effectiveWorks;
     }
 
     // Filter by type (movie vs tv)
@@ -345,11 +354,10 @@ export function PersonProfileClient({
     });
   }, [
     activeTab,
-    works,
+    effectiveWorks,
     directingWorks,
     actingWorks,
     crewWorks,
-    excludeSelfTalkshows,
     typeFilter,
     statusFilter,
     searchQuery,
@@ -645,16 +653,16 @@ export function PersonProfileClient({
               ))}
             </div>
 
-            {/* Toggle: Exclude self/talkshows for cast */}
-            {(activeTab === "acting" || activeTab === "all") && (
+            {/* Toggle: Show talkshows & interviews (default off) */}
+            {talkShowsCount > 0 && (
               <label className="flex items-center gap-2 text-xs text-slate-400 cursor-pointer select-none hover:text-slate-300">
                 <input
                   type="checkbox"
-                  checked={excludeSelfTalkshows}
-                  onChange={(e) => setExcludeSelfTalkshows(e.target.checked)}
+                  checked={showTalkShows}
+                  onChange={(e) => setShowTalkShows(e.target.checked)}
                   className="rounded bg-slate-900 border-slate-700 text-amber-500 focus:ring-0 focus:ring-offset-0"
                 />
-                <span>Talkshows & Specials ausblenden</span>
+                <span>Talkshows & Interviews einblenden (+{talkShowsCount})</span>
               </label>
             )}
           </div>
@@ -747,13 +755,13 @@ export function PersonProfileClient({
               </div>
 
               {/* Reset Button if any filter active */}
-              {(typeFilter !== "ALL" || statusFilter !== "ALL" || searchQuery.trim() || excludeSelfTalkshows) && (
+              {(typeFilter !== "ALL" || statusFilter !== "ALL" || searchQuery.trim() || showTalkShows) && (
                 <button
                   onClick={() => {
                     setTypeFilter("ALL");
                     setStatusFilter("ALL");
                     setSearchQuery("");
-                    setExcludeSelfTalkshows(false);
+                    setShowTalkShows(false);
                   }}
                   className="px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-bold flex items-center gap-1 transition"
                   title="Alle Filter zurücksetzen"
