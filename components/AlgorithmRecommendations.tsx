@@ -92,6 +92,19 @@ export function AlgorithmRecommendations() {
   const [recRefreshCounter, setRecRefreshCounter] = useState(0);
   const [skippedLandmarkIds, setSkippedLandmarkIds] = useState<number[]>([]);
   const [showMoreQuickRatings, setShowMoreQuickRatings] = useState<boolean>(false);
+  const [expandedReasonIds, setExpandedReasonIds] = useState<Set<number>>(new Set());
+
+  const toggleExpandReason = (id: number) => {
+    setExpandedReasonIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
 
   const myUserId = (session?.user as any)?.id || "user_lukas";
 
@@ -773,18 +786,69 @@ export function AlgorithmRecommendations() {
                       </h4>
                     </div>
 
-                    {/* Explainable Reason */}
-                    {item.reasons.length > 0 && (
-                      <p
-                        className={`text-[11px] leading-snug line-clamp-2 rounded-lg p-1.5 border ${
-                          item.isComboMatch
-                            ? "bg-amber-950/40 border-amber-500/40 text-amber-200 font-semibold"
-                            : "bg-emerald-950/40 border-emerald-500/20 text-emerald-300/90"
-                        }`}
-                      >
-                        {item.reasons[0]}
-                      </p>
-                    )}
+                    {/* Explainable Reason (Click to toggle expansion) */}
+                    {item.reasons.length > 0 && (() => {
+                      const isExpanded = expandedReasonIds.has(item.id);
+                      return (
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleExpandReason(item.id);
+                          }}
+                          className={`text-[11px] leading-snug rounded-xl p-2 border cursor-pointer transition select-none ${
+                            item.isComboMatch
+                              ? "bg-amber-950/40 border-amber-500/40 text-amber-200 hover:bg-amber-950/70 hover:border-amber-400"
+                              : "bg-emerald-950/40 border-emerald-500/20 text-emerald-300/90 hover:bg-emerald-950/70 hover:border-emerald-400"
+                          }`}
+                          title={
+                            isExpanded
+                              ? "Klicken zum Einklappen"
+                              : "Klicken, um die ganze Begründung zu lesen"
+                          }
+                        >
+                          <div className="flex items-start justify-between gap-1">
+                            <p className={isExpanded ? "font-semibold" : "line-clamp-2"}>
+                              {item.reasons[0]}
+                            </p>
+                            <span className="text-slate-400 hover:text-white p-0.5 flex-shrink-0 mt-0.5">
+                              {isExpanded ? (
+                                <ChevronUp className="w-3 h-3 text-amber-400" />
+                              ) : (
+                                <ChevronDown className="w-3 h-3 text-slate-400" />
+                              )}
+                            </span>
+                          </div>
+
+                          {/* Extra details when expanded */}
+                          {isExpanded && (
+                            <div className="mt-2 pt-2 border-t border-white/10 space-y-1.5 animate-in fade-in duration-150">
+                              {item.reasons.slice(1).map((r, i) => (
+                                <p key={i} className="text-[10px] text-slate-300 flex items-center gap-1">
+                                  <span className="text-amber-400">•</span> {r}
+                                </p>
+                              ))}
+                              {item.seedTitles && item.seedTitles.length > 0 && (
+                                <div className="pt-1">
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
+                                    Basiert auf deinen Favoriten:
+                                  </span>
+                                  <div className="flex flex-wrap gap-1">
+                                    {item.seedTitles.map((st, i) => (
+                                      <span
+                                        key={i}
+                                        className="px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-[10px] text-amber-300 font-medium"
+                                      >
+                                        ✓ {st}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Genres */}
                     {item.genres.length > 0 && (

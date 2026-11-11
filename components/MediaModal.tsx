@@ -1331,6 +1331,41 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 </div>
               )}
 
+              {/* Recommendation Reason Banner if present */}
+              {(media as any).reasons && (media as any).reasons.length > 0 && (
+                <div
+                  className={`p-4 rounded-2xl border text-xs leading-relaxed space-y-2 ${
+                    (media as any).isComboMatch
+                      ? "bg-amber-950/40 border-amber-500/50 text-amber-200"
+                      : "bg-emerald-950/40 border-emerald-500/30 text-emerald-300"
+                  }`}
+                >
+                  <div className="font-bold flex items-center gap-1.5 text-sm text-white">
+                    <span>
+                      {(media as any).isComboMatch
+                        ? "🔥 Dein Kombi-Match"
+                        : "✨ Warum für dich empfohlen?"}
+                    </span>
+                  </div>
+                  <p className="font-medium text-slate-200 text-xs sm:text-sm">
+                    {(media as any).reasons[0]}
+                  </p>
+                  {(media as any).seedTitles && (media as any).seedTitles.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-400">
+                      <span>Basiert auf deinen Favoriten:</span>
+                      {(media as any).seedTitles.map((st: string, idx: number) => (
+                        <span
+                          key={idx}
+                          className="px-2 py-0.5 rounded-lg bg-black/40 border border-white/10 text-amber-300 font-semibold"
+                        >
+                          ✓ {st}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div>
                 <h4 className="text-sm font-bold text-slate-300 uppercase tracking-wider mb-2">
                   Handlung
