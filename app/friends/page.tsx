@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
 import {
   Users,
@@ -18,8 +17,10 @@ import {
   X,
   AlertCircle,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
+import { useMedia, FriendGroup } from "@/components/MediaContext";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -29,6 +30,7 @@ export default function FriendsPage() {
     communityData,
     friendGroups,
     addFriendGroup,
+    updateFriendGroup,
     deleteFriendGroup,
     currentUserAvatar,
     sendFriendRequest,
@@ -38,11 +40,28 @@ export default function FriendsPage() {
     searchUsers,
   } = useMedia();
 
+  const myName = session?.user?.name || "Ich";
+
   // CineCrews state
   const [showGroupCreator, setShowGroupCreator] = useState(false);
   const [groupName, setGroupName] = useState("");
   const [groupEmoji, setGroupEmoji] = useState("🛋️");
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(["Lukas"]);
+  const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [newCustomMemberInput, setNewCustomMemberInput] = useState("");
+
+  // Edit Group Modal state
+  const [editingGroup, setEditingGroup] = useState<FriendGroup | null>(null);
+  const [editGroupName, setEditGroupName] = useState("");
+  const [editGroupEmoji, setEditGroupEmoji] = useState("🛋️");
+  const [editSelectedMembers, setEditSelectedMembers] = useState<string[]>([]);
+  const [editCustomMemberInput, setEditCustomMemberInput] = useState("");
+
+  // Initialize selectedMembers with current user when available
+  useEffect(() => {
+    if (session?.user?.name && selectedMembers.length === 0) {
+      setSelectedMembers([session.user.name]);
+    }
+  }, [session?.user?.name]);
 
   // Friend search & add state
   const [searchQuery, setSearchQuery] = useState("");
@@ -143,12 +162,68 @@ export default function FriendsPage() {
     );
   };
 
+  const handleAddNewCustomMember = () => {
+    const trimmed = newCustomMemberInput.trim().replace(/^@/, "");
+    if (!trimmed) return;
+    if (!selectedMembers.includes(trimmed)) {
+      setSelectedMembers((prev) => [...prev, trimmed]);
+    }
+    setNewCustomMemberInput("");
+  };
+
   const handleCreateGroup = (e: React.FormEvent) => {
     e.preventDefault();
     if (!groupName.trim() || selectedMembers.length === 0) return;
     addFriendGroup(groupName, groupEmoji, selectedMembers);
     setGroupName("");
+    setNewCustomMemberInput("");
     setShowGroupCreator(false);
+    setFeedback({
+      type: "success",
+      message: `Gruppe „${groupName.trim()}“ erfolgreich angelegt!`,
+    });
+  };
+
+  // Group edit handlers
+  const handleOpenEdit = (grp: FriendGroup) => {
+    setEditingGroup(grp);
+    setEditGroupName(grp.name);
+    setEditGroupEmoji(grp.emoji || "🛋️");
+    setEditSelectedMembers([...grp.memberNames]);
+    setEditCustomMemberInput("");
+  };
+
+  const handleCloseEdit = () => {
+    setEditingGroup(null);
+    setEditCustomMemberInput("");
+  };
+
+  const toggleEditMember = (name: string) => {
+    setEditSelectedMembers((prev) =>
+      prev.includes(name) ? prev.filter((m) => m !== name) : [...prev, name]
+    );
+  };
+
+  const handleAddEditCustomMember = () => {
+    const trimmed = editCustomMemberInput.trim().replace(/^@/, "");
+    if (!trimmed) return;
+    if (!editSelectedMembers.includes(trimmed)) {
+      setEditSelectedMembers((prev) => [...prev, trimmed]);
+    }
+    setEditCustomMemberInput("");
+  };
+
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingGroup) return;
+    const trimmedName = editGroupName.trim();
+    if (!trimmedName || editSelectedMembers.length === 0) return;
+    updateFriendGroup(editingGroup.id, trimmedName, editGroupEmoji, editSelectedMembers);
+    setFeedback({
+      type: "success",
+      message: `Gruppe „${trimmedName}“ erfolgreich aktualisiert!`,
+    });
+    setEditingGroup(null);
   };
 
   const getSubMeta = (key: string) => {
@@ -486,35 +561,104 @@ export default function FriendsPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-300 mb-2">
-                Wer gehört zur Gruppe? ({selectedMembers.length} gewählt)
-              </label>
-              {myFriends.length === 0 ? (
-                <p className="text-xs text-slate-500">
-                  Du hast noch keine Freunde in deiner Liste. Füge oben zuerst Freunde hinzu.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-2">
-                  {myFriends.map((f) => {
-                    const active = selectedMembers.includes(f.name);
-                    return (
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-300">
+                  Wer gehört zur Gruppe? ({selectedMembers.length} gewählt)
+                </label>
+                {selectedMembers.length === 0 && (
+                  <span className="text-[11px] text-rose-400 font-semibold">
+                    Mindestens 1 Mitglied erforderlich
+                  </span>
+                )}
+              </div>
+
+              {/* Selected chips */}
+              {selectedMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-900/60 border border-slate-800 mb-2.5">
+                  {selectedMembers.map((m) => (
+                    <span
+                      key={m}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold"
+                    >
+                      <span>@{m}</span>
                       <button
-                        key={f.id}
                         type="button"
-                        onClick={() => toggleMember(f.name)}
-                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 ${
-                          active
-                            ? "bg-emerald-500 text-black border-emerald-400"
-                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
-                        }`}
+                        onClick={() => toggleMember(m)}
+                        className="hover:text-rose-400 transition"
+                        title="Entfernen"
                       >
-                        <Check className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-0"}`} />
-                        <span>{f.name}</span>
+                        <X className="w-3 h-3" />
                       </button>
-                    );
-                  })}
+                    </span>
+                  ))}
                 </div>
               )}
+
+              {/* Friends & Self toggles */}
+              <div className="flex flex-wrap gap-1.5 mb-2.5">
+                {myName && (
+                  <button
+                    type="button"
+                    onClick={() => toggleMember(myName)}
+                    className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
+                      selectedMembers.includes(myName)
+                        ? "bg-emerald-500 text-black border-emerald-400"
+                        : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                    }`}
+                  >
+                    <Check
+                      className={`w-3.5 h-3.5 ${
+                        selectedMembers.includes(myName) ? "opacity-100" : "opacity-0"
+                      }`}
+                    />
+                    <span>@{myName} (Du)</span>
+                  </button>
+                )}
+                {myFriends.map((f) => {
+                  const active = selectedMembers.includes(f.name);
+                  return (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => toggleMember(f.name)}
+                      className={`px-2.5 py-1 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
+                        active
+                          ? "bg-emerald-500 text-black border-emerald-400"
+                          : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                      }`}
+                    >
+                      <Check className={`w-3.5 h-3.5 ${active ? "opacity-100" : "opacity-0"}`} />
+                      <span>@{f.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Add custom member input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newCustomMemberInput}
+                  onChange={(e) => setNewCustomMemberInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleAddNewCustomMember();
+                    }
+                  }}
+                  placeholder="Weiteres Mitglied per Name hinzufügen (z. B. Dennis)..."
+                  className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-400"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddNewCustomMember}
+                  disabled={!newCustomMemberInput.trim()}
+                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-white transition flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Hinzufügen</span>
+                </button>
+              </div>
             </div>
 
             <div className="flex justify-end gap-2 pt-1">
@@ -527,7 +671,8 @@ export default function FriendsPage() {
               </button>
               <button
                 type="submit"
-                className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs"
+                disabled={!groupName.trim() || selectedMembers.length === 0}
+                className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black font-bold text-xs"
               >
                 Gruppe speichern
               </button>
@@ -549,7 +694,7 @@ export default function FriendsPage() {
             {friendGroups.map((grp) => (
               <div
                 key={grp.id}
-                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col justify-between gap-3"
+                className="p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col justify-between gap-3 shadow-md hover:border-slate-700 transition"
               >
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-2.5">
@@ -561,14 +706,28 @@ export default function FriendsPage() {
                       </p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteFriendGroup(grp.id)}
-                    title="Gruppe löschen"
-                    className="text-slate-500 hover:text-rose-400 transition p-1"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEdit(grp)}
+                      title="Gruppe bearbeiten"
+                      className="text-slate-400 hover:text-amber-400 transition p-1.5 rounded-lg hover:bg-slate-800/80"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (confirm(`Gruppe „${grp.name}“ wirklich löschen?`)) {
+                          deleteFriendGroup(grp.id);
+                        }
+                      }}
+                      title="Gruppe löschen"
+                      className="text-slate-400 hover:text-rose-400 transition p-1.5 rounded-lg hover:bg-slate-800/80"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex flex-wrap gap-1.5">
@@ -596,6 +755,230 @@ export default function FriendsPage() {
           </div>
         )}
       </div>
+
+      {/* Edit Group Modal */}
+      {editingGroup && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+          onClick={handleCloseEdit}
+        >
+          <div
+            className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-white"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center border border-amber-500/30">
+                  <Pencil className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-white">Gruppe bearbeiten</h3>
+                  <p className="text-xs text-slate-400">Passe Name, Icon und Mitglieder an</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseEdit}
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEdit} className="space-y-4">
+              {/* Group Name & Emoji */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Gruppenname
+                  </label>
+                  <input
+                    type="text"
+                    value={editGroupName}
+                    onChange={(e) => setEditGroupName(e.target.value)}
+                    placeholder="z. B. Familie, WG-Couch"
+                    className="w-full px-3.5 py-2 rounded-xl bg-slate-900 border border-slate-700 text-sm text-white focus:outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-300 mb-1.5">
+                    Icon
+                  </label>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {["🛋️", "🍿", "✨", "🍻", "🔥", "🍕", "👨‍👩‍👧‍👦", "🎬"].map((em) => (
+                      <button
+                        key={em}
+                        type="button"
+                        onClick={() => setEditGroupEmoji(em)}
+                        className={`w-8 h-8 rounded-xl text-base flex items-center justify-center border transition ${
+                          editGroupEmoji === em
+                            ? "bg-amber-500/20 border-amber-400 scale-105"
+                            : "bg-slate-900 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Members */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-300">
+                    Mitglieder ({editSelectedMembers.length} ausgewählt)
+                  </label>
+                  {editSelectedMembers.length === 0 && (
+                    <span className="text-[11px] text-rose-400 font-semibold">
+                      Mindestens 1 Mitglied erforderlich
+                    </span>
+                  )}
+                </div>
+
+                {/* Selected Member Chips */}
+                <div className="flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 min-h-[44px]">
+                  {editSelectedMembers.map((m) => (
+                    <span
+                      key={m}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold"
+                    >
+                      <span>@{m}</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleEditMember(m)}
+                        className="hover:text-rose-400 transition"
+                        title="Entfernen"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                  {editSelectedMembers.length === 0 && (
+                    <span className="text-xs text-slate-500 italic py-1">
+                      Noch keine Mitglieder ausgewählt.
+                    </span>
+                  )}
+                </div>
+
+                {/* Quick Add from Friends */}
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-400">
+                    Aus deinen Kontakten hinzufügen / entfernen:
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {/* Self option if not in list */}
+                    {myName && (
+                      <button
+                        type="button"
+                        onClick={() => toggleEditMember(myName)}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${
+                          editSelectedMembers.includes(myName)
+                            ? "bg-emerald-500 text-black border-emerald-400"
+                            : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                        }`}
+                      >
+                        <Check
+                          className={`w-3 h-3 ${
+                            editSelectedMembers.includes(myName) ? "opacity-100" : "opacity-0"
+                          }`}
+                        />
+                        <span>@{myName} (Du)</span>
+                      </button>
+                    )}
+
+                    {myFriends.map((f) => {
+                      const active = editSelectedMembers.includes(f.name);
+                      return (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => toggleEditMember(f.name)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 ${
+                            active
+                              ? "bg-emerald-500 text-black border-emerald-400"
+                              : "bg-slate-900 text-slate-300 border-slate-800 hover:border-slate-700"
+                          }`}
+                        >
+                          <Check className={`w-3 h-3 ${active ? "opacity-100" : "opacity-0"}`} />
+                          <span>@{f.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Custom member input */}
+                <div className="pt-2">
+                  <span className="block text-[11px] font-semibold text-slate-400 mb-1">
+                    Oder weiteres Mitglied per Name hinzufügen:
+                  </span>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={editCustomMemberInput}
+                      onChange={(e) => setEditCustomMemberInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddEditCustomMember();
+                        }
+                      }}
+                      placeholder="Name eingeben (z. B. Dennis, Mama)..."
+                      className="flex-1 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleAddEditCustomMember}
+                      disabled={!editCustomMemberInput.trim()}
+                      className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-xs font-bold text-white transition flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Hinzufügen</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (confirm(`Möchtest du die Gruppe „${editingGroup.name}“ wirklich löschen?`)) {
+                      deleteFriendGroup(editingGroup.id);
+                      setEditingGroup(null);
+                    }
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 transition flex items-center gap-1"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Gruppe löschen</span>
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCloseEdit}
+                    className="px-4 py-2 rounded-xl text-xs text-slate-400 hover:text-white transition"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!editGroupName.trim() || editSelectedMembers.length === 0}
+                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black font-bold text-xs shadow-lg shadow-amber-500/20 transition"
+                  >
+                    Änderungen speichern
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Friends Cards (Only Accepted Friends) */}
       <div className="space-y-4">

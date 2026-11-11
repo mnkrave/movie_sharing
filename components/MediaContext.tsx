@@ -50,6 +50,7 @@ interface MediaContextType {
   openRatingModal: (target: RatingTarget) => void;
   friendGroups: FriendGroup[];
   addFriendGroup: (name: string, emoji: string, memberNames: string[]) => void;
+  updateFriendGroup: (id: string, name: string, emoji: string, memberNames: string[]) => void;
   deleteFriendGroup: (id: string) => void;
   communityData: {
     mediaStatuses: AppMediaStatus[];
@@ -167,6 +168,21 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       memberNames,
     };
     const updated = [...friendGroups, newGroup];
+    setFriendGroupsState(updated);
+    try {
+      localStorage.setItem("cinecircle_friend_groups", JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+  };
+
+  const updateFriendGroup = (id: string, name: string, emoji: string, memberNames: string[]) => {
+    if (!name.trim() || memberNames.length === 0) return;
+    const updated = friendGroups.map((g) =>
+      g.id === id
+        ? { ...g, name: name.trim(), emoji: emoji || "🍿", memberNames }
+        : g
+    );
     setFriendGroupsState(updated);
     try {
       localStorage.setItem("cinecircle_friend_groups", JSON.stringify(updated));
@@ -517,6 +533,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         openRatingModal: (target) => setRatingTarget(target),
         friendGroups,
         addFriendGroup,
+        updateFriendGroup,
         deleteFriendGroup,
         communityData,
         refreshCommunity,
