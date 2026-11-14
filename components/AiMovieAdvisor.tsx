@@ -607,6 +607,12 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
                         </div>
                       )}
 
+                      {pick.seriesNote && (
+                        <div className="text-[11px] leading-snug rounded-xl px-2.5 py-1.5 bg-indigo-950/60 border border-indigo-500/40 text-indigo-200 font-medium">
+                          {pick.seriesNote}
+                        </div>
+                      )}
+
                       <p className="text-xs text-slate-300 leading-snug">{pick.groupPitch}</p>
 
                       {/* Streaming Providers */}

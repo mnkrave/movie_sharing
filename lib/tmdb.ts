@@ -680,6 +680,108 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
   }
 }
 
+export interface CollectionEntryResolution {
+  action: "swap" | "note";
+  targetMovieId: number;
+  targetTitle: string;
+  partNumber: number;
+  totalParts: number;
+  collectionName: string;
+  originalMatchedTitle: string;
+  seriesNote: string;
+}
+
+/**
+ * Checks a TMDB movie collection so sequential sequels aren't recommended before earlier unwatched parts.
+ * Swaps e.g. "Dune: Part Two" -> "Dune" if Part 1 is unwatched, and provides a helpful series note.
+ */
+export async function resolveCollectionEntry(params: {
+  collectionId: number;
+  currentMovieId: number;
+  isWatched: (movieId: number, title?: string, origTitle?: string) => boolean;
+  isExcluded?: (movieId: number) => boolean;
+}): Promise<CollectionEntryResolution | null> {
+  try {
+    const colData = await tmdbFetch<any>(`/collection/${params.collectionId}`);
+    if (!colData || !Array.isArray(colData.parts)) return null;
+
+    const today = new Date().toISOString().slice(0, 10);
+    const releasedParts: any[] = colData.parts
+      .filter((p: any) => {
+        const d = (p.release_date || "").trim();
+        return Boolean(d && d <= today && (p.vote_count || 0) >= 80 && (p.vote_average || 0) >= 5.5);
+      })
+      .sort((a: any, b: any) =>
+        (a.release_date || "9999").localeCompare(b.release_date || "9999")
+      );
+
+    // Only auto-sequence focused multi-part series (2..10 released films), skip mega-anthologies
+    if (releasedParts.length < 2 || releasedParts.length > 10) return null;
+
+    const currentIndex = releasedParts.findIndex((p) => p.id === params.currentMovieId);
+    if (currentIndex === -1) return null;
+
+    const rawColName = String(colData.name || "").trim();
+    const cleanColName = rawColName
+      .replace(/\s*(Filmreihe|Collection|Reihe)$/i, "")
+      .trim() || rawColName;
+    const totalParts = releasedParts.length;
+    const currentPart = releasedParts[currentIndex];
+    const currentTitle = currentPart.title || currentPart.original_title || "Fortsetzung";
+
+    // Look for the earliest unwatched part before the recommended sequel
+    if (currentIndex > 0) {
+      for (let i = 0; i < currentIndex; i++) {
+        const part = releasedParts[i];
+        const partTitle = part.title || part.original_title || "";
+        if (params.isWatched(part.id, part.title, part.original_title)) continue;
+        if (params.isExcluded && params.isExcluded(part.id)) continue;
+        if ((part.vote_count || 0) < 150 || (part.vote_average || 0) < 6.3) continue;
+
+        const partNumber = i + 1;
+        const seriesNote =
+          partNumber === 1
+            ? `🎬 Teil 1/${totalParts} der „${cleanColName}“-Reihe: Da du den ersten Teil noch nicht gesehen hast, schlagen wir ihn statt „${currentTitle}“ vor – die ganze Filmreihe könnte was für dich sein!`
+            : `🎬 Teil ${partNumber}/${totalParts} der „${cleanColName}“-Reihe: Nächster ungesehener Teil vor „${currentTitle}“ – die Filmreihe könnte was für dich sein!`;
+
+        return {
+          action: "swap",
+          targetMovieId: part.id,
+          targetTitle: partTitle,
+          partNumber,
+          totalParts,
+          collectionName: cleanColName,
+          originalMatchedTitle: currentTitle,
+          seriesNote,
+        };
+      }
+    }
+
+    // If Part 1 itself is recommended and no sequel was watched yet, add a helpful series hint
+    if (currentIndex === 0) {
+      const anyWatched = releasedParts.some((p) =>
+        params.isWatched(p.id, p.title, p.original_title)
+      );
+      if (!anyWatched) {
+        return {
+          action: "note",
+          targetMovieId: params.currentMovieId,
+          targetTitle: currentTitle,
+          partNumber: 1,
+          totalParts,
+          collectionName: cleanColName,
+          originalMatchedTitle: currentTitle,
+          seriesNote: `🎬 Start der „${cleanColName}“-Reihe (${totalParts} Filme) – die ganze Filmreihe könnte was für dich sein!`,
+        };
+      }
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Promise<MediaDetails> {
   const data = await tmdbFetch<any>(`/${mediaType}/${id}`, {
     append_to_response: "credits,videos,watch/providers,external_ids,similar",

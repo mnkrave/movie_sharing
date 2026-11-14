@@ -6,6 +6,7 @@ import {
   ALL_GENRES_MAP,
   mapGenreIdsForMediaType,
   normalizeProviderKey,
+  resolveCollectionEntry,
   resolveItemGenres,
 } from "@/lib/tmdb";
 
@@ -45,6 +46,7 @@ export interface RecommendedMediaItem {
   reasons: string[];
   seedTitles: string[];
   isComboMatch?: boolean;
+  seriesNote?: string;
   availableProvidersDE: {
     providerId: number;
     providerName: string;
@@ -1194,49 +1196,101 @@ export async function POST(req: Request) {
       tryAddToPrePool(cand, 4);
     }
 
-    // 8. Enrich pre-pool with exact DE Watch Providers & compute final score with real subBonus
-    const enrichedAndRescored = await Promise.all(
-      prePool.map(async (cand) => {
-        const rawProviders = await fetchDEProviders(cand.mediaType, cand.id);
-        const mappedProviders = rawProviders.map((p: any) => {
-          const norm = normalizeProviderKey(p.provider_name);
-          return {
-            providerId: p.provider_id,
-            providerName: norm.displayName || p.provider_name,
-            logoPath: p.logo_path,
-            isMySub: userSubscriptions.includes(norm.key),
-          };
-        });
+    // 8. Resolve sequential movie series (e.g. Dune 2 -> Dune 1 if Part 1 unwatched),
+    // enrich pre-pool with exact DE Watch Providers & compute final score with real subBonus
+    const enrichedRaw = await fetchInBatches(prePool, 20, async (cand) => {
+      let activeEntry = cand.entry;
+      let targetId = cand.id;
+      let seriesNote: string | undefined = undefined;
 
-        const seenNames = new Set<string>();
-        const dedupedProviders = mappedProviders.filter((p: any) => {
-          if (seenNames.has(p.providerName)) return false;
-          seenNames.add(p.providerName);
-          return true;
-        });
+      if (cand.mediaType === "movie") {
+        const details =
+          cand.entry.raw?.belongs_to_collection !== undefined
+            ? cand.entry.raw
+            : await fetchSeedData({ tmdbId: cand.id, mediaType: "movie" });
 
-        const finalScored = scoreCandidate(cand.entry, dedupedProviders);
+        if (details) {
+          activeEntry = { ...activeEntry, raw: details };
+        }
+
+        if (details?.belongs_to_collection?.id) {
+          const colRes = await resolveCollectionEntry({
+            collectionId: details.belongs_to_collection.id,
+            currentMovieId: cand.id,
+            isWatched: (mId) => watchedSet.has(`movie_${mId}`),
+            isExcluded: (mId) => isExcludedByWatchlist("movie", mId),
+          });
+
+          if (colRes?.action === "swap") {
+            const replacementDetails = await fetchSeedData({
+              tmdbId: colRes.targetMovieId,
+              mediaType: "movie",
+            });
+            if (replacementDetails) {
+              activeEntry = { ...activeEntry, raw: replacementDetails };
+              targetId = replacementDetails.id;
+              seriesNote = colRes.seriesNote;
+            }
+          } else if (colRes?.action === "note") {
+            seriesNote = colRes.seriesNote;
+          }
+        }
+      }
+
+      const rawProviders = await fetchDEProviders(cand.mediaType, targetId);
+      const mappedProviders = rawProviders.map((p: any) => {
+        const norm = normalizeProviderKey(p.provider_name);
         return {
-          id: finalScored.id,
-          mediaType: finalScored.mediaType,
-          title: finalScored.title,
-          originalTitle: finalScored.originalTitle,
-          overview: finalScored.overview,
-          posterPath: finalScored.posterPath,
-          backdropPath: finalScored.backdropPath,
-          releaseYear: finalScored.releaseYear,
-          voteAverage: finalScored.voteAverage,
-          voteCount: finalScored.voteCount,
-          genreIds: finalScored.genreIds,
-          genres: finalScored.genres,
-          matchScore: finalScored.matchScore,
-          reasons: finalScored.reasons,
-          seedTitles: finalScored.seedTitles,
-          isComboMatch: finalScored.isComboMatch,
-          availableProvidersDE: dedupedProviders,
-        } satisfies RecommendedMediaItem;
-      })
-    );
+          providerId: p.provider_id,
+          providerName: norm.displayName || p.provider_name,
+          logoPath: p.logo_path,
+          isMySub: userSubscriptions.includes(norm.key),
+        };
+      });
+
+      const seenNames = new Set<string>();
+      const dedupedProviders = mappedProviders.filter((p: any) => {
+        if (seenNames.has(p.providerName)) return false;
+        seenNames.add(p.providerName);
+        return true;
+      });
+
+      const finalScored = scoreCandidate(activeEntry, dedupedProviders);
+      return {
+        id: finalScored.id,
+        mediaType: finalScored.mediaType,
+        title: finalScored.title,
+        originalTitle: finalScored.originalTitle,
+        overview: finalScored.overview,
+        posterPath: finalScored.posterPath,
+        backdropPath: finalScored.backdropPath,
+        releaseYear: finalScored.releaseYear,
+        voteAverage: finalScored.voteAverage,
+        voteCount: finalScored.voteCount,
+        genreIds: finalScored.genreIds,
+        genres: finalScored.genres,
+        matchScore: finalScored.matchScore,
+        reasons: finalScored.reasons,
+        seedTitles: finalScored.seedTitles,
+        isComboMatch: finalScored.isComboMatch,
+        seriesNote,
+        availableProvidersDE: dedupedProviders,
+      } satisfies RecommendedMediaItem;
+    });
+
+    // Deduplicate in case a collection swap mapped two entries to the same Part 1
+    const dedupedEnrichedMap = new Map<string, RecommendedMediaItem>();
+    for (const item of enrichedRaw) {
+      const k = `${item.mediaType}_${item.id}`;
+      const existing = dedupedEnrichedMap.get(k);
+      if (!existing || item.matchScore > existing.matchScore || (item.seriesNote && !existing.seriesNote)) {
+        dedupedEnrichedMap.set(k, {
+          ...item,
+          seriesNote: item.seriesNote || existing?.seriesNote,
+        });
+      }
+    }
+    const enrichedAndRescored = Array.from(dedupedEnrichedMap.values());
 
     // 9. Filter by onlyMySubscriptions if enabled and user has subscriptions configured
     let filteredResults = enrichedAndRescored;

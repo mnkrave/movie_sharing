@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { normalizeProviderKey, resolveItemGenres, POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
+import {
+  normalizeProviderKey,
+  resolveCollectionEntry,
+  resolveItemGenres,
+  POPULAR_SUBSCRIPTIONS,
+} from "@/lib/tmdb";
 
 // Allow up to 60 seconds execution time on Vercel for complex AI reasoning & TMDB lookups
 export const maxDuration = 60;
@@ -37,6 +42,7 @@ export interface AiRecommendedPick {
   genreIds: number[];
   matchScore: number;
   groupPitch: string;
+  seriesNote?: string;
   perPersonReasons: AiPersonReason[];
   availableProvidersDE: {
     providerId: number;
@@ -187,7 +193,12 @@ async function lookupTmdbAndEnrich(
     perPersonReasons?: AiPersonReason[];
   },
   combinedSubscriptions: string[],
-  maxRuntimeMinutes: number | null
+  checkIsWatchedFn: (
+    title: string,
+    origTitle?: string,
+    tmdbId?: number,
+    mediaType?: "movie" | "tv"
+  ) => boolean
 ): Promise<AiRecommendedPick | null> {
   const searchType: "movie" | "tv" = pick.mediaType === "tv" ? "tv" : "movie";
   const queries = [pick.title, pick.originalTitle].filter(Boolean) as string[];
@@ -223,9 +234,34 @@ async function lookupTmdbAndEnrich(
 
   // Fetch exact details + DE watch providers
   try {
-    const detailUrl = `${TMDB_BASE_URL}/${searchType}/${foundRaw.id}?api_key=${TMDB_API_KEY}&language=de-DE&append_to_response=watch/providers`;
-    const dRes = await fetch(detailUrl, { next: { revalidate: 43200 } });
-    const detailData = dRes.ok ? await dRes.json() : foundRaw;
+    const fetchDetailsWithProviders = async (id: number) => {
+      const detailUrl = `${TMDB_BASE_URL}/${searchType}/${id}?api_key=${TMDB_API_KEY}&language=de-DE&append_to_response=watch/providers`;
+      const dRes = await fetch(detailUrl, { next: { revalidate: 43200 } });
+      return dRes.ok ? await dRes.json() : null;
+    };
+
+    let detailData = (await fetchDetailsWithProviders(foundRaw.id)) || foundRaw;
+    let seriesNote: string | undefined = undefined;
+
+    // Sequential movie series check: if Gemini picked Part 2/3/4 and Part 1 is unwatched, swap to Part 1!
+    if (searchType === "movie" && detailData.belongs_to_collection?.id) {
+      const colRes = await resolveCollectionEntry({
+        collectionId: detailData.belongs_to_collection.id,
+        currentMovieId: detailData.id,
+        isWatched: (movieId, title, origTitle) =>
+          checkIsWatchedFn(title || "", origTitle, movieId, "movie"),
+      });
+
+      if (colRes?.action === "swap") {
+        const part1Details = await fetchDetailsWithProviders(colRes.targetMovieId);
+        if (part1Details) {
+          detailData = part1Details;
+          seriesNote = colRes.seriesNote;
+        }
+      } else if (colRes?.action === "note") {
+        seriesNote = colRes.seriesNote;
+      }
+    }
 
     const runtime =
       searchType === "movie"
@@ -275,6 +311,7 @@ async function lookupTmdbAndEnrich(
       genres: resolveItemGenres(searchType, genreIds, detailData.genres),
       matchScore: Math.min(99, Math.max(75, pick.matchScore || 94)),
       groupPitch: pick.groupPitch || "Perfekter Treffer für euren Filmabend!",
+      seriesNote,
       perPersonReasons: Array.isArray(pick.perPersonReasons) ? pick.perPersonReasons : [],
       availableProvidersDE,
     };
@@ -550,6 +587,7 @@ WICHTIGE REGELN & GENRE-FOKUS:
 3. Wenn ein Zeitlimit wie "maximal 120 Minuten" genannt wurde, schlage NUR Filme vor, deren echte Laufzeit <= 120 Minuten beträgt!
 4. Bevorzuge Filme/Serien, die in Deutschland auf den genannten Streaming-Abos (${readableSubs}) verfügbar sind.
 5. Gib für JEDEN Vorschlag in "perPersonReasons" für JEDEN Teilnehmer (${participants.join(", ")}) einen kurzen, sympathischen Satz auf Deutsch an, warum genau diese Person den Film feiern wird!
+6. FILMREIHEN-LOGIK (AUFBAUENDE SEQUELS): Wenn eine aufeinander aufbauende Filmreihe (z. B. Dune, Herr der Ringe, Harry Potter, John Wick, The Dark Knight, Spider-Verse) gut passt, aber Teil 1 (bzw. ein Vorgängerteil) noch NICHT gesehen wurde, empfehle NICHT Teil 2/3/4, sondern direkt den 1. Teil (bzw. den ersten noch ungesehenen Teil) und erwähne im "groupPitch", dass die ganze Filmreihe spannend für die Gruppe sein könnte!
 
 Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 10 bis 12 Picks:
 {
@@ -633,11 +671,7 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 10 bis 12 Picks:
     const enrichedPicks = (
       await Promise.all(
         filteredRawPicks.map((p) =>
-          lookupTmdbAndEnrich(
-            p,
-            Array.from(combinedSubsSet),
-            parsedIntent.maxRuntimeMinutes
-          )
+          lookupTmdbAndEnrich(p, Array.from(combinedSubsSet), checkIsWatched)
         )
       )
     ).filter(Boolean) as AiRecommendedPick[];

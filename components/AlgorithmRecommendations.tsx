@@ -807,6 +807,13 @@ export function AlgorithmRecommendations() {
                       </h4>
                     </div>
 
+                    {/* Sequential Series / Filmreihe Note */}
+                    {item.seriesNote && (
+                      <div className="text-[10px] leading-snug rounded-xl px-2 py-1.5 bg-indigo-950/50 border border-indigo-500/40 text-indigo-200 font-medium">
+                        {item.seriesNote}
+                      </div>
+                    )}
+
                     {/* Explainable Reason (Click to toggle expansion) */}
                     {item.reasons.length > 0 && (() => {
                       const isExpanded = expandedReasonIds.has(item.id);
