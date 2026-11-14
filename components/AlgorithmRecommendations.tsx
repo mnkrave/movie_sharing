@@ -170,6 +170,10 @@ export function AlgorithmRecommendations() {
           rating: m.rating,
           title: m.title,
         })),
+        watchlistIds: watchlistItems.map((m) => ({
+          tmdbId: m.tmdbId,
+          mediaType: m.mediaType,
+        })),
         userSubscriptions,
         mediaTypeFilter: recMediaType,
         onlyMySubscriptions: recOnlyMySubs,
@@ -199,6 +203,7 @@ export function AlgorithmRecommendations() {
     };
   }, [
     watchedItems,
+    watchlistItems,
     userSubscriptions,
     recMediaType,
     recOnlyMySubs,
@@ -664,12 +669,28 @@ export function AlgorithmRecommendations() {
               {g.emoji} {g.name}
             </span>
           ))}
-          {tasteSummary.topKeywords.slice(0, 6).map((kw) => (
+          {tasteSummary.topKeywords.slice(0, 5).map((kw) => (
             <span
               key={kw.id}
               className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-[11px] font-medium"
             >
               #{kw.name}
+            </span>
+          ))}
+          {tasteSummary.favoriteDirectors?.slice(0, 2).map((dir) => (
+            <span
+              key={`dir_${dir}`}
+              className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] font-semibold"
+            >
+              🎬 {dir}
+            </span>
+          ))}
+          {tasteSummary.favoriteActors?.slice(0, 2).map((actor) => (
+            <span
+              key={`act_${actor}`}
+              className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-[11px] font-semibold"
+            >
+              ⭐ {actor}
             </span>
           ))}
         </div>

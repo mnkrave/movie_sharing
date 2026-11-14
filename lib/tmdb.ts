@@ -229,9 +229,61 @@ export const OFFICIAL_TV_GENRES: GenreMeta[] = [
 ];
 
 export const ALL_GENRES_MAP: Record<number, GenreMeta> = {
-  ...Object.fromEntries(OFFICIAL_MOVIE_GENRES.map((g) => [g.id, g])),
   ...Object.fromEntries(OFFICIAL_TV_GENRES.map((g) => [g.id, g])),
+  ...Object.fromEntries(OFFICIAL_MOVIE_GENRES.map((g) => [g.id, g])),
 };
+
+const MOVIE_GENRE_ID_SET = new Set(OFFICIAL_MOVIE_GENRES.map((g) => g.id));
+const TV_GENRE_ID_SET = new Set(OFFICIAL_TV_GENRES.map((g) => g.id));
+
+const MOVIE_TO_TV_GENRE_MAP: Record<number, number[]> = {
+  28: [10759], // Action -> Action & Adventure
+  12: [10759], // Abenteuer -> Action & Adventure
+  878: [10765], // Science Fiction -> Sci-Fi & Fantasy
+  14: [10765], // Fantasy -> Sci-Fi & Fantasy
+  10752: [10768], // Kriegsfilm -> War & Politics
+  53: [80, 9648], // Thriller -> Crime / Mystery
+  10749: [18], // Liebesfilm -> Drama
+  36: [18, 99], // Historie -> Drama / Documentary
+};
+
+const TV_TO_MOVIE_GENRE_MAP: Record<number, number[]> = {
+  10759: [28, 12], // Action & Adventure -> Action, Abenteuer
+  10765: [878, 14], // Sci-Fi & Fantasy -> Sci-Fi, Fantasy
+  10768: [10752, 18], // War & Politics -> Kriegsfilm, Drama
+  10762: [10751, 16], // Kids -> Familie, Animation
+};
+
+/**
+ * Converts mixed movie/TV TMDB genre IDs into valid genre IDs for the target discover endpoint.
+ */
+export function mapGenreIdsForMediaType(
+  genreIds: number[],
+  targetType: "movie" | "tv"
+): number[] {
+  const validSet = targetType === "tv" ? TV_GENRE_ID_SET : MOVIE_GENRE_ID_SET;
+  const fallbackMap = targetType === "tv" ? MOVIE_TO_TV_GENRE_MAP : TV_TO_MOVIE_GENRE_MAP;
+  const result: number[] = [];
+  const seen = new Set<number>();
+
+  for (const id of genreIds) {
+    if (validSet.has(id)) {
+      if (!seen.has(id)) {
+        seen.add(id);
+        result.push(id);
+      }
+      continue;
+    }
+    const mapped = fallbackMap[id] || [];
+    for (const mId of mapped) {
+      if (validSet.has(mId) && !seen.has(mId)) {
+        seen.add(mId);
+        result.push(mId);
+      }
+    }
+  }
+  return result;
+}
 
 export function getGenreMeta(id: number, mediaType?: "movie" | "tv"): GenreMeta | undefined {
   if (mediaType === "tv") {

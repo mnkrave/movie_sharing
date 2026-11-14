@@ -232,15 +232,6 @@ async function lookupTmdbAndEnrich(
         ? detailData.runtime || pick.estimatedRuntime || 110
         : detailData.episode_run_time?.[0] || pick.estimatedRuntime || 45;
 
-    // If user strictly requested maxRuntimeMinutes on a movie, allow small tolerance (+8 min)
-    if (
-      maxRuntimeMinutes &&
-      searchType === "movie" &&
-      runtime > maxRuntimeMinutes + 10
-    ) {
-      // Keep it if needed, or note runtime
-    }
-
     const deProvidersRaw = detailData["watch/providers"]?.results?.DE;
     const flatrateAndFree = [
       ...(deProvidersRaw?.flatrate || []),
@@ -612,17 +603,30 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
 
     // 5. Final strict safety filter: ensure NO enriched item matches a watched TMDB ID or title, and deduplicate
     const seenTmdbIds = new Set<number>();
-    const finalPicks: AiRecommendedPick[] = [];
+    const dedupedPicks: AiRecommendedPick[] = [];
 
     for (const p of enrichedPicks) {
       if (seenTmdbIds.has(p.id)) continue;
       if (checkIsWatched(p.title, p.originalTitle, p.id)) continue;
 
       seenTmdbIds.add(p.id);
-      finalPicks.push(p);
-
-      if (finalPicks.length >= 6) break;
+      dedupedPicks.push(p);
     }
+
+    // Prioritize items respecting maxRuntimeMinutes (only fall back to longer movies if < 3 remain)
+    let finalPicks = dedupedPicks;
+    if (parsedIntent.maxRuntimeMinutes) {
+      const withinLimit = dedupedPicks.filter(
+        (p) =>
+          p.mediaType !== "movie" ||
+          !p.runtimeMinutes ||
+          p.runtimeMinutes <= (parsedIntent.maxRuntimeMinutes as number) + 10
+      );
+      if (withinLimit.length >= 3) {
+        finalPicks = withinLimit;
+      }
+    }
+    finalPicks = finalPicks.slice(0, 6);
 
     return NextResponse.json({
       usedModel,
