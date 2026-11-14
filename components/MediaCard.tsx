@@ -13,7 +13,7 @@ interface MediaCardProps {
 }
 
 export function MediaCard({ item, priority = false }: MediaCardProps) {
-  const { openMediaModal, communityData, updateMediaStatus, openRatingModal } = useMedia();
+  const { openMediaModal, communityData, updateMediaStatus, openRatingModal, showToast } = useMedia();
   const { data: session } = useSession();
 
   const myUserId = (session?.user as any)?.id;
@@ -55,7 +55,11 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
   const handleQuickWatchlist = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session) {
-      alert("Bitte logge dich ein, um deine Liste zu speichern!");
+      showToast("Bitte logge dich ein, um deine Liste zu speichern!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     updateMediaStatus({
@@ -71,7 +75,11 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
   const handleQuickWatched = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session) {
-      alert("Bitte logge dich ein, um deine Liste zu speichern!");
+      showToast("Bitte logge dich ein, um deine Liste zu speichern!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     openRatingModal({
@@ -244,6 +252,53 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           <span className="uppercase text-[10px] tracking-wider text-slate-500 font-mono">
             {item.mediaType === "tv" ? "Serie" : "Film"}
           </span>
+        </div>
+
+        {/* Touch-only quick action buttons (keeps desktop hover cards clean while giving 1-tap access on mobile) */}
+        <div className="flex [@media(hover:hover)]:hidden items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-800/70">
+          <button
+            type="button"
+            onClick={handleQuickWatchlist}
+            aria-label={
+              myStatusObj?.status === "WATCHLIST"
+                ? "Von Merkliste entfernen"
+                : "Auf Merkliste setzen"
+            }
+            className={`flex-1 min-w-0 py-1.5 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition ${
+              myStatusObj?.status === "WATCHLIST"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
+            }`}
+          >
+            {myStatusObj?.status === "WATCHLIST" ? (
+              <Check className="w-3 h-3 flex-shrink-0 stroke-[2.5]" />
+            ) : (
+              <Plus className="w-3 h-3 flex-shrink-0" />
+            )}
+            <span className="truncate">Liste</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleQuickWatched}
+            aria-label={
+              myStatusObj?.status === "WATCHED"
+                ? "Gesehen-Status oder Bewertung bearbeiten"
+                : "Als gesehen markieren"
+            }
+            className={`flex-1 min-w-0 py-1.5 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition ${
+              myStatusObj?.status === "WATCHED"
+                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
+                : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
+            }`}
+          >
+            <Check className="w-3 h-3 flex-shrink-0 stroke-[2.5]" />
+            <span className="truncate">
+              {myStatusObj?.status === "WATCHED" && myWatched?.rating
+                ? `${myWatched.rating}/10`
+                : "Gesehen"}
+            </span>
+          </button>
         </div>
       </div>
     </div>

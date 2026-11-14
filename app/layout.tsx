@@ -11,6 +11,8 @@ export const viewport: Viewport = {
   themeColor: "#07090e",
 };
 
+import { MobileBottomNav } from "@/components/MobileBottomNav";
+
 export const metadata: Metadata = {
   title: "CineCircle – Filme & Serien mit Freunden teilen & VPN-Streaming",
   description:
@@ -41,12 +43,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="de" className="dark">
-      <body className="bg-[#07090e] text-slate-100 min-h-dvh flex flex-col antialiased selection:bg-amber-500 selection:text-black">
+      <body className="bg-[#07090e] text-slate-100 min-h-dvh flex flex-col antialiased selection:bg-amber-500 selection:text-black pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <Providers>
           <MediaProvider>
             <Navbar />
             <main className="flex-1">{children}</main>
-            <footer className="border-t border-slate-900 bg-[#05070a] pt-10 pb-[calc(2.5rem+env(safe-area-inset-bottom))] mt-20 text-center text-xs text-slate-500">
+            <footer className="border-t border-slate-900 bg-[#05070a] py-10 mt-20 text-center text-xs text-slate-500">
               <div className="max-w-7xl mx-auto px-4 space-y-2">
                 <p className="font-semibold text-slate-400">
                   CineCircle – Entwickelt für Freunde & Film-Liebhaber
@@ -65,6 +67,7 @@ export default function RootLayout({
                 </p>
               </div>
             </footer>
+            <MobileBottomNav />
           </MediaProvider>
         </Providers>
       </body>

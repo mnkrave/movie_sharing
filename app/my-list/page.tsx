@@ -168,7 +168,7 @@ export default function MyListPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-8 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
         <div className="space-y-1">
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
             Meine Listen
@@ -188,21 +188,21 @@ export default function MyListPage() {
       </div>
 
       {/* Main Tabs (Watchlist vs Bereits gesehen) */}
-      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <button
             onClick={() => {
               setActiveTab("WATCHLIST");
               setSelectedCategory("ALL");
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition ${
               activeTab === "WATCHLIST"
                 ? "bg-sky-500 text-black shadow-lg shadow-sky-500/20"
                 : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
             }`}
           >
-            <Bookmark className="w-4 h-4" />
-            <span>Watchlist ({watchlistTotal})</span>
+            <Bookmark className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Watchlist ({watchlistTotal})</span>
           </button>
 
           <button
@@ -210,19 +210,19 @@ export default function MyListPage() {
               setActiveTab("WATCHED");
               setSelectedCategory("ALL");
             }}
-            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition ${
               activeTab === "WATCHED"
                 ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                 : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
             }`}
           >
-            <Check className="w-4 h-4" />
-            <span>Bereits gesehen ({watchedTotal})</span>
+            <Check className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Bereits gesehen ({watchedTotal})</span>
           </button>
         </div>
 
         {/* Media Type Switcher (Alle / Filme / Serien) */}
-        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800">
+        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full w-full sm:w-auto">
           <button
             type="button"
             onClick={() => setMediaTypeFilter("ALL")}
@@ -393,7 +393,7 @@ export default function MyListPage() {
                   )}
 
                   {/* Hover Quick Action Indicator */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center p-3 text-center">
+                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition hidden [@media(hover:hover)]:flex items-center justify-center p-3 text-center">
                     <span className="text-xs font-bold bg-amber-500 text-black px-3 py-1.5 rounded-xl shadow-lg">
                       Streaming & Details →
                     </span>
@@ -434,7 +434,7 @@ export default function MyListPage() {
                             isWatched: false,
                           });
                         }}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[10px] font-bold transition"
+                        className="flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[11px] sm:text-[10px] font-bold transition"
                         title="Als gesehen markieren & bewerten"
                       >
                         <Check className="w-3 h-3" />
@@ -454,7 +454,7 @@ export default function MyListPage() {
                             status: "WATCHLIST",
                           });
                         }}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-black border border-sky-500/30 text-[10px] font-bold transition"
+                        className="flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-black border border-sky-500/30 text-[11px] sm:text-[10px] font-bold transition"
                         title="Zurück auf die Watchlist"
                       >
                         <Bookmark className="w-3 h-3" />
@@ -473,7 +473,7 @@ export default function MyListPage() {
                           status: "NONE",
                         });
                       }}
-                      className="text-slate-500 hover:text-rose-400 p-1 rounded hover:bg-rose-500/10 transition"
+                      className="text-slate-500 hover:text-rose-400 p-1.5 sm:p-1 rounded hover:bg-rose-500/10 transition"
                       title="Aus Liste entfernen"
                     >
                       <Trash2 className="w-3.5 h-3.5" />

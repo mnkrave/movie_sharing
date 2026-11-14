@@ -28,7 +28,7 @@ interface CollectionDetailClientProps {
 
 export function CollectionDetailClient({ collection }: CollectionDetailClientProps) {
   const { data: session } = useSession();
-  const { communityData, updateMediaStatus, openMediaModal, openRatingModal } = useMedia();
+  const { communityData, updateMediaStatus, openMediaModal, openRatingModal, showToast } = useMedia();
 
   const [filterMode, setFilterMode] = useState<"all" | "unwatched" | "watched">("all");
   const [selectedSubGroup, setSelectedSubGroup] = useState<string>("ALL");
@@ -123,7 +123,11 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
   const handleToggleWatched = (movie: CollectionMovie, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session) {
-      alert("Bitte logge dich ein, um Filme als gesehen zu markieren!");
+      showToast("Bitte logge dich ein, um Filme als gesehen zu markieren!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     const watchedInfo = myWatchedMap.get(movie.id);
@@ -141,7 +145,11 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
   const handleToggleWatchlist = async (movie: CollectionMovie, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session) {
-      alert("Bitte logge dich ein, um Filme auf deiner Watchlist zu speichern!");
+      showToast("Bitte logge dich ein, um Filme auf deiner Watchlist zu speichern!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     const isOnWatchlist = myWatchlistSet.has(movie.id);
@@ -211,7 +219,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
             </div>
 
             {/* Giant Progress Card */}
-            <div className="p-6 rounded-3xl bg-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl flex-shrink-0 lg:w-96">
+            <div className="p-5 sm:p-6 rounded-3xl bg-slate-900/90 border border-slate-800/90 shadow-2xl backdrop-blur-xl w-full lg:w-96 lg:flex-shrink-0">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
                   {isComplete ? (
@@ -275,13 +283,13 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-4">
         {/* Row 1: Status Filter & Media Type & Sort */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 min-w-0">
             {/* Status Filter */}
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 overflow-x-auto scrollbar-none max-w-full">
               <button
                 type="button"
                 onClick={() => setFilterMode("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                   filterMode === "all"
                     ? "bg-amber-500 text-black shadow"
                     : "text-slate-400 hover:text-white"
@@ -292,7 +300,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
               <button
                 type="button"
                 onClick={() => setFilterMode("unwatched")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                   filterMode === "unwatched"
                     ? "bg-amber-500 text-black shadow"
                     : "text-slate-400 hover:text-white"
@@ -303,7 +311,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
               <button
                 type="button"
                 onClick={() => setFilterMode("watched")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                   filterMode === "watched"
                     ? "bg-emerald-500 text-black shadow"
                     : "text-slate-400 hover:text-white"
@@ -315,7 +323,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
 
             {/* Optional Type Filter for collections with series (like MCU) */}
             {hasTvSeries && (
-              <div className="flex items-center gap-1 pl-2 border-l border-slate-800">
+              <div className="flex items-center gap-1 sm:pl-2 sm:border-l sm:border-slate-800 overflow-x-auto scrollbar-none max-w-full">
                 <button
                   type="button"
                   onClick={() => setMediaTypeFilter("ALL")}
@@ -502,7 +510,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                       type="button"
                       onClick={(e) => handleToggleWatched(movie, e)}
                       title={isWatched ? "Als ungesehen markieren" : "Als gesehen markieren & bewerten"}
-                      className={`flex-1 py-1 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition ${
+                      className={`flex-1 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-bold flex items-center justify-center gap-1 transition ${
                         isWatched
                           ? "bg-emerald-500 text-black shadow-sm"
                           : "bg-slate-800 hover:bg-slate-700 text-slate-300"
@@ -516,7 +524,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                       type="button"
                       onClick={(e) => handleToggleWatchlist(movie, e)}
                       title={isOnWatchlist ? "Von Merkliste entfernen" : "Auf Merkliste setzen"}
-                      className={`py-1 px-2 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition ${
+                      className={`py-2 sm:py-1 px-2.5 sm:px-2 rounded-lg text-[11px] sm:text-[10px] font-bold flex items-center justify-center gap-1 transition ${
                         isOnWatchlist
                           ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/20 ring-1 ring-emerald-400"
                           : "bg-slate-800 hover:bg-slate-700 text-slate-300"

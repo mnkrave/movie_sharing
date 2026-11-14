@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
+import { useMedia } from "@/components/MediaContext";
 import {
   Shield,
   UserPlus,
@@ -22,6 +23,7 @@ interface WhitelistEntry {
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
+  const { confirmDialog } = useMedia();
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [newEmail, setNewEmail] = useState("");
@@ -89,7 +91,13 @@ export default function AdminPage() {
   };
 
   const handleRemove = async (email: string) => {
-    if (!confirm(`Möchtest du ${email} wirklich von der Whitelist entfernen?`)) return;
+    const confirmed = await confirmDialog({
+      title: "E-Mail von Whitelist entfernen?",
+      message: `Möchtest du ${email} wirklich von der Whitelist entfernen?`,
+      confirmLabel: "Entfernen",
+      dangerous: true,
+    });
+    if (!confirmed) return;
     try {
       const res = await fetch(`/api/admin/whitelist?email=${encodeURIComponent(email)}`, {
         method: "DELETE",
@@ -130,9 +138,9 @@ export default function AdminPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-10">
       {/* Header */}
-      <div className="flex items-center gap-4 p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-[#0e1424] border border-amber-500/30 shadow-xl">
-        <div className="p-3.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/40">
-          <Shield className="w-8 h-8" />
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-[#0e1424] border border-amber-500/30 shadow-xl">
+        <div className="p-3 sm:p-3.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/40 self-start sm:self-auto">
+          <Shield className="w-7 h-7 sm:w-8 sm:h-8" />
         </div>
         <div>
           <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
@@ -145,7 +153,7 @@ export default function AdminPage() {
       </div>
 
       {/* Invite Form */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
+      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <UserPlus className="w-5 h-5 text-amber-400" />
           <span>Freund freischalten & einladen</span>
@@ -181,23 +189,23 @@ export default function AdminPage() {
 
         {lastInviteLink && (
           <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 space-y-2 mt-4 animate-in fade-in">
-            <div className="flex items-center justify-between text-xs text-amber-300 font-bold">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-amber-300 font-bold">
               <span>Personalisierter Einladungslink generiert!</span>
               {emailSentNotice && (
                 <span className="text-emerald-400">✓ Einladungs-E-Mail via Resend verschickt</span>
               )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               <input
                 type="text"
                 readOnly
                 value={lastInviteLink}
-                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 font-mono"
+                className="w-full min-w-0 bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 font-mono"
               />
               <button
                 type="button"
                 onClick={() => copyToClipboard(lastInviteLink)}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 whitespace-nowrap"
+                className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 whitespace-nowrap"
               >
                 {copiedLink === lastInviteLink ? (
                   <>
@@ -215,7 +223,7 @@ export default function AdminPage() {
       </div>
 
       {/* Whitelisted Emails Table */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
+      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <Mail className="w-5 h-5 text-sky-400" />
           <span>Freigeschaltete E-Mails ({whitelist.length})</span>
@@ -274,7 +282,7 @@ export default function AdminPage() {
       </div>
 
       {/* Registered Users Overview */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
+      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
         <h3 className="text-lg font-bold text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-indigo-400" />
           <span>Registrierte Freunde ({users.length})</span>

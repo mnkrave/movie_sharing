@@ -38,6 +38,8 @@ export default function FriendsPage() {
     declineFriendRequest,
     removeFriend,
     searchUsers,
+    showToast,
+    confirmDialog,
   } = useMedia();
 
   const myName = session?.user?.name || "Ich";
@@ -154,7 +156,13 @@ export default function FriendsPage() {
   };
 
   const handleRemoveFriend = async (friendId: string, friendName: string) => {
-    if (!confirm(`Möchtest du die Freundschaft mit ${friendName} wirklich beenden?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Freundschaft beenden?",
+      message: `Möchtest du die Freundschaft mit ${friendName} wirklich beenden?`,
+      confirmLabel: "Freund entfernen",
+      dangerous: true,
+    });
+    if (!confirmed) return;
     setRemovingFriendId(friendId);
     const res = await removeFriend(friendId);
     setRemovingFriendId(null);
@@ -297,7 +305,7 @@ export default function FriendsPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
       {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-8 rounded-3xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-[#0e1424] border border-indigo-500/25 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-[#0e1424] border border-indigo-500/25 shadow-xl">
         <div className="space-y-1.5 max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/20 text-indigo-300 text-xs font-bold uppercase tracking-wider">
             <Users className="w-3.5 h-3.5" />
@@ -323,9 +331,17 @@ export default function FriendsPage() {
           ) : (
             <button
               type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(window.location.origin + "/register");
-                alert("Einladungslink in die Zwischenablage kopiert! Schicke ihn deinen Freunden oder deiner Familie.");
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(window.location.origin + "/register");
+                  showToast("Einladungslink in die Zwischenablage kopiert!", {
+                    type: "success",
+                  });
+                } catch {
+                  showToast("Link konnte nicht automatisch kopiert werden.", {
+                    type: "error",
+                  });
+                }
               }}
               className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
             >
@@ -365,7 +381,7 @@ export default function FriendsPage() {
 
       {/* Pending Incoming Friend Requests Banner */}
       {pendingReceived.length > 0 && (
-        <div className="p-6 rounded-3xl bg-amber-950/30 border border-amber-500/40 space-y-4 shadow-xl">
+        <div className="p-5 sm:p-6 rounded-3xl bg-amber-950/30 border border-amber-500/40 space-y-4 shadow-xl">
           <div className="flex items-center gap-2 text-amber-300">
             <UserPlus className="w-5 h-5" />
             <h3 className="text-base font-black tracking-tight">
@@ -548,7 +564,7 @@ export default function FriendsPage() {
       </div>
 
       {/* CineCrews / Friend Groups for AI Group Match */}
-      <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-5">
+      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
@@ -593,7 +609,7 @@ export default function FriendsPage() {
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-300 mb-1.5">Icon wählen</label>
-                <div className="flex items-center gap-1.5">
+                <div className="flex flex-wrap items-center gap-1.5">
                   {["🛋️", "🍿", "✨", "🍻", "🔥", "🍕", "👨‍👩‍👧‍👦"].map((em) => (
                     <button
                       key={em}
@@ -699,7 +715,7 @@ export default function FriendsPage() {
               </div>
 
               {/* Add custom member input */}
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="text"
                   value={newCustomMemberInput}
@@ -781,8 +797,14 @@ export default function FriendsPage() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (confirm(`Gruppe „${grp.name}“ wirklich löschen?`)) {
+                      onClick={async () => {
+                        const confirmed = await confirmDialog({
+                          title: "Gruppe löschen?",
+                          message: `Gruppe „${grp.name}“ wirklich löschen?`,
+                          confirmLabel: "Löschen",
+                          dangerous: true,
+                        });
+                        if (confirmed) {
                           deleteFriendGroup(grp.id);
                         }
                       }}
@@ -998,7 +1020,7 @@ export default function FriendsPage() {
                   <span className="block text-[11px] font-semibold text-slate-400 mb-1">
                     Oder weiteres Mitglied per Name hinzufügen:
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
                       value={editCustomMemberInput}
@@ -1026,22 +1048,28 @@ export default function FriendsPage() {
               </div>
 
               {/* Actions */}
-              <div className="flex items-center justify-between pt-3 border-t border-slate-800/80">
+              <div className="flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800/80">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (confirm(`Möchtest du die Gruppe „${editingGroup.name}“ wirklich löschen?`)) {
+                  onClick={async () => {
+                    const confirmed = await confirmDialog({
+                      title: "Gruppe löschen?",
+                      message: `Möchtest du die Gruppe „${editingGroup.name}“ wirklich löschen?`,
+                      confirmLabel: "Gruppe löschen",
+                      dangerous: true,
+                    });
+                    if (confirmed) {
                       deleteFriendGroup(editingGroup.id);
                       setEditingGroup(null);
                     }
                   }}
-                  className="px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 transition flex items-center gap-1"
+                  className="w-full sm:w-auto justify-center px-3 py-2 rounded-xl text-xs font-bold text-rose-400 hover:bg-rose-500/10 border border-rose-500/20 transition flex items-center gap-1"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Gruppe löschen</span>
                 </button>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={handleCloseEdit}
@@ -1065,8 +1093,8 @@ export default function FriendsPage() {
 
       {/* Friends Cards (Only Accepted Friends) */}
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-black text-white flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
             <span>Deine befreundeten Kontakte ({myFriends.length})</span>
           </h2>
           <span className="text-xs text-slate-400">

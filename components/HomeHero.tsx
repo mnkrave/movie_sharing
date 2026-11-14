@@ -38,7 +38,7 @@ export function HomeHero({
   initialGenericMovies = [],
   initialGenericTv = [],
 }: HomeHeroProps) {
-  const { openMediaModal, communityData, updateMediaStatus, userSubscriptions } = useMedia();
+  const { openMediaModal, communityData, updateMediaStatus, userSubscriptions, showToast } = useMedia();
   const { data: session } = useSession();
 
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -218,7 +218,11 @@ export function HomeHero({
   const handleWatchlist = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!session) {
-      alert("Bitte logge dich ein, um deine Merkliste zu speichern!");
+      showToast("Bitte logge dich ein, um deine Merkliste zu speichern!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     updateMediaStatus({
@@ -292,7 +296,7 @@ export function HomeHero({
       <div className="absolute inset-0 bg-gradient-to-r from-[#07090e] via-[#07090e]/85 md:via-[#07090e]/45 to-transparent z-10" />
 
       {/* Main Content Area */}
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[520px] sm:min-h-[580px] flex items-center py-10 sm:py-14">
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[430px] sm:min-h-[580px] flex items-center pt-10 pb-16 sm:py-14">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center w-full">
           {/* Left Column: Title, Overview & Actions */}
           <div className="md:col-span-8 lg:col-span-8 space-y-4 animate-in fade-in duration-300">
@@ -347,12 +351,12 @@ export function HomeHero({
             </p>
 
             {/* Action Buttons */}
-            <div className="flex flex-wrap items-center gap-3 pt-3">
+            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 pt-2 sm:pt-3">
               {/* Primary Action Button */}
               <button
                 type="button"
                 onClick={() => openMediaModal(currentItem)}
-                className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-xl shadow-amber-500/30 hover:scale-105 cursor-pointer"
+                className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-5 sm:px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-xl shadow-amber-500/30 hover:scale-105 cursor-pointer"
               >
                 <Play className="w-4 h-4 fill-slate-950" />
                 <span>Details, Trailer & Stream</span>
@@ -362,7 +366,7 @@ export function HomeHero({
               <button
                 type="button"
                 onClick={handleWatchlist}
-                className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
+                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
                   isWatchlist
                     ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/25"
                     : "bg-slate-900/80 hover:bg-slate-800 text-white border-slate-700/80 backdrop-blur-md hover:border-slate-600"
@@ -438,14 +442,14 @@ export function HomeHero({
         </div>
       </div>
 
-      {/* Carousel Navigation Arrows (Left & Right) */}
+      {/* Carousel Navigation Arrows (Desktop Side Controls - Hidden on mobile to avoid text overlap) */}
       {slides.length > 1 && (
         <>
           <button
             type="button"
             onClick={handlePrev}
             aria-label="Vorheriger Titel"
-            className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/40 hover:bg-black/80 border border-white/10 text-white/70 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100"
+            className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/40 hover:bg-black/80 border border-white/10 text-white/70 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100"
           >
             <ChevronLeft className="w-5 h-5" />
           </button>
@@ -454,16 +458,25 @@ export function HomeHero({
             type="button"
             onClick={handleNext}
             aria-label="Nächster Titel"
-            className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/40 hover:bg-black/80 border border-white/10 text-white/70 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100"
+            className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/40 hover:bg-black/80 border border-white/10 text-white/70 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100"
           >
             <ChevronRight className="w-5 h-5" />
           </button>
         </>
       )}
 
-      {/* Bottom Carousel Navigation Indicators */}
+      {/* Bottom Carousel Navigation Indicators (+ compact mobile arrows) */}
       {slides.length > 1 && (
-        <div className="absolute bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-2">
+        <div className="absolute bottom-3 sm:bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-1 sm:gap-1.5 px-4">
+          <button
+            type="button"
+            onClick={handlePrev}
+            aria-label="Vorheriger Titel"
+            className="sm:hidden p-2 rounded-full bg-black/45 hover:bg-black/75 border border-white/10 text-white/80 hover:text-white transition mr-1"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
           {slides.map((s, idx) => {
             const isActive = idx === (currentIndex % slides.length);
             return (
@@ -472,15 +485,28 @@ export function HomeHero({
                 type="button"
                 onClick={() => setCurrentIndex(idx)}
                 title={`${idx + 1}. ${s.item.title} (${s.item.mediaType === "tv" ? "Serie" : "Film"})`}
-                className={`transition-all duration-300 rounded-full cursor-pointer flex items-center justify-center ${
-                  isActive
-                    ? "w-8 h-2.5 bg-amber-400 shadow-md shadow-amber-400/50"
-                    : "w-2.5 h-2.5 bg-slate-700/80 hover:bg-slate-500"
-                }`}
+                className="p-1.5 cursor-pointer flex items-center justify-center group/dot"
                 aria-label={`Slide ${idx + 1} - ${s.item.title}`}
-              />
+              >
+                <span
+                  className={`block transition-all duration-300 rounded-full ${
+                    isActive
+                      ? "w-7 sm:w-8 h-2.5 bg-amber-400 shadow-md shadow-amber-400/50"
+                      : "w-2.5 h-2.5 bg-slate-600/90 group-hover/dot:bg-slate-400"
+                  }`}
+                />
+              </button>
             );
           })}
+
+          <button
+            type="button"
+            onClick={handleNext}
+            aria-label="Nächster Titel"
+            className="sm:hidden p-2 rounded-full bg-black/45 hover:bg-black/75 border border-white/10 text-white/80 hover:text-white transition ml-1"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       )}
     </section>

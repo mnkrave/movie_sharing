@@ -38,6 +38,8 @@ export function RecommendationThread({
     deleteRecommendationReply,
     currentUserAvatar,
     communityData,
+    showToast,
+    confirmDialog,
   } = useMedia();
 
   const [replyText, setReplyText] = useState("");
@@ -57,7 +59,11 @@ export function RecommendationThread({
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) {
-      alert("Bitte logge dich ein, um eine Antwort zu schreiben!");
+      showToast("Bitte logge dich ein, um eine Antwort zu schreiben!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     const trimmed = replyText.trim();
@@ -204,8 +210,14 @@ export function RecommendationThread({
                 {mine && (
                   <button
                     type="button"
-                    onClick={() => {
-                      if (confirm("Möchtest du diese Antwort löschen?")) {
+                    onClick={async () => {
+                      const confirmed = await confirmDialog({
+                        title: "Antwort löschen?",
+                        message: "Möchtest du diese Antwort löschen?",
+                        confirmLabel: "Löschen",
+                        dangerous: true,
+                      });
+                      if (confirmed) {
                         deleteRecommendationReply(rep.id);
                       }
                     }}

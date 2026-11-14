@@ -1,12 +1,19 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { MediaItem } from "@/lib/tmdb";
 import { MediaModal } from "./MediaModal";
 import { SearchModal } from "./SearchModal";
 import { SubscriptionModal } from "./SubscriptionModal";
 import { QuickRatingModal, RatingTarget } from "./QuickRatingModal";
 import { AvatarPickerModal } from "./AvatarPickerModal";
+import {
+  ConfirmDialogModal,
+  ConfirmDialogOptions,
+  ToastItem,
+  ToastOptions,
+  ToastStack,
+} from "./FeedbackOverlay";
 import { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
@@ -109,6 +116,8 @@ interface MediaContextType {
   closeAvatarPicker: () => void;
   currentUserAvatar: string | null;
   updateUserAvatar: (avatarUrl: string | null) => Promise<void>;
+  showToast: (message: string, options?: ToastOptions) => void;
+  confirmDialog: (options: ConfirmDialogOptions) => Promise<boolean>;
 }
 
 const MediaContext = createContext<MediaContextType | null>(null);
@@ -128,6 +137,18 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [isAvatarPickerOpen, setIsAvatarPickerOpen] = useState(false);
   const [currentUserAvatar, setCurrentUserAvatar] = useState<string | null>(null);
   const [ratingTarget, setRatingTarget] = useState<RatingTarget | null>(null);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const toastTimersRef = useRef<
+    Map<string, { timeoutId?: ReturnType<typeof setTimeout>; remainingMs: number; startedAt: number }>
+  >(new Map());
+  const toastPausedRef = useRef(false);
+  const [activeConfirm, setActiveConfirm] = useState<{
+    request: ConfirmDialogOptions & { id: string };
+    resolve: (confirmed: boolean) => void;
+  } | null>(null);
+  const confirmQueueRef = useRef<
+    Array<{ request: ConfirmDialogOptions & { id: string }; resolve: (confirmed: boolean) => void }>
+  >([]);
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
   const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
   const [friendGroups, setFriendGroupsState] = useState<FriendGroup[]>([]);
@@ -750,6 +771,112 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     setRatingTarget(null);
   };
 
+  const dismissToast = useCallback((id: string) => {
+    const timer = toastTimersRef.current.get(id);
+    if (timer?.timeoutId) clearTimeout(timer.timeoutId);
+    toastTimersRef.current.delete(id);
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const scheduleToastRemoval = useCallback(
+    (id: string, delayMs: number) => {
+      const existing = toastTimersRef.current.get(id);
+      if (existing?.timeoutId) clearTimeout(existing.timeoutId);
+
+      if (toastPausedRef.current) {
+        toastTimersRef.current.set(id, { remainingMs: delayMs, startedAt: Date.now() });
+        return;
+      }
+
+      const timeoutId = setTimeout(() => {
+        dismissToast(id);
+      }, delayMs);
+      toastTimersRef.current.set(id, { timeoutId, remainingMs: delayMs, startedAt: Date.now() });
+    },
+    [dismissToast]
+  );
+
+  const showToast = useCallback(
+    (message: string, options?: ToastOptions) => {
+      const id = `toast_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      const item: ToastItem = {
+        id,
+        message,
+        type: options?.type ?? "info",
+        actionLabel: options?.actionLabel,
+        actionHref: options?.actionHref,
+      };
+      const durationMs = options?.durationMs ?? (options?.actionHref ? 6500 : 4000);
+
+      setToasts((prev) => [...prev.slice(-2), item]);
+      scheduleToastRemoval(id, durationMs);
+    },
+    [scheduleToastRemoval]
+  );
+
+  const handleToastPauseChange = useCallback(
+    (paused: boolean) => {
+      toastPausedRef.current = paused;
+      if (paused) {
+        const now = Date.now();
+        toastTimersRef.current.forEach((entry, id) => {
+          if (entry.timeoutId) {
+            clearTimeout(entry.timeoutId);
+            const elapsed = now - entry.startedAt;
+            toastTimersRef.current.set(id, {
+              remainingMs: Math.max(800, entry.remainingMs - elapsed),
+              startedAt: now,
+            });
+          }
+        });
+      } else {
+        toastTimersRef.current.forEach((entry, id) => {
+          if (!entry.timeoutId) {
+            scheduleToastRemoval(id, entry.remainingMs);
+          }
+        });
+      }
+    },
+    [scheduleToastRemoval]
+  );
+
+  const confirmDialog = useCallback((options: ConfirmDialogOptions) => {
+    return new Promise<boolean>((resolve) => {
+      const entry = {
+        request: {
+          ...options,
+          id: `confirm_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        },
+        resolve,
+      };
+      setActiveConfirm((current) => {
+        if (!current) return entry;
+        confirmQueueRef.current.push(entry);
+        return current;
+      });
+    });
+  }, []);
+
+  const handleResolveConfirm = useCallback((confirmed: boolean) => {
+    setActiveConfirm((current) => {
+      if (current) {
+        current.resolve(confirmed);
+      }
+      const next = confirmQueueRef.current.shift() || null;
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    const timers = toastTimersRef.current;
+    return () => {
+      timers.forEach((entry) => {
+        if (entry.timeoutId) clearTimeout(entry.timeoutId);
+      });
+      timers.clear();
+    };
+  }, []);
+
   return (
     <MediaContext.Provider
       value={{
@@ -789,6 +916,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         closeAvatarPicker: () => setIsAvatarPickerOpen(false),
         currentUserAvatar,
         updateUserAvatar,
+        showToast,
+        confirmDialog,
       }}
     >
       {children}
@@ -827,6 +956,17 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         currentAvatar={currentUserAvatar}
         userName={session?.user?.name || "Kino-Fan"}
         onSave={updateUserAvatar}
+      />
+
+      <ConfirmDialogModal
+        request={activeConfirm?.request ?? null}
+        onResolve={handleResolveConfirm}
+      />
+
+      <ToastStack
+        toasts={toasts}
+        onDismiss={dismissToast}
+        onPauseChange={handleToastPauseChange}
       />
     </MediaContext.Provider>
   );

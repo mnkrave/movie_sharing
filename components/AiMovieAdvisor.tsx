@@ -321,7 +321,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
             })}
             <button
               type="submit"
-              className="ml-auto px-4 py-1.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-black font-bold text-xs"
+              className="w-full sm:w-auto sm:ml-auto px-4 py-2 sm:py-1.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-black font-bold text-xs"
             >
               Gruppe speichern
             </button>

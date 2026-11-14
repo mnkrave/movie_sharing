@@ -122,6 +122,7 @@ function ExtendedSearchContent() {
   const [loading, setLoading] = useState(true);
   const [matchingPersons, setMatchingPersons] = useState<PersonSearchResult[]>([]);
   const [selectedActorPerson, setSelectedActorPerson] = useState<PersonSearchResult | null>(null);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   // Auto-resolve actor profile info when actor filter changes
   useEffect(() => {
@@ -218,14 +219,17 @@ function ExtendedSearchContent() {
     return () => clearTimeout(timer);
   }, [fetchResults]);
 
-  const activeFilterCount =
-    (mediaType !== "all" ? 1 : 0) +
+  const advancedFilterCount =
     (genreId !== null ? 1 : 0) +
     (director.trim() ? 1 : 0) +
     (actor.trim() ? 1 : 0) +
     (country !== "ALL" ? 1 : 0) +
     (minRating > 0 ? 1 : 0) +
-    (era !== "all" ? 1 : 0) +
+    (era !== "all" ? 1 : 0);
+
+  const activeFilterCount =
+    (mediaType !== "all" ? 1 : 0) +
+    advancedFilterCount +
     (query.trim() ? 1 : 0);
 
   const resetAllFilters = () => {
@@ -280,15 +284,15 @@ function ExtendedSearchContent() {
       {/* Main Content Area: Controls + Results */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 space-y-6">
         {/* Filter Controls Box */}
-        <div className="rounded-2xl bg-[#0c111e] border border-slate-800/90 p-5 shadow-xl space-y-5">
+        <div className="rounded-2xl bg-[#0c111e] border border-slate-800/90 p-4 sm:p-5 shadow-xl space-y-4 sm:space-y-5">
           {/* Row 1: Format Toggle & Sort Options */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800/80 pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-2.5 sm:gap-3 border-b border-slate-800/80 pb-4">
             {/* Format Pills */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full w-full sm:w-auto">
               <button
                 type="button"
                 onClick={() => setMediaType("all")}
-                className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`flex-1 sm:flex-initial justify-center whitespace-nowrap px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                   mediaType === "all"
                     ? "bg-amber-500 text-slate-950 shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -299,38 +303,38 @@ function ExtendedSearchContent() {
               <button
                 type="button"
                 onClick={() => setMediaType("movie")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`flex-1 sm:flex-initial justify-center whitespace-nowrap flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                   mediaType === "movie"
                     ? "bg-amber-500 text-slate-950 shadow-sm"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                <Film className="w-3.5 h-3.5" />
+                <Film className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>Nur Filme</span>
               </button>
               <button
                 type="button"
                 onClick={() => setMediaType("tv")}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
+                className={`flex-1 sm:flex-initial justify-center whitespace-nowrap flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
                   mediaType === "tv"
                     ? "bg-cyan-500 text-slate-950 shadow-sm"
                     : "text-slate-400 hover:text-white"
                 }`}
               >
-                <Tv className="w-3.5 h-3.5" />
+                <Tv className="w-3.5 h-3.5 flex-shrink-0" />
                 <span>Nur Serien</span>
               </button>
             </div>
 
             {/* Sort Options */}
-            <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full w-full sm:w-auto">
               <span className="text-[11px] font-semibold text-slate-400 px-2 hidden sm:inline">
                 Sortierung:
               </span>
               <button
                 type="button"
                 onClick={() => setSortBy("popularity.desc")}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                className={`flex-1 sm:flex-initial whitespace-nowrap px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition ${
                   sortBy === "popularity.desc"
                     ? "bg-slate-800 text-amber-300 shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -341,7 +345,7 @@ function ExtendedSearchContent() {
               <button
                 type="button"
                 onClick={() => setSortBy("vote_average.desc")}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                className={`flex-1 sm:flex-initial whitespace-nowrap px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition ${
                   sortBy === "vote_average.desc"
                     ? "bg-slate-800 text-amber-300 shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -352,7 +356,7 @@ function ExtendedSearchContent() {
               <button
                 type="button"
                 onClick={() => setSortBy("primary_release_date.desc")}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                className={`flex-1 sm:flex-initial whitespace-nowrap px-2.5 sm:px-3 py-1 rounded-lg text-xs font-semibold transition ${
                   sortBy === "primary_release_date.desc"
                     ? "bg-slate-800 text-amber-300 shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -384,6 +388,42 @@ function ExtendedSearchContent() {
             )}
           </div>
 
+          {/* Mobile Advanced Filter Toggle + Jump to Results */}
+          <div className="flex md:hidden items-center justify-between gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setShowMobileFilters((v) => !v)}
+              aria-expanded={showMobileFilters}
+              className={`flex-1 flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl border text-xs font-bold transition ${
+                showMobileFilters || advancedFilterCount > 0
+                  ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
+                  : "bg-slate-950/80 border-slate-800 text-slate-300"
+              }`}
+            >
+              <Filter className="w-3.5 h-3.5" />
+              <span>
+                Erweiterte Filter{advancedFilterCount > 0 ? ` (${advancedFilterCount})` : ""}
+              </span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                  showMobileFilters ? "rotate-180" : ""
+                }`}
+              />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                document.getElementById("search-results")?.scrollIntoView({ behavior: "smooth" })
+              }
+              className="px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs font-bold text-slate-300 whitespace-nowrap"
+            >
+              Treffer ({results.length}) ↓
+            </button>
+          </div>
+
+          {/* Advanced Filters (collapsible on mobile, always expanded on md+ desktop) */}
+          <div className={`${showMobileFilters ? "block" : "hidden"} md:block space-y-5`}>
           {/* Row 3: Regie (Director) */}
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs font-bold text-slate-300">
@@ -621,10 +661,11 @@ function ExtendedSearchContent() {
               </div>
             </div>
           </div>
+          </div>
         </div>
 
         {/* Results Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <div id="search-results" className="flex flex-wrap items-center justify-between gap-3 pt-2 scroll-mt-20">
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-bold text-white">
               Gefundene Titel ({results.length})

@@ -45,6 +45,7 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
     removeFriend,
     sendFriendRequest,
     currentUserAvatar,
+    confirmDialog,
   } = useMedia();
 
   const [activeTab, setActiveTab] = useState<"watched" | "watchlist" | "recommendations">("watched");
@@ -226,7 +227,13 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
 
   const handleUnfriend = async () => {
     if (!friend) return;
-    if (!confirm(`Möchtest du die Freundschaft mit ${friend.name} wirklich beenden?`)) return;
+    const confirmed = await confirmDialog({
+      title: "Freundschaft beenden?",
+      message: `Möchtest du die Freundschaft mit ${friend.name} wirklich beenden?`,
+      confirmLabel: "Freund entfernen",
+      dangerous: true,
+    });
+    if (!confirmed) return;
     const res = await removeFriend(friend.id);
     if (res.success) {
       router.push("/friends");
@@ -314,7 +321,7 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
       </div>
 
       {/* Main Profile Header Card */}
-      <div className="relative overflow-hidden p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900 to-[#0c1222] border border-indigo-500/25 shadow-2xl space-y-6">
+      <div className="relative overflow-hidden p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-indigo-950/60 via-slate-900 to-[#0c1222] border border-indigo-500/25 shadow-2xl space-y-6">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="flex items-center gap-4 sm:gap-6 min-w-0">
             {friendAvatar ? (

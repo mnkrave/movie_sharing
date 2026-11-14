@@ -81,7 +81,7 @@ export function CollectionsClient({ collections }: CollectionsClientProps) {
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 pb-20">
       {/* Hero Header */}
-      <div className="relative border-b border-slate-800/80 bg-gradient-to-b from-[#0f172a]/60 via-[#0a0f1d] to-[#07090e] py-12 px-4 sm:px-6 lg:px-8">
+      <div className="relative border-b border-slate-800/80 bg-gradient-to-b from-[#0f172a]/60 via-[#0a0f1d] to-[#07090e] py-8 sm:py-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div>
@@ -99,7 +99,7 @@ export function CollectionsClient({ collections }: CollectionsClientProps) {
             </div>
 
             {/* Total progress banner */}
-            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl flex-shrink-0 min-w-[280px]">
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl w-full md:w-auto md:flex-shrink-0 md:min-w-[280px]">
               <div className="flex items-center justify-between text-xs mb-1.5">
                 <span className="font-bold text-slate-300 flex items-center gap-1.5">
                   <TrendingUp className="w-4 h-4 text-amber-400" />
@@ -125,7 +125,7 @@ export function CollectionsClient({ collections }: CollectionsClientProps) {
           {/* Filter Tabs and Search */}
           <div className="mt-8 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             {/* Category Tabs */}
-            <div className="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-2xl border border-slate-800 overflow-x-auto">
+            <div className="flex items-center gap-1.5 bg-slate-900/80 p-1 rounded-2xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full">
               <button
                 type="button"
                 onClick={() => setSelectedCategory("all")}
@@ -162,7 +162,7 @@ export function CollectionsClient({ collections }: CollectionsClientProps) {
             </div>
 
             {/* Live Search */}
-            <div className="relative min-w-[260px]">
+            <div className="relative w-full sm:w-auto sm:min-w-[260px]">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
                 type="text"

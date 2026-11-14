@@ -70,6 +70,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     onlyMySubs,
     setOnlyMySubs,
     toggleOnlyMySubs,
+    showToast,
+    confirmDialog,
   } = useMedia();
 
   const curatedCollection = useMemo(() => {
@@ -162,7 +164,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
@@ -227,7 +229,11 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   const handleStatusChange = async (status: "WATCHED" | "WATCHLIST" | "NONE", rating?: number) => {
     if (!session) {
-      alert("Bitte logge dich ein, um Filme auf deiner Liste zu speichern!");
+      showToast("Bitte logge dich ein, um Filme auf deiner Liste zu speichern!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
     await updateMediaStatus({
@@ -245,7 +251,11 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   const handleRecSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!session) {
-      alert("Bitte logge dich ein, um eine Empfehlung abzugeben!");
+      showToast("Bitte logge dich ein, um eine Empfehlung abzugeben!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
       return;
     }
 
@@ -352,7 +362,13 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   const handleDeleteMyRec = async () => {
     if (!myRec) return;
-    if (confirm("Möchtest du deine Empfehlung wirklich entfernen?")) {
+    const confirmed = await confirmDialog({
+      title: "Empfehlung entfernen?",
+      message: "Möchtest du deine Empfehlung wirklich entfernen?",
+      confirmLabel: "Entfernen",
+      dangerous: true,
+    });
+    if (confirmed) {
       setSubmittingRec(true);
       await deleteRecommendation(myRec.id);
       setSubmittingRec(false);
@@ -431,7 +447,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
         {/* Scrollable Container */}
         <div className="overflow-y-auto flex-1 overscroll-contain pb-[env(safe-area-inset-bottom)]">
           {/* Hero Backdrop Banner */}
-          <div className="relative h-64 sm:h-80 w-full bg-slate-900">
+          <div className="relative h-52 sm:h-80 w-full bg-slate-900">
             {details?.backdropPath ? (
               <Image
                 src={`https://image.tmdb.org/t/p/w1280${details.backdropPath}`}
@@ -673,7 +689,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             </div>
 
             {/* Quick Action Bar (Watched, Watchlist, Recommend) */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3 my-5 p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 my-5 p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
               <button
                 type="button"
                 onClick={() => {
@@ -683,14 +699,14 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     setShowRatingSelector(!showRatingSelector);
                   }
                 }}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+                className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
                   myStatusObj?.status === "WATCHED"
                     ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                     : "bg-slate-800 hover:bg-slate-700 text-slate-200"
                 }`}
               >
-                <Check className="w-4 h-4 stroke-[2.5]" />
-                <span>
+                <Check className="w-4 h-4 stroke-[2.5] flex-shrink-0" />
+                <span className="truncate">
                   {myStatusObj?.status === "WATCHED"
                     ? `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10 ★` : "✓"})`
                     : "Als gesehen markieren"}
@@ -702,18 +718,18 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 onClick={() =>
                   handleStatusChange(myStatusObj?.status === "WATCHLIST" ? "NONE" : "WATCHLIST")
                 }
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition ${
+                className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
                   myStatusObj?.status === "WATCHLIST"
                     ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/50"
                     : "bg-slate-800 hover:bg-slate-700 text-slate-200"
                 }`}
               >
                 {myStatusObj?.status === "WATCHLIST" ? (
-                  <Check className="w-4 h-4 stroke-[2.5]" />
+                  <Check className="w-4 h-4 stroke-[2.5] flex-shrink-0" />
                 ) : (
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-4 h-4 flex-shrink-0" />
                 )}
-                <span>
+                <span className="truncate">
                   {myStatusObj?.status === "WATCHLIST" ? "Auf Merkliste ✓" : "Merkliste"}
                 </span>
               </button>
@@ -721,7 +737,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               <button
                 type="button"
                 onClick={handleOpenRecForm}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-lg ml-auto ${
+                className={`col-span-2 sm:col-span-1 sm:ml-auto flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition shadow-lg ${
                   myRec
                     ? "bg-purple-500/20 text-purple-200 border border-purple-500/40 hover:bg-purple-500/30 shadow-purple-500/10"
                     : "bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black shadow-rose-500/20"
@@ -1199,7 +1215,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             {activeTab === "de" && (
               <div className="space-y-6 pb-8">
                 {/* Status notice when filter is active */}
-                <div className="flex items-center justify-between text-xs text-slate-400">
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
                   <span>
                     {onlyMySubs
                       ? `Filter aktiv: Nur deine hinterlegten Abos (${userSubscriptions.length} gewählt)`
@@ -1209,7 +1225,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     <button
                       type="button"
                       onClick={() => setOnlyMySubs(false)}
-                      className="text-amber-400 hover:underline font-medium"
+                      className="text-amber-400 hover:underline font-medium whitespace-nowrap"
                     >
                       {hiddenDECount} weitere Anbieter anzeigen
                     </button>
@@ -1392,7 +1408,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     (z. B. Japan 🇯🇵 oder UK 🇬🇧) verbinden und direkt streamen.
                   </div>
 
-                  <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
                       onClick={toggleOnlyMySubs}
@@ -1622,26 +1638,26 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                 : "bg-slate-900/80 border-slate-800"
                             }`}
                           >
-                            <div className="flex items-center justify-between">
+                            <div className="flex flex-wrap items-start sm:items-center justify-between gap-2">
                               <Link
                                 href={isMine ? "/profile" : `/friends/${encodeURIComponent(rec.userId || rec.userName)}`}
                                 onClick={onClose}
-                                className="flex items-center gap-2.5 group hover:opacity-90 transition-opacity"
+                                className="flex items-start sm:items-center gap-2.5 group hover:opacity-90 transition-opacity min-w-0 flex-1"
                                 title={isMine ? "Dein Profil aufrufen" : `Profil von ${rec.userName} aufrufen`}
                               >
-                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 text-black font-bold flex items-center justify-center text-xs group-hover:ring-2 group-hover:ring-amber-400 transition-all">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-500 to-rose-500 text-black font-bold flex items-center justify-center text-xs group-hover:ring-2 group-hover:ring-amber-400 transition-all flex-shrink-0">
                                   {rec.userName.slice(0, 1)}
                                 </div>
-                                <div>
+                                <div className="min-w-0 flex flex-wrap items-center gap-1.5">
                                   <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">{rec.userName}</span>
                                   {isMine && (
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold ml-1.5 border border-purple-500/30">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/25 text-purple-300 font-bold border border-purple-500/30">
                                       Du
                                     </span>
                                   )}
                                   {rec.targetNames && rec.targetNames.length > 0 ? (
-                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30 ml-1.5">
-                                      <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+                                    <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md bg-purple-500/20 text-purple-300 font-bold border border-purple-500/30">
+                                      <Sparkles className="w-2.5 h-2.5 text-purple-400 flex-shrink-0" />
                                       <span>
                                         {rec.targetNames.some((t) => t.startsWith("@"))
                                           ? `Für ${rec.targetNames.join(", ")}`
@@ -1651,17 +1667,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                       </span>
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700 ml-1.5">
-                                      <Users className="w-2.5 h-2.5 text-slate-500" />
+                                    <span className="inline-flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-md bg-slate-800 text-slate-400 border border-slate-700">
+                                      <Users className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />
                                       <span>Alle Freunde</span>
                                     </span>
                                   )}
-                                  <span className="text-[11px] text-slate-500 ml-2">
+                                  <span className="text-[11px] text-slate-500">
                                     {new Date(rec.createdAt).toLocaleDateString("de-DE")}
                                   </span>
                                 </div>
                               </Link>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-shrink-0">
                                 <div className="flex items-center gap-1 text-amber-400 font-extrabold text-sm bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
                                   <Star className="w-3.5 h-3.5 fill-amber-400" />
                                   {rec.rating}/10
@@ -2008,22 +2024,22 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <Link
                     href={`/collections/${curatedCollection.id}`}
                     onClick={() => onClose()}
-                    className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-purple-500/10 border border-amber-500/30 flex items-center justify-between hover:border-amber-400 transition group shadow-md"
+                    className="p-4 rounded-2xl bg-gradient-to-r from-amber-500/10 via-slate-900 to-purple-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:border-amber-400 transition group shadow-md"
                   >
-                    <div className="flex items-center gap-3.5">
+                    <div className="flex items-center gap-3.5 min-w-0">
                       <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-300 border border-amber-500/30 flex items-center justify-center text-xl flex-shrink-0">
                         🎬
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
                           CineCircle Universum & Sammlung
                         </div>
-                        <div className="text-sm font-black text-white group-hover:text-amber-300 transition">
+                        <div className="text-sm font-black text-white group-hover:text-amber-300 transition truncate">
                           {curatedCollection.name} ({curatedCollection.movies.length} Titel)
                         </div>
                       </div>
                     </div>
-                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1 group-hover:translate-x-1 transition">
+                    <span className="text-xs font-bold text-amber-400 flex items-center gap-1 group-hover:translate-x-1 transition whitespace-nowrap self-end sm:self-auto">
                       Ganze Reihe ansehen <ChevronRight className="w-4 h-4" />
                     </span>
                   </Link>

@@ -34,6 +34,7 @@ export default function FeedPage() {
     openSearch,
     userSubscriptions,
     currentUserAvatar,
+    confirmDialog,
   } = useMedia();
 
   // Filter States: Default is "FRIENDS", "hideWatched = true", "onlyStreamable = true"
@@ -200,7 +201,7 @@ export default function FeedPage() {
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
         <div className="space-y-1 max-w-md">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
@@ -231,17 +232,17 @@ export default function FeedPage() {
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 shadow-xl">
         {/* Row 1: Format & Author Switchers */}
         <div className="flex flex-wrap items-center justify-between gap-3.5">
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full sm:w-auto min-w-0">
             {/* Format Filter (Alle vs Filme vs Serien) */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex-shrink-0">
                 Format:
               </span>
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto scrollbar-none max-w-full">
                 <button
                   type="button"
                   onClick={() => setFilterType("ALL")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                     filterType === "ALL"
                       ? "bg-rose-500 text-white shadow"
                       : "text-slate-400 hover:text-white"
@@ -253,7 +254,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   onClick={() => setFilterType("movie")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                     filterType === "movie"
                       ? "bg-amber-500 text-black shadow"
                       : "text-slate-400 hover:text-white"
@@ -266,7 +267,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   onClick={() => setFilterType("tv")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                     filterType === "tv"
                       ? "bg-cyan-500 text-black shadow"
                       : "text-slate-400 hover:text-white"
@@ -279,15 +280,15 @@ export default function FeedPage() {
             </div>
 
             {/* Author Switcher (Standard: Von Freunden) */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider flex-shrink-0">
                 Ansicht:
               </span>
-              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto scrollbar-none max-w-full">
                 <button
                   type="button"
                   onClick={() => setAuthorFilter("FRIENDS")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                     authorFilter === "FRIENDS"
                       ? "bg-rose-500 text-white shadow"
                       : "text-slate-400 hover:text-white"
@@ -301,7 +302,7 @@ export default function FeedPage() {
                   <button
                     type="button"
                     onClick={() => setAuthorFilter("TARGETED")}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                       authorFilter === "TARGETED"
                         ? "bg-purple-500 text-black shadow font-extrabold"
                         : "text-purple-300 hover:text-white"
@@ -315,7 +316,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   onClick={() => setAuthorFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                     authorFilter === "ALL"
                       ? "bg-slate-800 text-white shadow"
                       : "text-slate-400 hover:text-white"
@@ -327,7 +328,7 @@ export default function FeedPage() {
                 <button
                   type="button"
                   onClick={() => setAuthorFilter("MINE")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap flex-shrink-0 ${
                     authorFilter === "MINE"
                       ? "bg-amber-500 text-black shadow"
                       : "text-slate-400 hover:text-white"
@@ -427,7 +428,7 @@ export default function FeedPage() {
             return (
               <div
                 key={rec.id}
-                className={`p-5 sm:p-6 rounded-3xl border transition shadow-lg flex flex-col sm:flex-row gap-5 ${
+                className={`p-4 sm:p-6 rounded-3xl border transition shadow-lg grid grid-cols-[5.25rem_1fr] sm:grid-cols-[7rem_1fr] gap-x-3.5 sm:gap-x-5 gap-y-3 ${
                   isMyOwn
                     ? "bg-gradient-to-br from-slate-900/90 to-[#121828] border-amber-500/30"
                     : "bg-slate-900/70 border-slate-800 hover:border-slate-700"
@@ -443,7 +444,7 @@ export default function FeedPage() {
                       posterPath: rec.posterPath,
                     })
                   }
-                  className="w-24 sm:w-28 aspect-[2/3] rounded-2xl overflow-hidden bg-slate-800 flex-shrink-0 cursor-pointer relative shadow-md group"
+                  className="w-full aspect-[2/3] sm:row-span-2 rounded-2xl overflow-hidden bg-slate-800 cursor-pointer relative shadow-md group self-start"
                 >
                   {rec.posterPath ? (
                     <Image
@@ -458,157 +459,164 @@ export default function FeedPage() {
                       <Film className="w-6 h-6" />
                     </div>
                   )}
-                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white text-[10px] font-bold">
+                  <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition hidden [@media(hover:hover)]:flex items-center justify-center text-white text-[10px] font-bold">
                     Öffnen
                   </div>
                 </div>
 
-                {/* Content */}
-                <div className="flex-1 flex flex-col justify-between space-y-3">
-                  <div>
-                    {/* User & Rating Header */}
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <Link
-                        href={isMyOwn ? "/profile" : `/friends/${encodeURIComponent(rec.userId || rec.userName)}`}
-                        className="flex items-center gap-2.5 group hover:opacity-95 transition-opacity"
-                        title={isMyOwn ? "Dein Profil aufrufen" : `Profil von ${rec.userName} ansehen`}
-                      >
-                        {(() => {
-                          const authorImg = isMyOwn
-                            ? currentUserAvatar || rec.userImage
-                            : rec.userImage ||
-                              communityData.friends.find(
-                                (f) => f.name === rec.userName || f.id === rec.userId
-                              )?.image;
-
-                          return authorImg ? (
-                            <div className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-500/40 flex-shrink-0 shadow group-hover:border-amber-400 transition-colors">
-                              <Image
-                                src={authorImg}
-                                alt={rec.userName}
-                                fill
-                                sizes="32px"
-                                className="object-cover"
-                              />
-                            </div>
-                          ) : (
-                            <div
-                              className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow flex-shrink-0 group-hover:ring-2 group-hover:ring-amber-400 transition-all ${
-                                isMyOwn
-                                  ? "bg-amber-400"
-                                  : "bg-gradient-to-tr from-amber-500 to-rose-500"
-                              }`}
-                            >
-                              {rec.userName.slice(0, 1)}
-                            </div>
-                          );
-                        })()}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors">
-                              {rec.userName}
-                            </span>
-                            {isMyOwn && (
-                              <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/30">
-                                Du
-                              </span>
-                            )}
-                            {isWatchedByMe && (
-                              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-semibold border border-emerald-500/30">
-                                Von dir gesehen ✓
-                              </span>
-                            )}
-                            {rec.targetNames && rec.targetNames.length > 0 ? (
-                              <span className="inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-bold border border-purple-500/30">
-                                <Sparkles className="w-2.5 h-2.5 text-purple-400" />
-                                <span>
-                                  {rec.targetNames.some((t) => t.startsWith("@"))
-                                    ? `Für ${rec.targetNames.join(", ")}`
-                                    : isMyOwn
-                                    ? `An ${rec.targetNames.join(", ")}`
-                                    : `Speziell für dich!`}
-                                </span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center gap-1 text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium border border-slate-700">
-                                <Users className="w-2.5 h-2.5 text-slate-500" />
-                                <span>Alle Freunde</span>
-                              </span>
-                            )}
-                          </div>
-                          <span className="text-[11px] text-slate-500">
-                            {new Date(rec.createdAt).toLocaleDateString("de-DE")}
-                          </span>
-                        </div>
-                      </Link>
-
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-sm">
-                          <Star className="w-3.5 h-3.5 fill-amber-400" />
-                          <span>{rec.rating}/10</span>
-                        </div>
-                        {isMyOwn && (
-                          <div className="flex items-center gap-0.5 ml-1">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                openMediaModal({
-                                  id: rec.tmdbId,
-                                  mediaType: rec.mediaType,
-                                  title: rec.title,
-                                  posterPath: rec.posterPath,
-                                })
-                              }
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
-                              title="Empfehlung bearbeiten"
-                            >
-                              <Pencil className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  confirm(`Möchtest du deine Empfehlung für „${rec.title}“ wirklich entfernen?`)
-                                ) {
-                                  deleteRecommendation(rec.id);
-                                }
-                              }}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
-                              title="Empfehlung entfernen"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Movie/TV Title */}
-                    <div
-                      onClick={() =>
-                        openMediaModal({
-                          id: rec.tmdbId,
-                          mediaType: rec.mediaType,
-                          title: rec.title,
-                          posterPath: rec.posterPath,
-                        })
-                      }
-                      className="cursor-pointer group inline-block"
+                {/* Header + Title (sits beside poster on mobile & top row on desktop) */}
+                <div className="col-start-2 min-w-0 flex flex-col justify-center sm:justify-start">
+                  {/* User & Rating Header */}
+                  <div className="flex flex-wrap items-start justify-between gap-2 mb-1.5">
+                    <Link
+                      href={isMyOwn ? "/profile" : `/friends/${encodeURIComponent(rec.userId || rec.userName)}`}
+                      className="flex items-start sm:items-center gap-2.5 group hover:opacity-95 transition-opacity min-w-0 flex-1"
+                      title={isMyOwn ? "Dein Profil aufrufen" : `Profil von ${rec.userName} ansehen`}
                     >
-                      <h3 className="text-lg font-bold text-white group-hover:text-amber-400 transition flex items-center gap-2">
-                        {rec.title}
-                        <span className="text-xs font-normal text-slate-400">
-                          ({rec.releaseYear || "–"})
-                        </span>
-                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                          {rec.mediaType === "tv" ? "Serie" : "Film"}
-                        </span>
-                      </h3>
-                    </div>
+                      {(() => {
+                        const authorImg = isMyOwn
+                          ? currentUserAvatar || rec.userImage
+                          : rec.userImage ||
+                            communityData.friends.find(
+                              (f) => f.name === rec.userName || f.id === rec.userId
+                            )?.image;
 
+                        return authorImg ? (
+                          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-amber-500/40 flex-shrink-0 shadow group-hover:border-amber-400 transition-colors">
+                            <Image
+                              src={authorImg}
+                              alt={rec.userName}
+                              fill
+                              sizes="32px"
+                              className="object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-black font-extrabold text-xs shadow flex-shrink-0 group-hover:ring-2 group-hover:ring-amber-400 transition-all ${
+                              isMyOwn
+                                ? "bg-amber-400"
+                                : "bg-gradient-to-tr from-amber-500 to-rose-500"
+                            }`}
+                          >
+                            {rec.userName.slice(0, 1)}
+                          </div>
+                        );
+                      })()}
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="text-sm font-bold text-white group-hover:text-amber-400 transition-colors truncate max-w-full">
+                            {rec.userName}
+                          </span>
+                          {isMyOwn && (
+                            <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold border border-amber-500/30">
+                              Du
+                            </span>
+                          )}
+                          {isWatchedByMe && (
+                            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-semibold border border-emerald-500/30">
+                              Von dir gesehen ✓
+                            </span>
+                          )}
+                          {rec.targetNames && rec.targetNames.length > 0 ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded font-bold border border-purple-500/30">
+                              <Sparkles className="w-2.5 h-2.5 text-purple-400 flex-shrink-0" />
+                              <span>
+                                {rec.targetNames.some((t) => t.startsWith("@"))
+                                  ? `Für ${rec.targetNames.join(", ")}`
+                                  : isMyOwn
+                                  ? `An ${rec.targetNames.join(", ")}`
+                                  : `Speziell für dich!`}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded font-medium border border-slate-700">
+                              <Users className="w-2.5 h-2.5 text-slate-500 flex-shrink-0" />
+                              <span>Alle Freunde</span>
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-[11px] text-slate-500 block mt-0.5">
+                          {new Date(rec.createdAt).toLocaleDateString("de-DE")}
+                        </span>
+                      </div>
+                    </Link>
+
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-extrabold text-xs sm:text-sm">
+                        <Star className="w-3.5 h-3.5 fill-amber-400" />
+                        <span>{rec.rating}/10</span>
+                      </div>
+                      {isMyOwn && (
+                        <div className="flex items-center gap-0.5 ml-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openMediaModal({
+                                id: rec.tmdbId,
+                                mediaType: rec.mediaType,
+                                title: rec.title,
+                                posterPath: rec.posterPath,
+                              })
+                            }
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+                            title="Empfehlung bearbeiten"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const confirmed = await confirmDialog({
+                                title: "Empfehlung entfernen?",
+                                message: `Möchtest du deine Empfehlung für „${rec.title}“ wirklich entfernen?`,
+                                confirmLabel: "Entfernen",
+                                dangerous: true,
+                              });
+                              if (confirmed) {
+                                deleteRecommendation(rec.id);
+                              }
+                            }}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
+                            title="Empfehlung entfernen"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Movie/TV Title */}
+                  <div
+                    onClick={() =>
+                      openMediaModal({
+                        id: rec.tmdbId,
+                        mediaType: rec.mediaType,
+                        title: rec.title,
+                        posterPath: rec.posterPath,
+                      })
+                    }
+                    className="cursor-pointer group inline-block"
+                  >
+                    <h3 className="text-base sm:text-lg font-bold text-white group-hover:text-amber-400 transition flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <span>{rec.title}</span>
+                      <span className="text-xs font-normal text-slate-400">
+                        ({rec.releaseYear || "–"})
+                      </span>
+                      <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                        {rec.mediaType === "tv" ? "Serie" : "Film"}
+                      </span>
+                    </h3>
+                  </div>
+                </div>
+
+                {/* Content Body + Footer (spans full width below poster on mobile, column 2 on desktop) */}
+                <div className="col-span-2 sm:col-span-1 sm:col-start-2 flex flex-col justify-between space-y-3 min-w-0">
+                  <div>
                     {/* Comment (if provided) */}
                     {rec.comment ? (
-                      <p className="text-sm text-slate-300 leading-relaxed mt-2 italic">
+                      <p className="text-sm text-slate-300 leading-relaxed italic">
                         &quot;{rec.comment}&quot;
                       </p>
                     ) : null}

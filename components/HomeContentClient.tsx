@@ -29,7 +29,7 @@ export function HomeContentClient({
   return (
     <div className="space-y-12">
       {/* Top Filter Bar with Mode Switcher */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
         <div className="space-y-0.5">
           <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2">
             {filterMode === "movie" && (
@@ -56,10 +56,10 @@ export function HomeContentClient({
         </div>
 
         {/* Segmented Control Switcher (Filme / Serien / Alle) */}
-        <div className="p-1 rounded-2xl bg-black/60 border border-slate-700/80 backdrop-blur-md flex items-center shadow-lg self-end sm:self-auto">
+        <div className="w-full sm:w-auto p-1 rounded-2xl bg-black/60 border border-slate-700/80 backdrop-blur-md flex items-center shadow-lg">
           <button
             onClick={() => setFilterMode("movie")}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition ${
               filterMode === "movie"
                 ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
                 : "text-slate-400 hover:text-white"
@@ -71,7 +71,7 @@ export function HomeContentClient({
 
           <button
             onClick={() => setFilterMode("tv")}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-bold transition ${
               filterMode === "tv"
                 ? "bg-cyan-500 text-black shadow-md shadow-cyan-500/20"
                 : "text-slate-400 hover:text-white"
@@ -83,7 +83,7 @@ export function HomeContentClient({
 
           <button
             onClick={() => setFilterMode("ALL")}
-            className={`px-3.5 py-2 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center px-3.5 py-2 rounded-xl text-xs font-bold transition ${
               filterMode === "ALL"
                 ? "bg-rose-500 text-white shadow-md shadow-rose-500/20"
                 : "text-slate-400 hover:text-white"
@@ -97,13 +97,13 @@ export function HomeContentClient({
       {/* SECTION: Oscar-Gewinner (Nur bei ALL oder movie) */}
       {(filterMode === "ALL" || filterMode === "movie") && (
         <section className="space-y-5 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20">
-                <Award className="w-6 h-6" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className="p-2.5 bg-amber-500/10 text-amber-400 rounded-2xl border border-amber-500/20 flex-shrink-0">
+                <Award className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
+              <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Oscar-Gewinner & Bester Film
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-400">
@@ -113,7 +113,7 @@ export function HomeContentClient({
             </div>
             <Link
               href="/oscars"
-              className="flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition"
+              className="flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition whitespace-nowrap self-start sm:self-auto py-1"
             >
               <span>Alle ansehen</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -131,13 +131,13 @@ export function HomeContentClient({
       {/* SECTION: Top 250 Filme (Nur bei ALL oder movie) */}
       {(filterMode === "ALL" || filterMode === "movie") && (
         <section className="space-y-5 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-2xl border border-sky-500/20">
-                <Film className="w-6 h-6" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className="p-2.5 bg-sky-500/10 text-sky-400 rounded-2xl border border-sky-500/20 flex-shrink-0">
+                <Film className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
+              <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Top bewertete Filme (IMDb & TMDB)
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-400">
@@ -147,7 +147,7 @@ export function HomeContentClient({
             </div>
             <Link
               href="/movies"
-              className="flex items-center gap-1 text-xs font-bold text-sky-400 hover:text-sky-300 transition"
+              className="flex items-center gap-1 text-xs font-bold text-sky-400 hover:text-sky-300 transition whitespace-nowrap self-start sm:self-auto py-1"
             >
               <span>Ganze Top 250 ansehen</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -176,13 +176,13 @@ export function HomeContentClient({
       {/* SECTION: Top Serien (Nur bei ALL oder tv) */}
       {(filterMode === "ALL" || filterMode === "tv") && (
         <section className="space-y-5 animate-in fade-in duration-300">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20">
-                <Tv className="w-6 h-6" />
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-4">
+            <div className="flex items-start sm:items-center gap-3 min-w-0">
+              <div className="p-2.5 bg-cyan-500/10 text-cyan-400 rounded-2xl border border-cyan-500/20 flex-shrink-0">
+                <Tv className="w-5 h-5 sm:w-6 sm:h-6" />
               </div>
-              <div>
-                <h2 className="text-2xl font-black text-white tracking-tight">
+              <div className="min-w-0">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                   Top bewertete Serien
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-400">
@@ -192,7 +192,7 @@ export function HomeContentClient({
             </div>
             <Link
               href="/tv"
-              className="flex items-center gap-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition"
+              className="flex items-center gap-1 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition whitespace-nowrap self-start sm:self-auto py-1"
             >
               <span>Alle Top-Serien ansehen</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -221,12 +221,12 @@ export function HomeContentClient({
       {/* SECTION: Aktuell im Trend (Gefiltert nach Modus) */}
       <section className="space-y-5 animate-in fade-in duration-300">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-2xl border border-rose-500/20">
-              <Flame className="w-6 h-6" />
+          <div className="flex items-start sm:items-center gap-3">
+            <div className="p-2.5 bg-rose-500/10 text-rose-400 rounded-2xl border border-rose-500/20 flex-shrink-0">
+              <Flame className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
-              <h2 className="text-2xl font-black text-white tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
                 {filterMode === "movie"
                   ? "Aktuelle Film-Trends"
                   : filterMode === "tv"
