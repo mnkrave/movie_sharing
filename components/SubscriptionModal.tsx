@@ -25,6 +25,15 @@ export function SubscriptionModal({
     setCurrent(selectedSubscriptions);
   }, [selectedSubscriptions, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const toggle = (key: string) => {
@@ -41,8 +50,14 @@ export function SubscriptionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#0f1422] border border-slate-800 rounded-2xl w-full max-w-lg p-6 shadow-2xl relative">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+      onClick={onClose}
+    >
+      <div
+        className="bg-[#0f1422] border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90dvh] flex flex-col p-5 sm:p-6 shadow-2xl relative overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800/60 transition"
@@ -87,7 +102,7 @@ export function SubscriptionModal({
           </button>
         </div>
 
-        <div className="grid grid-cols-2 gap-2.5 my-6 max-h-[60vh] overflow-y-auto pr-1">
+        <div className="grid grid-cols-2 gap-2.5 my-5 max-h-[55dvh] overflow-y-auto overscroll-contain pr-1 flex-1">
           {POPULAR_SUBSCRIPTIONS.map((sub) => {
             const isSelected = current.includes(sub.key);
             return (
@@ -95,18 +110,18 @@ export function SubscriptionModal({
                 key={sub.key}
                 type="button"
                 onClick={() => toggle(sub.key)}
-                className={`flex items-center justify-between p-3 rounded-xl border text-left transition ${
+                className={`flex items-center justify-between p-3 rounded-xl border text-left transition min-w-0 ${
                   isSelected
                     ? "bg-amber-500/15 border-amber-500/60 text-white shadow-sm"
                     : "bg-slate-900/60 border-slate-800 text-slate-300 hover:border-slate-700 hover:bg-slate-800/40"
                 }`}
               >
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2.5 min-w-0">
                   <span
                     className="w-3 h-3 rounded-full flex-shrink-0"
                     style={{ backgroundColor: sub.color }}
                   />
-                  <span className="text-sm font-medium">{sub.label}</span>
+                  <span className="text-sm font-medium truncate">{sub.label}</span>
                 </div>
                 {isSelected && (
                   <Check className="w-4 h-4 text-amber-400 flex-shrink-0 ml-1" />

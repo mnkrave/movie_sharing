@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -12,6 +12,14 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
+
+  useEffect(() => {
+    const nav = window.navigator as Navigator & { standalone?: boolean };
+    setIsStandalone(
+      Boolean(nav.standalone) || window.matchMedia("(display-mode: standalone)").matches
+    );
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,8 +49,8 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <div className="bg-[#0e1422] border border-slate-800 rounded-3xl w-full max-w-md p-8 shadow-2xl space-y-6">
+    <div className="min-h-[80dvh] flex items-center justify-center px-4 py-8 sm:py-12">
+      <div className="bg-[#0e1422] border border-slate-800 rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-black font-black mx-auto shadow-lg shadow-amber-500/20">
             <Film className="w-6 h-6 fill-black" />
@@ -86,6 +94,12 @@ export default function LoginPage() {
           </svg>
           <span>Mit Google anmelden</span>
         </button>
+
+        {isStandalone && (
+          <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 leading-relaxed">
+            Hinweis für die Home-Screen-App: Für den direkten Login ohne Browser-Wechsel nutze am besten E-Mail &amp; Passwort unten.
+          </p>
+        )}
 
         <div className="flex items-center gap-3">
           <div className="h-px bg-slate-800 flex-1" />

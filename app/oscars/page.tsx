@@ -252,9 +252,9 @@ export default function OscarsPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {/* Status Quick Filters */}
-            <div className="flex items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs">
+            <div className="flex flex-wrap sm:flex-nowrap items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs max-w-full">
               <button
                 onClick={() => setStatusFilter("ALL")}
                 className={`px-3 py-1.5 rounded-lg font-medium transition ${

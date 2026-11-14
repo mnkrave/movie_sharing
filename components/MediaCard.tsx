@@ -186,8 +186,8 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           )}
         </div>
 
-        {/* Quick action buttons (Hover overlay) */}
-        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
+        {/* Quick action buttons (Hover overlay on pointer devices; avoids iOS double-tap quirk on touch) */}
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden [@media(hover:hover)]:flex items-center justify-center gap-3">
           <button
             type="button"
             onClick={handleQuickWatchlist}

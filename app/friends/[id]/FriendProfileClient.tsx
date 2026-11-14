@@ -513,11 +513,11 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
       {/* Navigation Tabs (Gesehen, Merkliste, Empfehlungen) */}
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
             <button
               type="button"
               onClick={() => setActiveTab("watched")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex-shrink-0 ${
                 activeTab === "watched"
                   ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-black"
                   : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
@@ -530,7 +530,7 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
             <button
               type="button"
               onClick={() => setActiveTab("watchlist")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex-shrink-0 ${
                 activeTab === "watchlist"
                   ? "bg-sky-500 text-black shadow-lg shadow-sky-500/20 font-black"
                   : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"
@@ -543,7 +543,7 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
             <button
               type="button"
               onClick={() => setActiveTab("recommendations")}
-              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition ${
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex-shrink-0 ${
                 activeTab === "recommendations"
                   ? "bg-rose-500 text-black shadow-lg shadow-rose-500/20 font-black"
                   : "bg-slate-900/80 text-slate-400 hover:text-white border border-slate-800"

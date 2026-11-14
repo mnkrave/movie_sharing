@@ -52,20 +52,20 @@ function RecommendationsContent() {
 
         {/* Central Switcher between KI and Algorithmus */}
         <div className="pt-3 flex justify-center">
-          <div className="p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl inline-flex items-center gap-1.5 w-full max-w-md">
+          <div className="p-1 sm:p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl inline-flex items-center gap-1 sm:gap-1.5 w-full max-w-md">
             <button
               type="button"
               onClick={() => handleSelectMode("ai")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+              className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
                 mode === "ai"
                   ? "bg-gradient-to-r from-amber-500 via-amber-400 to-rose-500 text-black shadow-lg shadow-amber-500/20 font-black"
                   : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
-              <Bot className="w-4 h-4" />
-              <span>KI-Filmberater</span>
+              <Bot className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">KI-Filmberater</span>
               <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                className={`hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 ${
                   mode === "ai" ? "bg-black/20 text-black" : "bg-purple-500/20 text-purple-300"
                 }`}
               >
@@ -76,16 +76,16 @@ function RecommendationsContent() {
             <button
               type="button"
               onClick={() => handleSelectMode("algorithm")}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
+              className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
                 mode === "algorithm"
                   ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-black"
                   : "text-slate-400 hover:text-white hover:bg-slate-800/60"
               }`}
             >
-              <Zap className="w-4 h-4" />
-              <span>Algorithmus</span>
+              <Zap className="w-4 h-4 flex-shrink-0" />
+              <span className="truncate">Algorithmus</span>
               <span
-                className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
+                className={`hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 ${
                   mode === "algorithm" ? "bg-black/20 text-black" : "bg-emerald-500/20 text-emerald-300"
                 }`}
               >

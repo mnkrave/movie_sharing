@@ -376,7 +376,7 @@ export default function FriendsPage() {
             {pendingReceived.map((req) => (
               <div
                 key={req.requestId}
-                className="p-3.5 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex items-center justify-between gap-3 shadow"
+                className="p-3.5 rounded-2xl bg-slate-950/80 border border-amber-500/30 flex flex-wrap sm:flex-nowrap items-center justify-between gap-3 shadow"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {req.user.image ? (
@@ -834,7 +834,7 @@ export default function FriendsPage() {
           onClick={handleCloseEdit}
         >
           <div
-            className="w-full max-w-lg bg-slate-950 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 text-white"
+            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain bg-slate-950 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-5 text-white"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1094,9 +1094,9 @@ export default function FriendsPage() {
               return (
                 <div
                   key={friend.id}
-                  className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-lg space-y-4 relative group"
+                  className="p-5 sm:p-6 rounded-3xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition shadow-lg space-y-4 relative group"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-3">
                     <Link
                       href={`/friends/${friend.id}`}
                       className="flex items-center gap-3 min-w-0 group/link hover:opacity-90 transition"

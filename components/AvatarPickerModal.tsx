@@ -48,6 +48,15 @@ export function AvatarPickerModal({
     setSelectedAvatar(currentAvatar);
   }, [currentAvatar, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   // TMDB Person Live Search
   useEffect(() => {
     if (!searchQuery.trim() || activeTab !== "search") {
@@ -102,9 +111,12 @@ export function AvatarPickerModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-3xl rounded-3xl bg-[#0b0f19] border border-slate-800 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200"
+        className="w-full max-w-3xl rounded-3xl bg-[#0b0f19] border border-slate-800 shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -208,7 +220,7 @@ export function AvatarPickerModal({
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-4">
           {/* 1. Predefined Grid (All / Series / Movies / Sci-Fi / Directors) */}
           {activeTab !== "search" && activeTab !== "custom" && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
@@ -335,7 +347,7 @@ export function AvatarPickerModal({
                   Füge einen direkten Link zu einem Bild (.jpg, .png, .webp) ein.
                 </p>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="url"
                   value={customUrl}

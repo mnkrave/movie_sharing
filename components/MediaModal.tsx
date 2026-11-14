@@ -160,6 +160,14 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     };
   }, [media.id, media.mediaType]);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   // Current user identification
   const myUserId = (session?.user as any)?.id;
   const myName = session?.user?.name;
@@ -408,7 +416,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       onClick={onClose}
     >
       <div
-        className="bg-[#0b0f19] border border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden relative my-auto max-h-[92vh] flex flex-col"
+        className="bg-[#0b0f19] border border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden relative my-auto max-h-[92dvh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close button */}
@@ -421,7 +429,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
         </button>
 
         {/* Scrollable Container */}
-        <div className="overflow-y-auto flex-1">
+        <div className="overflow-y-auto flex-1 overscroll-contain pb-[env(safe-area-inset-bottom)]">
           {/* Hero Backdrop Banner */}
           <div className="relative h-64 sm:h-80 w-full bg-slate-900">
             {details?.backdropPath ? (
@@ -462,7 +470,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             {showTrailer && details?.trailerKey && (
               <div className="absolute inset-0 z-20 bg-black">
                 <iframe
-                  src={`https://www.youtube.com/embed/${details.trailerKey}?autoplay=1`}
+                  src={`https://www.youtube.com/embed/${details.trailerKey}?autoplay=1&playsinline=1`}
                   title="Trailer"
                   className="w-full h-full"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -489,8 +497,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
           </div>
 
           {/* Header Info & Actions */}
-          <div className="px-6 -mt-16 relative z-10">
-            <div className="flex flex-col sm:flex-row gap-6 items-start">
+          <div className="px-4 sm:px-6 -mt-12 sm:-mt-16 relative z-10">
+            <div className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-start">
               {/* Poster thumbnail */}
               <div className="w-28 sm:w-36 aspect-[2/3] rounded-2xl overflow-hidden shadow-2xl border-2 border-slate-700/60 bg-slate-800 flex-shrink-0 relative hidden sm:block">
                 {details?.posterPath || media.posterPath ? (
@@ -736,17 +744,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             {/* Quick Rating Selector Drawer */}
             {showRatingSelector && (
               <div className="p-4 mb-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 animate-in fade-in">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2">
                   <span className="text-sm font-semibold text-emerald-300">
                     Wie fandest du {mediaNoun}? ({userRatingInput}/10)
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="grid grid-cols-5 sm:flex sm:items-center gap-1.5 sm:gap-1">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                       <button
                         key={num}
                         type="button"
                         onClick={() => setUserRatingInput(num)}
-                        className={`w-7 h-7 rounded-lg text-xs font-bold transition ${
+                        className={`h-9 sm:w-7 sm:h-7 rounded-lg text-xs font-bold transition ${
                           userRatingInput === num
                             ? "bg-emerald-400 text-black scale-110"
                             : "bg-slate-800 text-slate-400 hover:bg-slate-700"
@@ -807,13 +815,13 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <label className="block text-xs font-medium text-slate-400 mb-1.5">
                     Deine Bewertung: <span className="text-amber-400 font-bold">{recRating}/10</span>
                   </label>
-                  <div className="flex items-center gap-1.5">
+                  <div className="grid grid-cols-5 sm:flex sm:items-center gap-1.5">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
                       <button
                         key={num}
                         type="button"
                         onClick={() => setRecRating(num)}
-                        className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition ${
+                        className={`sm:flex-1 py-2 sm:py-1.5 rounded-lg text-xs font-bold transition ${
                           recRating === num
                             ? "bg-amber-400 text-black ring-2 ring-amber-300"
                             : "bg-slate-800 text-slate-400 hover:bg-slate-700"
@@ -1098,7 +1106,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
             {/* Content Tabs Switcher & Global Filter Toggle */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 mb-6 gap-2">
-              <div className="flex items-center gap-0.5 sm:gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1 overflow-x-auto no-scrollbar">
                 <button
                   type="button"
                   onClick={() => setActiveTab("de")}

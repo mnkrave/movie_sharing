@@ -47,6 +47,15 @@ export function SearchModal({
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       setPersons([]);
@@ -79,7 +88,7 @@ export function SearchModal({
       onClick={onClose}
     >
       <div
-        className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82vh]"
+        className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Bar Row with Quick Input & Extended Search Button on Right */}
@@ -91,7 +100,7 @@ export function SearchModal({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filme, Serien oder Schauspieler suchen (z. B. DiCaprio, Nolan, Inception)..."
-            className="w-full bg-transparent text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base"
+            className="w-full min-w-0 flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base"
           />
           {loading && <Loader2 className="w-5 h-5 text-amber-400 animate-spin flex-shrink-0" />}
           {query && (
@@ -127,7 +136,7 @@ export function SearchModal({
         </div>
 
         {/* Results List */}
-        <div className="overflow-y-auto p-3 divide-y divide-slate-800/50 flex-1">
+        <div className="overflow-y-auto overscroll-contain p-3 divide-y divide-slate-800/50 flex-1">
           {/* Person / Actor Results */}
           {persons.length > 0 && (
             <div className="pb-3 mb-2">

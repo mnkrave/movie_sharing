@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -43,6 +43,24 @@ export function Navbar() {
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [discoverDropdownOpen, setDiscoverDropdownOpen] = useState(false);
   const discoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMobileMenuOpen(false);
+    setUserDropdownOpen(false);
+    setDiscoverDropdownOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!userDropdownOpen) return;
+    const handlePointerDown = (e: PointerEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, [userDropdownOpen]);
 
   const handleDiscoverEnter = () => {
     if (discoverTimeoutRef.current) clearTimeout(discoverTimeoutRef.current);
@@ -123,7 +141,7 @@ export function Navbar() {
   ];
 
   return (
-    <nav className="sticky top-0 z-40 bg-[#07090e]/95 backdrop-blur-xl border-b border-slate-800/80">
+    <nav className="sticky top-0 z-40 pt-[env(safe-area-inset-top)] bg-[#07090e]/95 backdrop-blur-xl border-b border-slate-800/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Brand Logo with Film Camera */}
         <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
@@ -258,7 +276,7 @@ export function Navbar() {
 
           {/* User Account / Profile */}
           {session?.user ? (
-            <div className="relative">
+            <div ref={userMenuRef} className="relative">
               <button
                 type="button"
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
@@ -367,7 +385,7 @@ export function Navbar() {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0a0e1a] border-b border-slate-800 px-4 py-4 space-y-1 text-sm">
+        <div className="md:hidden bg-[#0a0e1a] border-b border-slate-800 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain space-y-1 text-sm">
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 py-1">
             Entdecken
           </div>

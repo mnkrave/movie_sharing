@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Star, X, Check, Film, Tv, Trash2 } from "lucide-react";
 
@@ -28,6 +28,15 @@ export function QuickRatingModal({
   onRemoveWatched,
 }: QuickRatingModalProps) {
   const [hoveredNumber, setHoveredNumber] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!target) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [target, onClose]);
 
   if (!target) return null;
 
@@ -65,7 +74,7 @@ export function QuickRatingModal({
       onClick={onClose}
     >
       <div
-        className="bg-[#0b101d] border border-slate-800 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative text-center"
+        className="bg-[#0b101d] border border-slate-800 rounded-3xl w-full max-w-sm max-h-[90dvh] overflow-y-auto overscroll-contain p-6 shadow-2xl relative text-center"
         onClick={(e) => e.stopPropagation()}
       >
         <button
