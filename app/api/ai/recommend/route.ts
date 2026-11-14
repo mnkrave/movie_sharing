@@ -296,6 +296,7 @@ export async function POST(req: Request) {
     const allFriends: any[] = body.friends || [];
     const mySubscriptions: string[] = body.userSubscriptions || [];
     const callerWatchedTmdbIds: number[] = body.userWatchedTmdbIds || [];
+    const callerWatchedKeys: string[] = body.userWatchedKeys || [];
     const callerWatchedTitles: string[] = body.userWatchedTitles || [];
 
     if (!userPrompt) {
@@ -330,7 +331,10 @@ export async function POST(req: Request) {
     const watchedNormalizedTitles = new Set<string>(
       callerWatchedTitles.map(normalizeTitle).filter(Boolean)
     );
-    const watchedTmdbIds = new Set<string>(callerWatchedTmdbIds.map(String));
+    const watchedTmdbKeys = new Set<string>(callerWatchedKeys);
+    const watchedLegacyTmdbIds = new Set<string>(
+      callerWatchedKeys.length === 0 ? callerWatchedTmdbIds.map(String) : []
+    );
 
     const watchlistCounts = new Map<string, string[]>(); // title -> who has it on watchlist
     const combinedSubsSet = new Set<string>(mySubscriptions);
@@ -367,9 +371,10 @@ export async function POST(req: Request) {
           if (norm) watchedNormalizedTitles.add(norm);
         }
         if (m.tmdbId) {
-          watchedTmdbIds.add(String(m.tmdbId));
           if (m.mediaType) {
-            watchedTmdbIds.add(`${m.mediaType}_${m.tmdbId}`);
+            watchedTmdbKeys.add(`${m.mediaType}_${m.tmdbId}`);
+          } else {
+            watchedLegacyTmdbIds.add(String(m.tmdbId));
           }
         }
       }
@@ -400,11 +405,7 @@ export async function POST(req: Request) {
 
     const participantProfilesText = participants
       .map((pName) => {
-        const friendObj = allFriends.find(
-          (f) =>
-            f.name?.toLowerCase() === pName.toLowerCase() ||
-            pName.toLowerCase().startsWith(f.name?.toLowerCase() || "___")
-        );
+        const friendObj = allFriends.find((f) => isSamePerson(f.name, pName));
         if (friendObj?.subscriptions) {
           friendObj.subscriptions.forEach((s: string) => combinedSubsSet.add(s));
         }
@@ -412,23 +413,30 @@ export async function POST(req: Request) {
         const pStatuses = allMediaStatuses.filter((m) => isStatusForParticipant(m, pName));
         const watched = pStatuses.filter((m) => m.status === "WATCHED");
 
-        // Separate TV Series and Movies
-        const watchedTv = watched.filter((w) => w.mediaType === "tv");
-        const watchedMovies = watched.filter((w) => w.mediaType === "movie");
+        const sortByRatingDesc = (a: any, b: any) => (b.rating ?? -1) - (a.rating ?? -1);
+        const formatRated = (w: any) => `${w.title} (${w.rating}★)`;
 
-        const lovedTv = watchedTv
-          .filter((w) => (w.rating || 8) >= 8)
-          .slice(0, 12)
-          .map((w) => `${w.title} (${w.rating || 8}/10★)`);
+        // Separate rated vs unrated and Movie vs TV, keeping ALL rated items sorted by rating!
+        const watchedMovies = watched.filter((w) => w.mediaType === "movie").sort(sortByRatingDesc);
+        const watchedTv = watched.filter((w) => w.mediaType === "tv").sort(sortByRatingDesc);
 
-        const lovedMovies = watchedMovies
-          .filter((w) => (w.rating || 8) >= 8)
-          .slice(0, 15)
-          .map((w) => `${w.title} (${w.rating || 8}/10★)`);
+        const ratedMovies = watchedMovies.filter((w) => typeof w.rating === "number" && w.rating > 0);
+        const ratedTv = watchedTv.filter((w) => typeof w.rating === "number" && w.rating > 0);
+        const unratedWatched = watched.filter((w) => typeof w.rating !== "number" || w.rating <= 0);
 
-        const disliked = watched
-          .filter((w) => typeof w.rating === "number" && w.rating <= 5)
-          .map((w) => `${w.title} (${w.rating}/10★)`);
+        const lovedMovies = ratedMovies.filter((w) => w.rating >= 8).map(formatRated);
+        const solidMovies = ratedMovies.filter((w) => w.rating >= 6 && w.rating <= 7).map(formatRated);
+        const dislikedMovies = ratedMovies.filter((w) => w.rating <= 5).map(formatRated);
+
+        const lovedTv = ratedTv.filter((w) => w.rating >= 8).map(formatRated);
+        const solidTv = ratedTv.filter((w) => w.rating >= 6 && w.rating <= 7).map(formatRated);
+        const dislikedTv = ratedTv.filter((w) => w.rating <= 5).map(formatRated);
+
+        const allRatedValues = [...ratedMovies, ...ratedTv].map((w) => w.rating as number);
+        const avgPersonalRating =
+          allRatedValues.length > 0
+            ? (allRatedValues.reduce((a, b) => a + b, 0) / allRatedValues.length).toFixed(1)
+            : null;
 
         const watchlist = pStatuses
           .filter((m) => m.status === "WATCHLIST")
@@ -439,34 +447,59 @@ export async function POST(req: Request) {
             return w.title;
           });
 
-        let profileLines = [`- Person "${pName}":`];
+        const profileLines = [
+          `- Person "${pName}" (${allRatedValues.length} bewertete Titel${
+            avgPersonalRating ? `, Ø ${avgPersonalRating}★` : ""
+          }):`,
+        ];
+
         if (isSeriesRequest || isSitcomOrComedy) {
           profileLines.push(
-            `  • Lieblings-Serien & TV-Shows (8-10★): ${
-              lovedTv.length > 0 ? lovedTv.join(", ") : "Noch keine Serien bewertet"
+            `  • Alle Top-Serien (8-10★): ${
+              lovedTv.length > 0 ? lovedTv.join(", ") : "Noch keine Serien >=8★"
             }`
           );
+          if (solidTv.length > 0) {
+            profileLines.push(`  • Solide Serien (6-7★): ${solidTv.join(", ")}`);
+          }
           profileLines.push(
-            `  • Lieblings-Filme (8-10★): ${
-              lovedMovies.length > 0 ? lovedMovies.slice(0, 8).join(", ") : "Keine"
+            `  • Alle Top-Filme (8-10★): ${
+              lovedMovies.length > 0 ? lovedMovies.join(", ") : "Keine"
             }`
           );
+          if (solidMovies.length > 0) {
+            profileLines.push(`  • Solide Filme (6-7★): ${solidMovies.join(", ")}`);
+          }
         } else {
           profileLines.push(
-            `  • Lieblingsfilme (8-10★): ${
-              lovedMovies.length > 0 ? lovedMovies.join(", ") : "Mag packende Filme"
+            `  • Alle Top-Filme (8-10★): ${
+              lovedMovies.length > 0 ? lovedMovies.join(", ") : "Noch keine Filme >=8★"
             }`
           );
+          if (solidMovies.length > 0) {
+            profileLines.push(`  • Solide Filme (6-7★): ${solidMovies.join(", ")}`);
+          }
           if (lovedTv.length > 0) {
-            profileLines.push(`  • Lieblings-Serien (8-10★): ${lovedTv.slice(0, 6).join(", ")}`);
+            profileLines.push(`  • Alle Top-Serien (8-10★): ${lovedTv.join(", ")}`);
+          }
+          if (solidTv.length > 0) {
+            profileLines.push(`  • Solide Serien (6-7★): ${solidTv.join(", ")}`);
           }
         }
 
+        const allDisliked = [...dislikedMovies, ...dislikedTv];
         profileLines.push(
-          `  • Abneigungen/No-Gos (<=5★): ${disliked.length > 0 ? disliked.join(", ") : "Keine"}`
+          `  • Abneigungen/No-Gos (<=5★): ${allDisliked.length > 0 ? allDisliked.join(", ") : "Keine"}`
         );
+        if (unratedWatched.length > 0) {
+          profileLines.push(
+            `  • Gesehen ohne Note: ${unratedWatched.map((u) => u.title).join(", ")}`
+          );
+        }
         profileLines.push(
-          `  • Auf der Watchlist: ${watchlist.length > 0 ? watchlist.slice(0, 8).join(", ") : "Keine"}`
+          `  • Auf der Watchlist (${watchlist.length}): ${
+            watchlist.length > 0 ? watchlist.slice(0, 25).join(", ") : "Keine"
+          }`
         );
 
         return profileLines.join("\n");
@@ -482,11 +515,11 @@ export async function POST(req: Request) {
       .map((key) => POPULAR_SUBSCRIPTIONS.find((s) => s.key === key)?.label || key)
       .join(", ");
 
-    const watchedForbiddenList = Array.from(allWatchedTitlesList).slice(0, 250);
+    const watchedForbiddenList = Array.from(allWatchedTitlesList).slice(0, 800);
 
     // 3. Construct prompt for Gemini
     const fullPrompt = `Du bist "CineBot", der hochintelligente KI-Filmberater von CineCircle.
-Analysiere den Wunsch des Nutzers und finde die 8 bis 10 besten Vorschläge (Filme oder Serien), damit nach strengem Ausschluss bereits gesehener Titel mindestens 6 absolut neue Treffer übrig bleiben!
+Analysiere den Wunsch des Nutzers sowie ALLE bewerteten Filme & Serien jedes Teilnehmers und finde die 10 bis 12 besten Vorschläge (Filme oder Serien), damit nach strengem Ausschluss bereits gesehener Titel, Laufzeit-Checks und deutschem Abo-Check mindestens 6 absolut passende Treffer übrig bleiben!
 
 NUTZER-EINGABE:
 "${userPrompt}"
@@ -518,7 +551,7 @@ WICHTIGE REGELN & GENRE-FOKUS:
 4. Bevorzuge Filme/Serien, die in Deutschland auf den genannten Streaming-Abos (${readableSubs}) verfügbar sind.
 5. Gib für JEDEN Vorschlag in "perPersonReasons" für JEDEN Teilnehmer (${participants.join(", ")}) einen kurzen, sympathischen Satz auf Deutsch an, warum genau diese Person den Film feiern wird!
 
-Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
+Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 10 bis 12 Picks:
 {
   "parsedIntent": {
     "detectedGroupName": ${detectedGroupName ? `"${detectedGroupName}"` : "null"},
@@ -571,8 +604,16 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
     const rawPicks: any[] = Array.isArray(aiResponse.picks) ? aiResponse.picks : [];
 
     // Check function to verify if an item was already watched by user or participants
-    const checkIsWatched = (title: string, origTitle?: string, tmdbId?: number) => {
-      if (tmdbId && watchedTmdbIds.has(String(tmdbId))) return true;
+    const checkIsWatched = (
+      title: string,
+      origTitle?: string,
+      tmdbId?: number,
+      mediaType?: "movie" | "tv"
+    ) => {
+      if (tmdbId) {
+        if (mediaType && watchedTmdbKeys.has(`${mediaType}_${tmdbId}`)) return true;
+        if (watchedLegacyTmdbIds.has(String(tmdbId))) return true;
+      }
       const n1 = normalizeTitle(title);
       const n2 = origTitle ? normalizeTitle(origTitle) : "";
       if (n1 && watchedNormalizedTitles.has(n1)) return true;
@@ -602,21 +643,31 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
     ).filter(Boolean) as AiRecommendedPick[];
 
     // 5. Final strict safety filter: ensure NO enriched item matches a watched TMDB ID or title, and deduplicate
-    const seenTmdbIds = new Set<number>();
+    const seenKeys = new Set<string>();
     const dedupedPicks: AiRecommendedPick[] = [];
 
     for (const p of enrichedPicks) {
-      if (seenTmdbIds.has(p.id)) continue;
-      if (checkIsWatched(p.title, p.originalTitle, p.id)) continue;
+      const key = `${p.mediaType}_${p.id}`;
+      if (seenKeys.has(key)) continue;
+      if (checkIsWatched(p.title, p.originalTitle, p.id, p.mediaType)) continue;
 
-      seenTmdbIds.add(p.id);
+      seenKeys.add(key);
       dedupedPicks.push(p);
     }
 
-    // Prioritize items respecting maxRuntimeMinutes (only fall back to longer movies if < 3 remain)
     let finalPicks = dedupedPicks;
+
+    // Respect requested mediaType ("movie" | "tv") when specified
+    if (parsedIntent.mediaType === "movie" || parsedIntent.mediaType === "tv") {
+      const matchingType = finalPicks.filter((p) => p.mediaType === parsedIntent.mediaType);
+      if (matchingType.length >= 3) {
+        finalPicks = matchingType;
+      }
+    }
+
+    // Prioritize items respecting maxRuntimeMinutes (only fall back to longer movies if < 3 remain)
     if (parsedIntent.maxRuntimeMinutes) {
-      const withinLimit = dedupedPicks.filter(
+      const withinLimit = finalPicks.filter(
         (p) =>
           p.mediaType !== "movie" ||
           !p.runtimeMinutes ||
@@ -626,6 +677,17 @@ Antworte AUSSCHLIESSLICH im folgenden JSON-Format mit 8 bis 10 Picks:
         finalPicks = withinLimit;
       }
     }
+
+    // Prioritize picks actually streamable on the participants' DE subscriptions
+    if (combinedSubsSet.size > 0) {
+      finalPicks = [...finalPicks].sort((a, b) => {
+        const aSub = a.availableProvidersDE.some((prov) => prov.isMySub) ? 1 : 0;
+        const bSub = b.availableProvidersDE.some((prov) => prov.isMySub) ? 1 : 0;
+        if (bSub !== aSub) return bSub - aSub;
+        return b.matchScore - a.matchScore;
+      });
+    }
+
     finalPicks = finalPicks.slice(0, 6);
 
     return NextResponse.json({

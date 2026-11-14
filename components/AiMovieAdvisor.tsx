@@ -149,6 +149,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
     );
 
     const userWatchedTmdbIds = myWatchedStatuses.map((m) => m.tmdbId);
+    const userWatchedKeys = myWatchedStatuses.map((m) => `${m.mediaType}_${m.tmdbId}`);
     const userWatchedTitles = myWatchedStatuses.map((m) => m.title);
     const cleanExplicitParticipants = selectedFriends.filter((n) => !isMe(n));
 
@@ -166,6 +167,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
           friends: communityData.friends,
           userSubscriptions,
           userWatchedTmdbIds,
+          userWatchedKeys,
           userWatchedTitles,
         }),
       });
@@ -186,9 +188,9 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
               : `Fehler bei der KI-Anfrage (HTTP ${res.status}). Bitte versuche es kurz erneut.`)
         );
       } else {
-        const watchedSet = new Set(userWatchedTmdbIds);
+        const watchedKeySet = new Set(userWatchedKeys);
         const filteredPicks = (data.picks || []).filter(
-          (p: AiRecommendedPick) => !watchedSet.has(p.id)
+          (p: AiRecommendedPick) => !watchedKeySet.has(`${p.mediaType}_${p.id}`)
         );
 
         setResultSummary(data.aiSummary);
