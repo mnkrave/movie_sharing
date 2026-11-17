@@ -20,10 +20,19 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 export default function MyListPage() {
   const { data: session } = useSession();
-  const { communityData, openMediaModal, updateMediaStatus, openSearch, openRatingModal } = useMedia();
+  const {
+    communityData,
+    openMediaModal,
+    updateMediaStatus,
+    openSearch,
+    openRatingModal,
+    refreshCommunity,
+    showToast,
+  } = useMedia();
 
   const [activeTab, setActiveTab] = useState<"WATCHLIST" | "WATCHED">("WATCHLIST");
   const [mediaTypeFilter, setMediaTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
@@ -165,8 +174,18 @@ export default function MyListPage() {
     (m) => (m.userId === myUserId || m.userName === myName) && m.status === "WATCHED"
   ).length;
 
+  const handlePullRefresh = async () => {
+    try {
+      await refreshCommunity();
+      showToast("Liste aktualisiert!", { type: "success" });
+    } catch {
+      showToast("Konnte Liste nicht aktualisieren.", { type: "error" });
+    }
+  };
+
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <PullToRefresh onRefresh={handlePullRefresh}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
         <div className="space-y-1">
@@ -521,6 +540,7 @@ export default function MyListPage() {
           )}
         </div>
       )}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

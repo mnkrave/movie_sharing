@@ -197,6 +197,20 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Lock body scroll when any modal is open (avoids scroll chaining and rubber-banding on iOS/Android)
+  const isAnyModalOpen = Boolean(
+    selectedMedia || isSearchOpen || isSubsOpen || ratingTarget || isAvatarPickerOpen || activeConfirm
+  );
+
+  useEffect(() => {
+    if (!isAnyModalOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, [isAnyModalOpen]);
+
   // Normalize user aliases in friendGroups whenever session user name is loaded
   useEffect(() => {
     const currentName = session?.user?.name;

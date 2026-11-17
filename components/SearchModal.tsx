@@ -84,11 +84,11 @@ export function SearchModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-14 sm:pt-20 p-3 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-start justify-center pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:pt-20 p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[82dvh]"
+        className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[82dvh]"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search Bar Row with Quick Input & Extended Search Button on Right */}

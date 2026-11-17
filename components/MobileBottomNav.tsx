@@ -23,13 +23,13 @@ export function MobileBottomNav() {
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-800/80 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.45)]"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-800/80 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.45)] select-none"
     >
       <div className="grid grid-cols-5 items-stretch max-w-lg mx-auto h-16 px-1">
         <Link
           href="/"
           aria-current={isDiscoverActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
             isDiscoverActive
               ? "text-amber-400"
               : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
@@ -48,7 +48,7 @@ export function MobileBottomNav() {
         <Link
           href="/feed"
           aria-current={isFeedActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
             isFeedActive
               ? "text-amber-400"
               : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
@@ -81,7 +81,7 @@ export function MobileBottomNav() {
         <Link
           href="/my-list"
           aria-current={isListActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-colors ${
+          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
             isListActive
               ? "text-amber-400"
               : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
@@ -100,7 +100,7 @@ export function MobileBottomNav() {
         <Link
           href="/friends"
           aria-current={isFriendsActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-colors relative ${
+          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 relative ${
             isFriendsActive
               ? "text-amber-400"
               : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"

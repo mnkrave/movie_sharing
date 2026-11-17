@@ -280,7 +280,7 @@ export function HomeHero({
             }`}
           >
             <Image
-              src={`https://image.tmdb.org/t/p/original${s.item.backdropPath}`}
+              src={`https://image.tmdb.org/t/p/w1280${s.item.backdropPath}`}
               alt={s.item.title}
               fill
               priority={idx === 0}

@@ -23,11 +23,13 @@ import {
 } from "lucide-react";
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 import { RecommendationThread } from "@/components/RecommendationThread";
+import { PullToRefresh } from "@/components/PullToRefresh";
 
 export default function FeedPage() {
   const { data: session } = useSession();
   const {
     communityData,
+    refreshCommunity,
     upvoteRecommendation,
     deleteRecommendation,
     openMediaModal,
@@ -35,6 +37,7 @@ export default function FeedPage() {
     userSubscriptions,
     currentUserAvatar,
     confirmDialog,
+    showToast,
   } = useMedia();
 
   // Filter States: Default is "FRIENDS", "hideWatched = true", "onlyStreamable = true"
@@ -198,8 +201,18 @@ export default function FeedPage() {
     userSubscriptions,
   ]);
 
+  const handlePullRefresh = async () => {
+    try {
+      await refreshCommunity();
+      showToast("Feed aktualisiert!", { type: "success" });
+    } catch {
+      showToast("Konnte Feed nicht aktualisieren.", { type: "error" });
+    }
+  };
+
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+    <PullToRefresh onRefresh={handlePullRefresh}>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
       {/* Header */}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
         <div className="space-y-1 max-w-md">
@@ -793,6 +806,7 @@ export default function FeedPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </PullToRefresh>
   );
 }

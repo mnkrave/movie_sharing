@@ -96,7 +96,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
   return (
     <div
       onClick={() => openMediaModal(item)}
-      className="group relative cursor-pointer flex flex-col transition duration-300 hover:-translate-y-1.5 focus:outline-none"
+      className="group relative cursor-pointer flex flex-col transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 active:opacity-95 focus:outline-none"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -264,16 +264,16 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
                 ? "Von Merkliste entfernen"
                 : "Auf Merkliste setzen"
             }
-            className={`flex-1 min-w-0 py-1.5 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition ${
+            className={`flex-1 min-w-0 min-h-[36px] py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHLIST"
                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                 : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
             }`}
           >
             {myStatusObj?.status === "WATCHLIST" ? (
-              <Check className="w-3 h-3 flex-shrink-0 stroke-[2.5]" />
+              <Check className="w-3.5 h-3.5 flex-shrink-0 stroke-[2.5]" />
             ) : (
-              <Plus className="w-3 h-3 flex-shrink-0" />
+              <Plus className="w-3.5 h-3.5 flex-shrink-0" />
             )}
             <span className="truncate">Liste</span>
           </button>
@@ -286,13 +286,13 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
                 ? "Gesehen-Status oder Bewertung bearbeiten"
                 : "Als gesehen markieren"
             }
-            className={`flex-1 min-w-0 py-1.5 px-2 rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1 transition ${
+            className={`flex-1 min-w-0 min-h-[36px] py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHED"
                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                 : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
             }`}
           >
-            <Check className="w-3 h-3 flex-shrink-0 stroke-[2.5]" />
+            <Check className="w-3.5 h-3.5 flex-shrink-0 stroke-[2.5]" />
             <span className="truncate">
               {myStatusObj?.status === "WATCHED" && myWatched?.rating
                 ? `${myWatched.rating}/10`

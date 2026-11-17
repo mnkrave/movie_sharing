@@ -428,24 +428,31 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="bg-[#0b0f19] border border-slate-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden relative my-auto max-h-[92dvh] flex flex-col"
+        className="bg-[#0b0f19] border-0 sm:border sm:border-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden relative max-h-[95dvh] sm:max-h-[92dvh] flex flex-col h-[95dvh] sm:h-auto"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Mobile grab handle */}
+        <div
+          className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto my-2.5 sm:hidden flex-shrink-0 cursor-pointer"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-30 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition shadow-lg"
+          className="absolute top-3 sm:top-4 right-3 sm:right-4 z-30 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition shadow-lg"
           aria-label="Schließen"
         >
           <X className="w-5 h-5" />
         </button>
 
         {/* Scrollable Container */}
-        <div className="overflow-y-auto flex-1 overscroll-contain pb-[env(safe-area-inset-bottom)]">
+        <div className="overflow-y-auto flex-1 overscroll-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
           {/* Hero Backdrop Banner */}
           <div className="relative h-52 sm:h-80 w-full bg-slate-900">
             {details?.backdropPath ? (
@@ -2045,6 +2052,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   </Link>
                 </div>
               )}
+              {/* Mobile Bottom Dismiss Button for 1-hand thumb ergonomics */}
+              <div className="pt-6 pb-2 sm:hidden flex justify-center">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="w-full py-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 font-bold text-xs active:bg-slate-800 transition flex items-center justify-center gap-2"
+                >
+                  <X className="w-4 h-4 text-slate-400" />
+                  <span>Modal schließen</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

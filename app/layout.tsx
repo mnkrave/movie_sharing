@@ -12,6 +12,7 @@ export const viewport: Viewport = {
 };
 
 import { MobileBottomNav } from "@/components/MobileBottomNav";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   title: "CineCircle – Filme & Serien mit Freunden teilen & VPN-Streaming",
@@ -47,6 +48,7 @@ export default function RootLayout({
         <Providers>
           <MediaProvider>
             <Navbar />
+            <ServiceWorkerRegister />
             <main className="flex-1">{children}</main>
             <footer className="border-t border-slate-900 bg-[#05070a] py-10 mt-20 text-center text-xs text-slate-500">
               <div className="max-w-7xl mx-auto px-4 space-y-2">

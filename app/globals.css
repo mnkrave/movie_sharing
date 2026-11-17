@@ -24,6 +24,13 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Eliminate tap delay & double-tap zoom delay on interactive elements */
+button,
+a,
+[role="button"] {
+  touch-action: manipulation;
+}
+
 /* Prevent automatic iOS Safari zoom when focusing inputs/selects/textareas on touch devices */
 @media (hover: none) and (pointer: coarse) {
   input:not([type="checkbox"]):not([type="radio"]),

@@ -247,11 +247,11 @@ export function Navbar() {
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Search Trigger Button */}
+          {/* Search Trigger Button (Desktop/Tablet - on mobile Search is prominent in MobileBottomNav) */}
           <button
             type="button"
             onClick={openSearch}
-            className="flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-xs font-medium transition shadow-sm"
+            className="hidden sm:flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-xs font-medium transition shadow-sm"
           >
             <Search className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">Suchen...</span>
@@ -383,9 +383,18 @@ export function Navbar() {
         </div>
       </div>
 
+      {/* Mobile Drawer Backdrop */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 top-16 bg-black/60 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-200"
+          onClick={() => setMobileMenuOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-[#0a0e1a] border-b border-slate-800 px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain space-y-1 text-sm">
+        <div className="md:hidden relative z-40 bg-[#0a0e1a] border-b border-slate-800 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain space-y-1 text-sm shadow-2xl animate-in slide-in-from-top-2 duration-200">
           <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 py-1">
             Entdecken
           </div>

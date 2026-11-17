@@ -18,6 +18,9 @@ import type {
 } from "@/app/api/tmdb/recommendations/route";
 import { AiMovieAdvisor } from "@/components/AiMovieAdvisor";
 import { AlgorithmRecommendations } from "@/components/AlgorithmRecommendations";
+import { WatchtimeDetailsModal } from "@/components/WatchtimeDetailsModal";
+import { EditRecommendationModal } from "@/components/EditRecommendationModal";
+import { AppRecommendation } from "@/lib/store";
 import {
   User,
   Star,
@@ -43,6 +46,10 @@ import {
   Filter,
   Tag,
   Camera,
+  Edit3,
+  Trash2,
+  ExternalLink,
+  MessageSquare,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -75,7 +82,7 @@ function getEmojiForGenreName(name: string, id?: number): string {
   return "🎬";
 }
 
-type ProfileTab = "stats" | "hall-of-fame" | "ai" | "matches";
+type ProfileTab = "stats" | "hall-of-fame" | "recommendations" | "ai" | "matches";
 
 function ProfileContent() {
   const { data: session } = useSession();
@@ -89,17 +96,29 @@ function ProfileContent() {
     openSearch,
     openAvatarPicker,
     currentUserAvatar,
+    deleteRecommendation,
+    confirmDialog,
+    showToast,
   } = useMedia();
 
   const [metaMap, setMetaMap] = useState<Record<string, BatchMediaMeta>>({});
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [favFilter, setFavFilter] = useState<"ALL" | "movie" | "tv">("ALL");
+  const [showWatchtimeModal, setShowWatchtimeModal] = useState(false);
+  const [editingRecommendation, setEditingRecommendation] = useState<AppRecommendation | null>(null);
+
   const searchParams = useSearchParams();
   const urlTab = searchParams.get("tab") as ProfileTab | null;
   const urlPrompt = searchParams.get("prompt");
 
   const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
-    if (urlTab === "ai" || urlTab === "matches" || urlTab === "hall-of-fame" || urlTab === "stats") {
+    if (
+      urlTab === "ai" ||
+      urlTab === "matches" ||
+      urlTab === "hall-of-fame" ||
+      urlTab === "stats" ||
+      urlTab === "recommendations"
+    ) {
       return urlTab;
     }
     if (urlPrompt) {
@@ -109,7 +128,13 @@ function ProfileContent() {
   });
 
   useEffect(() => {
-    if (urlTab === "ai" || urlTab === "matches" || urlTab === "hall-of-fame" || urlTab === "stats") {
+    if (
+      urlTab === "ai" ||
+      urlTab === "matches" ||
+      urlTab === "hall-of-fame" ||
+      urlTab === "stats" ||
+      urlTab === "recommendations"
+    ) {
       setActiveTab(urlTab);
     } else if (urlPrompt) {
       setActiveTab("ai");
@@ -410,6 +435,19 @@ function ProfileContent() {
     return POPULAR_SUBSCRIPTIONS.filter((s) => userSubscriptions.includes(s.key));
   }, [userSubscriptions]);
 
+  const handleDeleteRec = async (rec: AppRecommendation) => {
+    const confirmed = await confirmDialog({
+      title: "Empfehlung löschen?",
+      message: `Möchtest du deine Empfehlung für „${rec.title}“ wirklich löschen? Sie wird für alle Freunde aus dem Feed entfernt.`,
+      confirmLabel: "Löschen",
+      dangerous: true,
+    });
+    if (confirmed) {
+      await deleteRecommendation(rec.id);
+      showToast("Empfehlung erfolgreich gelöscht", { type: "info" });
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
       {/* 1. Profile Hero & CineDNA Header */}
@@ -535,34 +573,56 @@ function ProfileContent() {
             </p>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1">
+          <button
+            type="button"
+            onClick={() => setShowWatchtimeModal(true)}
+            className="group text-left p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-sky-500/50 hover:bg-slate-900/90 transition-all shadow-sm hover:shadow-sky-500/10 space-y-1 relative cursor-pointer"
+          >
             <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Kino-Lebenszeit</span>
-              <Clock className="w-4 h-4 text-sky-400" />
+              <span className="group-hover:text-sky-300 font-semibold transition">Kino-Lebenszeit</span>
+              <Clock className="w-4 h-4 text-sky-400 group-hover:scale-110 transition" />
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-white">{totalHours} Std.</p>
-            <p className="text-[11px] text-slate-400">
-              Entspricht ca. <span className="text-sky-400 font-semibold">{totalDays} Tagen</span> Non-Stop
+            <p className="text-2xl sm:text-3xl font-black text-white group-hover:text-sky-200 transition">
+              {totalHours} Std.
             </p>
-          </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <p className="text-[11px] text-slate-400">
+                Ca. <span className="text-sky-400 font-semibold">{totalDays} Tage</span>
+              </p>
+              <span className="text-[10px] font-bold text-sky-400 group-hover:translate-x-0.5 transition flex items-center gap-0.5">
+                Details & Top Contributor →
+              </span>
+            </div>
+          </button>
 
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1">
+          <button
+            type="button"
+            onClick={() => setActiveTab("recommendations")}
+            className="group text-left p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-rose-500/50 hover:bg-slate-900/90 transition-all shadow-sm hover:shadow-rose-500/10 space-y-1 relative cursor-pointer"
+          >
             <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Watchlist & Feed</span>
-              <Bookmark className="w-4 h-4 text-rose-400" />
+              <span className="group-hover:text-rose-300 font-semibold transition">Watchlist & Feed</span>
+              <Bookmark className="w-4 h-4 text-rose-400 group-hover:scale-110 transition" />
             </div>
-            <p className="text-2xl sm:text-3xl font-black text-white">{watchlistItems.length}</p>
-            <p className="text-[11px] text-slate-400">
-              Auf Watchlist •{" "}
-              <span className="text-rose-400 font-semibold">{myRecommendations.length}</span>{" "}
-              Empfehlungen
+            <p className="text-2xl sm:text-3xl font-black text-white group-hover:text-rose-200 transition">
+              {watchlistItems.length}
             </p>
-          </div>
+            <div className="flex items-center justify-between pt-0.5">
+              <p className="text-[11px] text-slate-400">
+                Watchlist •{" "}
+                <span className="text-rose-400 font-semibold">{myRecommendations.length}</span>{" "}
+                Empfehlungen
+              </p>
+              <span className="text-[10px] font-bold text-rose-400 group-hover:translate-x-0.5 transition flex items-center gap-0.5">
+                Meine Empfehlungen →
+              </span>
+            </div>
+          </button>
         </div>
       </div>
 
 
-      {/* 4 Dedicated Tabs Navigation */}
+      {/* 5 Dedicated Tabs Navigation */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto no-scrollbar">
         {/* Tab 1: Statistiken */}
         <button
@@ -606,7 +666,30 @@ function ProfileContent() {
           </span>
         </button>
 
-        {/* Tab 3: KI-Empfehlungen (Recommendation) */}
+        {/* Tab 3: Meine Empfehlungen */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("recommendations")}
+          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
+            activeTab === "recommendations"
+              ? "bg-gradient-to-r from-amber-500 via-rose-500 to-pink-500 text-white shadow-lg shadow-rose-500/25 font-black"
+              : "bg-slate-900/80 text-rose-300 hover:text-white hover:bg-slate-800 border border-rose-500/30"
+          }`}
+        >
+          <Flame className="w-4 h-4 text-amber-400" />
+          <span>3. Meine Empfehlungen</span>
+          <span
+            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+              activeTab === "recommendations"
+                ? "bg-white/20 text-white"
+                : "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+            }`}
+          >
+            {myRecommendations.length}
+          </span>
+        </button>
+
+        {/* Tab 4: KI-Empfehlungen (Recommendation) */}
         <button
           type="button"
           onClick={() => setActiveTab("ai")}
@@ -617,7 +700,7 @@ function ProfileContent() {
           }`}
         >
           <Sparkles className="w-4 h-4" />
-          <span>3. KI-Empfehlungen</span>
+          <span>4. KI-Empfehlungen</span>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               activeTab === "ai"
@@ -629,7 +712,7 @@ function ProfileContent() {
           </span>
         </button>
 
-        {/* Tab 4: Standard-Matches */}
+        {/* Tab 5: Standard-Matches */}
         <button
           type="button"
           onClick={() => setActiveTab("matches")}
@@ -640,7 +723,7 @@ function ProfileContent() {
           }`}
         >
           <Wand2 className="w-4 h-4" />
-          <span>4. Standard-Matches</span>
+          <span>5. Standard-Matches</span>
           <span
             className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
               activeTab === "matches"
@@ -1126,19 +1209,270 @@ function ProfileContent() {
         </div>
       )}
 
-      {/* TAB 3: 🤖 KI-EMPFEHLUNGEN (Recommendation mit Oben KI-Fenster & Vorschlägen) */}
+      {/* TAB 3: 🔥 MEINE EMPFEHLUNGEN (Liste aller eigenen Empfehlungen & Bearbeiten) */}
+      {activeTab === "recommendations" && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 sm:p-6 rounded-3xl bg-slate-900/60 border border-slate-800">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+                <Flame className="w-6 h-6 text-amber-400" />
+                <span>Meine Empfehlungen ({myRecommendations.length})</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-xl">
+                Titel, die du mit deinen Freunden und Gruppen geteilt hast. Du kannst deine Rezensionen,
+                Zielgruppen und Tags jederzeit bearbeiten.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openSearch}
+              className="px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-black text-xs sm:text-sm shadow-lg shadow-rose-500/20 transition flex items-center gap-2 shrink-0 self-start sm:self-auto"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>Neuen Titel empfehlen</span>
+            </button>
+          </div>
+
+          {myRecommendations.length === 0 ? (
+            <div className="p-12 sm:p-16 rounded-3xl bg-slate-900/40 border border-slate-800 text-center space-y-4">
+              <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center mx-auto text-amber-400">
+                <Flame className="w-8 h-8" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                Noch keine Empfehlungen verfasst
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto">
+                Teile deine Lieblingsfilme und Geheimtipps mit Freunden oder speziellen Gruppen.
+                Suche einfach nach einem Film oder einer Serie und klicke auf „Empfehlen“.
+              </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={openSearch}
+                  className="px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs sm:text-sm transition shadow-lg shadow-amber-500/20"
+                >
+                  Filme & Serien durchsuchen
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5">
+              {myRecommendations.map((rec) => {
+                const posterUrl = rec.posterPath
+                  ? rec.posterPath.startsWith("http")
+                    ? rec.posterPath
+                    : `https://image.tmdb.org/t/p/w342${rec.posterPath}`
+                  : null;
+
+                const isTargeted =
+                  rec.targetType &&
+                  rec.targetType !== "ALL" &&
+                  ((rec.targetNames && rec.targetNames.length > 0) ||
+                    (rec.targetGroupIds && rec.targetGroupIds.length > 0));
+
+                const formattedDate = rec.createdAt
+                  ? new Date(rec.createdAt).toLocaleDateString("de-DE", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })
+                  : null;
+
+                return (
+                  <div
+                    key={rec.id}
+                    className="p-4 sm:p-5 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-slate-700/80 transition-all flex flex-col justify-between space-y-4 group"
+                  >
+                    {/* Top Row: Poster + Title Info */}
+                    <div className="flex gap-4">
+                      {/* Clickable Poster */}
+                      <button
+                        type="button"
+                        onClick={() =>
+                          openMediaModal({
+                            id: rec.tmdbId,
+                            mediaType: rec.mediaType,
+                            title: rec.title,
+                            posterPath: rec.posterPath,
+                          })
+                        }
+                        className="relative w-20 sm:w-24 aspect-[2/3] rounded-2xl overflow-hidden shrink-0 bg-slate-950 border border-slate-800/80 shadow-md group-hover:shadow-amber-500/10 transition group/poster"
+                        title="Titel im Detail ansehen"
+                      >
+                        {posterUrl ? (
+                          <Image
+                            src={posterUrl}
+                            alt={rec.title}
+                            fill
+                            sizes="(max-width: 640px) 80px, 96px"
+                            className="object-cover group-hover/poster:scale-105 transition duration-300"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-slate-600">
+                            {rec.mediaType === "tv" ? (
+                              <Tv className="w-8 h-8" />
+                            ) : (
+                              <Film className="w-8 h-8" />
+                            )}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/poster:opacity-100 transition flex items-center justify-center">
+                          <ExternalLink className="w-5 h-5 text-white drop-shadow" />
+                        </div>
+                      </button>
+
+                      {/* Title & Metadata */}
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openMediaModal({
+                                id: rec.tmdbId,
+                                mediaType: rec.mediaType,
+                                title: rec.title,
+                                posterPath: rec.posterPath,
+                              })
+                            }
+                            className="text-left font-black text-white hover:text-amber-400 text-base sm:text-lg line-clamp-1 transition"
+                            title={rec.title}
+                          >
+                            {rec.title}
+                          </button>
+
+                          {/* Score Badge */}
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-black text-xs shrink-0 shadow-sm">
+                            <Star className="w-3.5 h-3.5 fill-amber-400" />
+                            <span>{rec.rating || 9}/10</span>
+                          </div>
+                        </div>
+
+                        {/* Media type, Year & Audience badges */}
+                        <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                          <span className="px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 font-semibold uppercase tracking-wider text-[10px]">
+                            {rec.mediaType === "tv" ? "Serie" : "Film"}
+                          </span>
+                          {rec.releaseYear && (
+                            <span className="text-slate-400 font-medium">
+                              {rec.releaseYear}
+                            </span>
+                          )}
+                          <span className="text-slate-600">•</span>
+                          {isTargeted ? (
+                            <span className="px-2 py-0.5 rounded-md bg-purple-500/15 border border-purple-500/30 text-purple-300 font-medium">
+                              🎯 {rec.targetNames?.slice(0, 2).join(", ")}
+                              {(rec.targetNames?.length || 0) > 2
+                                ? ` +${(rec.targetNames?.length || 0) - 2}`
+                                : ""}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md bg-sky-500/15 border border-sky-500/30 text-sky-300 font-medium">
+                              🌐 Alle Freunde
+                            </span>
+                          )}
+                          {formattedDate && (
+                            <span className="text-slate-500 text-[10px] ml-auto">
+                              {formattedDate}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Tags */}
+                        {rec.tags && rec.tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-0.5">
+                            {rec.tags.map((t) => (
+                              <span
+                                key={t}
+                                className="px-2 py-0.5 rounded-lg bg-slate-800/80 text-slate-300 text-[11px] font-medium border border-slate-700/50"
+                              >
+                                {t}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Comment Quote Bubble */}
+                    {rec.comment && (
+                      <div className="relative p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs sm:text-sm text-slate-200 italic leading-relaxed">
+                        <MessageSquare className="w-3.5 h-3.5 text-slate-500 mb-1 inline-block mr-1.5 not-italic" />
+                        <span>„{rec.comment}“</span>
+                      </div>
+                    )}
+
+                    {/* Bottom Actions Row */}
+                    <div className="pt-2 border-t border-slate-800/70 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-3 text-xs text-slate-400">
+                        <span className="flex items-center gap-1 font-semibold text-slate-300">
+                          <Flame className="w-3.5 h-3.5 text-rose-400" />
+                          <span>{rec.upvoterIds?.length || 0} Upvotes</span>
+                        </span>
+                        {rec.replies && rec.replies.length > 0 && (
+                          <span className="flex items-center gap-1 font-medium text-slate-400">
+                            <MessageSquare className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>{rec.replies.length} Antworten</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setEditingRecommendation(rec)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-amber-300 hover:text-black hover:bg-amber-400 bg-amber-500/15 border border-amber-500/30 transition flex items-center gap-1.5 shadow-sm"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Bearbeiten</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteRec(rec)}
+                          className="p-1.5 rounded-xl text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 border border-transparent hover:border-rose-500/20 transition"
+                          title="Empfehlung löschen"
+                          aria-label="Empfehlung löschen"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: 🤖 KI-EMPFEHLUNGEN (Recommendation mit Oben KI-Fenster & Vorschlägen) */}
       {activeTab === "ai" && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <AiMovieAdvisor initialPrompt={urlPrompt || undefined} />
         </div>
       )}
 
-      {/* TAB 4: ⚡ STANDARD-MATCHES (Stufe 1 Hybrid-Algorithmus basierend auf Abos & Geschmack) */}
+      {/* TAB 5: ⚡ STANDARD-MATCHES (Stufe 1 Hybrid-Algorithmus basierend auf Abos & Geschmack) */}
       {activeTab === "matches" && (
         <div className="space-y-6 animate-in fade-in duration-300">
           <AlgorithmRecommendations />
         </div>
       )}
+
+      {/* MODAL 1: Watchtime Details & Top 10/15 Contributor & Genre Aufschlüsselung */}
+      <WatchtimeDetailsModal
+        isOpen={showWatchtimeModal}
+        onClose={() => setShowWatchtimeModal(false)}
+        watchedItems={watchedItems}
+        metaMap={metaMap}
+      />
+
+      {/* MODAL 2: Empfehlung bearbeiten */}
+      <EditRecommendationModal
+        isOpen={Boolean(editingRecommendation)}
+        recommendation={editingRecommendation}
+        onClose={() => setEditingRecommendation(null)}
+      />
 
     </div>
   );
