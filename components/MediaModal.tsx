@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import { COLLECTIONS_DATA } from "@/lib/collections";
 import {
@@ -231,6 +231,9 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   const [selectedTvSeasons, setSelectedTvSeasons] = useState<number[]>([]);
   const [showTvSeasonEditor, setShowTvSeasonEditor] = useState<boolean>(false);
+  const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false);
+  const hasUserEditedSeasonsRef = useRef<boolean>(false);
+  const currentMediaIdRef = useRef<number | null>(null);
 
   const totalTvSeasons = useMemo(() => {
     return (
@@ -240,7 +243,15 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   }, [details, myStatusObj]);
 
   useEffect(() => {
+    if (media.id !== currentMediaIdRef.current) {
+      currentMediaIdRef.current = media.id;
+      hasUserEditedSeasonsRef.current = false;
+    }
+  }, [media.id]);
+
+  useEffect(() => {
     if (isTv) {
+      if (hasUserEditedSeasonsRef.current) return;
       if (myStatusObj?.watchedSeasons && myStatusObj.watchedSeasons.length > 0) {
         setSelectedTvSeasons(myStatusObj.watchedSeasons);
       } else {
@@ -258,18 +269,42 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       });
       return;
     }
-    await updateMediaStatus({
-      tmdbId: media.id,
-      mediaType: media.mediaType,
-      title: details?.title || media.title || "Titel",
-      posterPath: details?.posterPath || media.posterPath || null,
-      releaseYear: details?.releaseYear || null,
-      status,
-      rating: rating ?? (status === "WATCHED" ? userRatingInput : undefined),
-      watchedSeasons: isTv && status === "WATCHED" ? selectedTvSeasons : undefined,
-      totalSeasons: isTv && status === "WATCHED" ? totalTvSeasons : undefined,
-    });
-    setShowRatingSelector(false);
+    const finalSeasons =
+      isTv && status === "WATCHED"
+        ? selectedTvSeasons.length === 0
+          ? Array.from({ length: totalTvSeasons }, (_, i) => i + 1)
+          : selectedTvSeasons
+        : undefined;
+
+    setIsSavingStatus(true);
+    try {
+      await updateMediaStatus({
+        tmdbId: media.id,
+        mediaType: media.mediaType,
+        title: details?.title || media.title || "Titel",
+        posterPath: details?.posterPath || media.posterPath || null,
+        releaseYear: details?.releaseYear || null,
+        status,
+        rating: rating ?? (status === "WATCHED" ? userRatingInput : undefined),
+        watchedSeasons: finalSeasons,
+        totalSeasons: isTv && status === "WATCHED" ? totalTvSeasons : undefined,
+      });
+      hasUserEditedSeasonsRef.current = false;
+      setShowRatingSelector(false);
+      showToast(
+        status === "NONE"
+          ? "Von deiner Liste entfernt"
+          : isTv && finalSeasons
+          ? `Gespeichert (${formatWatchedSeasons(finalSeasons, totalTvSeasons)})`
+          : "Status erfolgreich gespeichert!",
+        { type: "success" }
+      );
+    } catch (err) {
+      console.error("Error saving status:", err);
+      showToast("Fehler beim Speichern. Bitte erneut versuchen.", { type: "error" });
+    } finally {
+      setIsSavingStatus(false);
+    }
   };
 
   const handleRecSubmit = async (e: React.FormEvent) => {
@@ -732,13 +767,13 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               >
                 <Check className="w-4 h-4 stroke-[2.5] flex-shrink-0" />
                 <span className="truncate">
-                  {myStatusObj?.status === "WATCHED"
+                  {myStatusObj?.status === "WATCHED" || (showRatingSelector && isTv)
                     ? isTv
                       ? `Gesehen (${formatWatchedSeasons(
-                          myStatusObj.watchedSeasons,
+                          showRatingSelector ? selectedTvSeasons : myStatusObj?.watchedSeasons,
                           totalTvSeasons
-                        )}${myStatusObj.rating ? ` • ${myStatusObj.rating}★` : ""})`
-                      : `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10 ★` : "✓"})`
+                        )}${(showRatingSelector ? userRatingInput : myStatusObj?.rating) ? ` • ${showRatingSelector ? userRatingInput : myStatusObj?.rating}★` : ""})`
+                      : `Gesehen (${(showRatingSelector ? userRatingInput : myStatusObj?.rating) ? `${showRatingSelector ? userRatingInput : myStatusObj?.rating}/10 ★` : "✓"})`
                     : "Als gesehen markieren"}
                 </span>
               </button>
@@ -846,18 +881,22 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
+                                hasUserEditedSeasonsRef.current = true;
                                 setSelectedTvSeasons(
                                   Array.from({ length: totalTvSeasons }, (_, i) => i + 1)
-                                )
-                              }
+                                );
+                              }}
                               className="text-amber-400 hover:underline font-semibold"
                             >
                               Alle
                             </button>
                             <button
                               type="button"
-                              onClick={() => setSelectedTvSeasons([1])}
+                              onClick={() => {
+                                hasUserEditedSeasonsRef.current = true;
+                                setSelectedTvSeasons([1]);
+                              }}
                               className="text-slate-400 hover:underline"
                             >
                               Nur S1
@@ -873,6 +912,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                 key={sNum}
                                 type="button"
                                 onClick={() => {
+                                  hasUserEditedSeasonsRef.current = true;
                                   setSelectedTvSeasons((prev) =>
                                     prev.includes(sNum)
                                       ? prev.filter((s) => s !== sNum)
@@ -926,10 +966,11 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     </button>
                     <button
                       type="button"
+                      disabled={isSavingStatus}
                       onClick={() => handleStatusChange("WATCHED", userRatingInput)}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 shadow-sm"
+                      className="px-4 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 disabled:opacity-50 transition shadow-sm flex items-center gap-1.5"
                     >
-                      Speichern
+                      {isSavingStatus ? <span>Speichern...</span> : <span>Speichern</span>}
                     </button>
                   </div>
                 </div>

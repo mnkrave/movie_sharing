@@ -55,9 +55,11 @@ model MediaStatus {
   title       String
   posterPath  String?
   releaseYear String?
-  status      String   // "WATCHED" | "WATCHLIST"
-  rating      Int?     // 1-10 personal rating
-  updatedAt   DateTime @updatedAt
+  status         String   // "WATCHED" | "WATCHLIST"
+  rating         Int?     // 1-10 personal rating
+  watchedSeasons String?  // JSON string: "[1, 2]"
+  totalSeasons   Int?
+  updatedAt      DateTime @updatedAt
   createdAt   DateTime @default(now())
 
   @@unique([userId, tmdbId, mediaType])

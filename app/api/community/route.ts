@@ -114,8 +114,19 @@ export async function POST(req: Request) {
         releaseYear: body.releaseYear || null,
         status: body.status, // "WATCHED" | "WATCHLIST" | "NONE"
         rating: body.rating ? Number(body.rating) : undefined,
-        watchedSeasons: Array.isArray(body.watchedSeasons) ? body.watchedSeasons : undefined,
-        totalSeasons: body.totalSeasons ? Number(body.totalSeasons) : undefined,
+        watchedSeasons: Array.isArray(body.watchedSeasons)
+          ? body.watchedSeasons
+          : body.watchedSeasons === null
+          ? null
+          : undefined,
+        totalSeasons:
+          typeof body.totalSeasons === "number"
+            ? body.totalSeasons
+            : body.totalSeasons
+            ? Number(body.totalSeasons)
+            : body.totalSeasons === null
+            ? null
+            : undefined,
       });
     } else if (action === "recommend") {
       await addRecommendation({

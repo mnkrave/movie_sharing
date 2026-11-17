@@ -92,7 +92,11 @@ export function QuickRatingModal({
 
   const handleSave = (score?: number) => {
     if (target.mediaType === "tv") {
-      onSaveRating(score, selectedSeasons, totalSeasons);
+      const finalSeasons =
+        selectedSeasons.length === 0
+          ? Array.from({ length: totalSeasons }, (_, i) => i + 1)
+          : selectedSeasons;
+      onSaveRating(score, finalSeasons, totalSeasons);
     } else {
       onSaveRating(score);
     }

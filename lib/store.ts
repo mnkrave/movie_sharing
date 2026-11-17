@@ -1507,6 +1507,22 @@ function isRecommendationVisibleToUser(
   return false;
 }
 
+let mediaStatusColumnsEnsured = false;
+async function ensureMediaStatusColumns() {
+  if (mediaStatusColumnsEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "MediaStatus" ADD COLUMN IF NOT EXISTS "watchedSeasons" TEXT;
+    `);
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE "MediaStatus" ADD COLUMN IF NOT EXISTS "totalSeasons" INTEGER;
+    `);
+    mediaStatusColumnsEnsured = true;
+  } catch {
+    // ignore
+  }
+}
+
 export async function getAllCommunityData(
   currentUserId?: string,
   currentUserName?: string
@@ -1533,6 +1549,7 @@ export async function getAllCommunityData(
   }
 
   if (await isPostgresAvailable()) {
+    await ensureMediaStatusColumns();
     let statuses: any[] = [];
     let recs: any[] = [];
     try {
@@ -1685,6 +1702,7 @@ export async function toggleMediaStatus(params: {
   totalSeasons?: number | null;
 }) {
   if (await isPostgresAvailable()) {
+    await ensureMediaStatusColumns();
     if (params.status === "NONE") {
       await prisma.mediaStatus.deleteMany({
         where: {
