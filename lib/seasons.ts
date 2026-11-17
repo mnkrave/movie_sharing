@@ -22,3 +22,58 @@ export function formatWatchedSeasons(
   }
   return `Staffel ${sorted.join("+")}`;
 }
+
+export interface MediaRuntimeItem {
+  mediaType: "movie" | "tv";
+  watchedSeasons?: number[] | null;
+  totalSeasons?: number | null;
+}
+
+export interface MediaRuntimeMeta {
+  runtimeMinutes?: number;
+  episodeRuntimeMinutes?: number;
+  numberOfSeasons?: number;
+  numberOfEpisodes?: number;
+  seasonEpisodes?: Record<number, number>;
+}
+
+export function getItemRuntimeMinutes(
+  item: MediaRuntimeItem,
+  meta?: MediaRuntimeMeta
+): number {
+  if (item.mediaType === "movie") {
+    return meta?.runtimeMinutes || 120;
+  }
+
+  // TV series calculation
+  const totalSeasons = item.totalSeasons || meta?.numberOfSeasons || 1;
+  const watched =
+    item.watchedSeasons && item.watchedSeasons.length > 0
+      ? item.watchedSeasons
+      : null;
+
+  const baseRuntime = meta?.runtimeMinutes || 400;
+
+  // If user watched all seasons or no specific filter is set
+  if (!watched || (totalSeasons > 0 && watched.length >= totalSeasons)) {
+    return baseRuntime;
+  }
+
+  // If specific seasons are watched and we have per-season episode data
+  if (meta?.seasonEpisodes && meta.episodeRuntimeMinutes && meta.episodeRuntimeMinutes > 0) {
+    const watchedEpisodes = watched.reduce(
+      (sum, sNum) => sum + (meta.seasonEpisodes?.[sNum] || 0),
+      0
+    );
+    if (watchedEpisodes > 0) {
+      return watchedEpisodes * meta.episodeRuntimeMinutes;
+    }
+  }
+
+  // Proportional fallback (watched season count / total seasons)
+  if (totalSeasons > 0 && watched.length < totalSeasons) {
+    return Math.round(baseRuntime * (watched.length / totalSeasons));
+  }
+
+  return baseRuntime;
+}

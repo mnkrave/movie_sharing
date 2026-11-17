@@ -8,7 +8,10 @@ export interface BatchMediaMeta {
   genreNames: string[];
   genres: { id: number; name: string }[];
   runtimeMinutes: number;
+  episodeRuntimeMinutes?: number;
   numberOfSeasons?: number;
+  numberOfEpisodes?: number;
+  seasonEpisodes?: Record<number, number>;
   director?: string;
   actors: string[];
   tmdbVoteAverage: number;
@@ -35,8 +38,12 @@ export async function POST(req: Request) {
       const key = `${item.type}_${item.id}`;
       if (metaCache.has(key)) {
         const cached = metaCache.get(key)!;
-        genresResult[key] = cached.genreNames;
-        metaResult[key] = cached;
+        if (item.type === "tv" && !cached.seasonEpisodes && (cached.numberOfSeasons || 0) > 1) {
+          toFetch.push({ id: item.id, type: item.type, key });
+        } else {
+          genresResult[key] = cached.genreNames;
+          metaResult[key] = cached;
+        }
       } else {
         toFetch.push({ id: item.id, type: item.type, key });
       }
@@ -57,11 +64,36 @@ export async function POST(req: Request) {
 
               // Runtime estimation
               let runtimeMinutes = 0;
+              let episodeRuntimeMinutes: number | undefined = undefined;
+              let seasonEpisodes: Record<number, number> | undefined = undefined;
+
               if (type === "movie") {
                 runtimeMinutes = data.runtime || 115;
               } else {
-                const epLen = data.episode_run_time?.[0] || data.last_episode_to_air?.runtime || 45;
-                const epCount = Math.min(data.number_of_episodes || 10, 40);
+                const epLen =
+                  (Array.isArray(data.episode_run_time) &&
+                  data.episode_run_time.length > 0 &&
+                  data.episode_run_time[0] > 0
+                    ? data.episode_run_time[0]
+                    : data.last_episode_to_air?.runtime) || 45;
+
+                episodeRuntimeMinutes = epLen;
+
+                const regularSeasons = Array.isArray(data.seasons)
+                  ? data.seasons.filter((s: any) => s.season_number > 0)
+                  : [];
+
+                let totalEps = 0;
+                if (regularSeasons.length > 0) {
+                  seasonEpisodes = {};
+                  regularSeasons.forEach((s: any) => {
+                    const count = s.episode_count || 0;
+                    seasonEpisodes![s.season_number] = count;
+                    totalEps += count;
+                  });
+                }
+
+                const epCount = totalEps > 0 ? totalEps : (data.number_of_episodes || 10);
                 runtimeMinutes = epLen * epCount;
               }
 
@@ -111,7 +143,10 @@ export async function POST(req: Request) {
                 genreNames,
                 genres: rawGenres,
                 runtimeMinutes,
+                episodeRuntimeMinutes,
                 numberOfSeasons: data.number_of_seasons,
+                numberOfEpisodes: data.number_of_episodes,
+                seasonEpisodes,
                 director: directorObj?.name,
                 actors,
                 tmdbVoteAverage: data.vote_average

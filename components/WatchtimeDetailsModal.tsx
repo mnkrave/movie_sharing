@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { useMedia } from "./MediaContext";
 import type { AppMediaStatus } from "@/lib/store";
-import { formatWatchedSeasons } from "@/lib/seasons";
+import { formatWatchedSeasons, getItemRuntimeMinutes } from "@/lib/seasons";
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 import {
   X,
@@ -90,17 +90,7 @@ export function WatchtimeDetailsModal({
 
     watchedItems.forEach((item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      let minutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
-      if (item.mediaType === "tv") {
-        const total = item.totalSeasons || meta?.numberOfSeasons || 1;
-        const watched =
-          item.watchedSeasons && item.watchedSeasons.length > 0
-            ? item.watchedSeasons.length
-            : total;
-        if (total > 0 && watched < total) {
-          minutes = Math.round(minutes * (watched / total));
-        }
-      }
+      const minutes = getItemRuntimeMinutes(item, meta);
       totalMinutes += minutes;
 
       if (item.mediaType === "movie") {
@@ -145,17 +135,16 @@ export function WatchtimeDetailsModal({
   const contributors = useMemo(() => {
     const list = watchedItems.map((item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      let minutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      const minutes = getItemRuntimeMinutes(item, meta);
       let seasonInfo: string | null = null;
       if (item.mediaType === "tv") {
         const total = item.totalSeasons || meta?.numberOfSeasons || 1;
         const watched =
           item.watchedSeasons && item.watchedSeasons.length > 0
-            ? item.watchedSeasons.length
-            : total;
-        if (total > 0 && watched < total) {
-          minutes = Math.round(minutes * (watched / total));
-          seasonInfo = formatWatchedSeasons(item.watchedSeasons, total);
+            ? item.watchedSeasons
+            : null;
+        if (watched && total > 0 && watched.length < total) {
+          seasonInfo = formatWatchedSeasons(watched, total);
         }
       }
       const hours = Math.round((minutes / 60) * 10) / 10;
@@ -200,7 +189,7 @@ export function WatchtimeDetailsModal({
 
     watchedItems.forEach((item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const itemMinutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      const itemMinutes = getItemRuntimeMinutes(item, meta);
       const genres = meta?.genres || [];
 
       if (genres.length === 0) {
