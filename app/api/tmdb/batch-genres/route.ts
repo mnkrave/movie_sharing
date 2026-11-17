@@ -8,6 +8,7 @@ export interface BatchMediaMeta {
   genreNames: string[];
   genres: { id: number; name: string }[];
   runtimeMinutes: number;
+  numberOfSeasons?: number;
   director?: string;
   actors: string[];
   tmdbVoteAverage: number;
@@ -110,6 +111,7 @@ export async function POST(req: Request) {
                 genreNames,
                 genres: rawGenres,
                 runtimeMinutes,
+                numberOfSeasons: data.number_of_seasons,
                 director: directorObj?.name,
                 actors,
                 tmdbVoteAverage: data.vote_average

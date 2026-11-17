@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { Star, X, Check, Film, Tv, Trash2 } from "lucide-react";
+import { Star, X, Check, Film, Tv, Trash2, SlidersHorizontal } from "lucide-react";
 
 export interface RatingTarget {
   tmdbId: number;
@@ -12,12 +12,18 @@ export interface RatingTarget {
   releaseYear?: string | null;
   currentRating?: number | null;
   isWatched?: boolean;
+  watchedSeasons?: number[] | null;
+  totalSeasons?: number | null;
 }
 
 interface QuickRatingModalProps {
   target: RatingTarget | null;
   onClose: () => void;
-  onSaveRating: (rating: number | undefined) => void;
+  onSaveRating: (
+    rating: number | undefined,
+    watchedSeasons?: number[] | null,
+    totalSeasons?: number | null
+  ) => void;
   onRemoveWatched: () => void;
 }
 
@@ -28,6 +34,46 @@ export function QuickRatingModal({
   onRemoveWatched,
 }: QuickRatingModalProps) {
   const [hoveredNumber, setHoveredNumber] = useState<number | null>(null);
+  const [totalSeasons, setTotalSeasons] = useState<number>(() => target?.totalSeasons || 1);
+  const [selectedSeasons, setSelectedSeasons] = useState<number[]>(() => {
+    if (target?.watchedSeasons && target.watchedSeasons.length > 0) {
+      return target.watchedSeasons;
+    }
+    const count = target?.totalSeasons || 1;
+    return Array.from({ length: count }, (_, i) => i + 1);
+  });
+  const [showSeasonEditor, setShowSeasonEditor] = useState<boolean>(false);
+  const [loadingSeasons, setLoadingSeasons] = useState<boolean>(false);
+
+  // Sync state and fetch TV series total seasons if needed
+  useEffect(() => {
+    if (!target) return;
+    if (target.mediaType === "tv") {
+      let isMounted = true;
+      setLoadingSeasons(true);
+      fetch(`/api/tmdb/details?id=${target.tmdbId}&type=tv`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!isMounted) return;
+          const count = data.numberOfSeasons || (data.seasons ? data.seasons.length : 1);
+          if (count > 0) {
+            setTotalSeasons(count);
+            if (!target.watchedSeasons || target.watchedSeasons.length === 0) {
+              setSelectedSeasons(Array.from({ length: count }, (_, i) => i + 1));
+            } else {
+              setSelectedSeasons(target.watchedSeasons);
+            }
+          }
+        })
+        .catch((err) => console.error("Error loading seasons in QuickRatingModal:", err))
+        .finally(() => {
+          if (isMounted) setLoadingSeasons(false);
+        });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, [target]);
 
   useEffect(() => {
     if (!target) return;
@@ -42,6 +88,14 @@ export function QuickRatingModal({
 
   const current = target.currentRating || 8;
   const activeRating = hoveredNumber ?? current;
+
+  const handleSave = (score?: number) => {
+    if (target.mediaType === "tv") {
+      onSaveRating(score, selectedSeasons, totalSeasons);
+    } else {
+      onSaveRating(score);
+    }
+  };
 
   const getRatingLabel = (num: number) => {
     switch (num) {
@@ -86,7 +140,7 @@ export function QuickRatingModal({
         </button>
 
         {/* Thumbnail & Title */}
-        <div className="flex items-center gap-3.5 text-left mb-4">
+        <div className="flex items-center gap-3.5 text-left mb-3">
           <div className="w-12 h-16 rounded-xl overflow-hidden bg-slate-900 border border-slate-700/60 relative flex-shrink-0 shadow">
             {target.posterPath ? (
               <Image
@@ -115,8 +169,90 @@ export function QuickRatingModal({
           </div>
         </div>
 
+        {/* TV Series Seasons Selector (Default: All) */}
+        {target.mediaType === "tv" && (
+          <div className="my-3 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-left">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-1.5 text-xs font-bold">
+                <Tv className="w-3.5 h-3.5 text-cyan-400" />
+                {selectedSeasons.length === totalSeasons ? (
+                  <span className="text-emerald-400 font-semibold">
+                    Alle {totalSeasons} {totalSeasons === 1 ? "Staffel" : "Staffeln"} gesehen ✓
+                  </span>
+                ) : (
+                  <span className="text-amber-400 font-semibold">
+                    {selectedSeasons.length} von {totalSeasons} Staffeln gesehen
+                  </span>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowSeasonEditor(!showSeasonEditor)}
+                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition flex items-center gap-1"
+              >
+                <SlidersHorizontal className="w-3 h-3" />
+                <span>{showSeasonEditor ? "Fertig" : "Edit Staffeln"}</span>
+              </button>
+            </div>
+
+            {showSeasonEditor && (
+              <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-2 animate-fadeIn">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span>Wähle deine gesehenen Staffeln:</span>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setSelectedSeasons(Array.from({ length: totalSeasons }, (_, i) => i + 1))
+                      }
+                      className="text-amber-400 hover:underline font-semibold"
+                    >
+                      Alle
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSeasons([1])}
+                      className="text-slate-400 hover:underline"
+                    >
+                      Nur S1
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 max-h-36 overflow-y-auto pt-1">
+                  {Array.from({ length: totalSeasons }, (_, i) => i + 1).map((sNum) => {
+                    const isSelected = selectedSeasons.includes(sNum);
+                    return (
+                      <button
+                        key={sNum}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSeasons((prev) =>
+                            prev.includes(sNum)
+                              ? prev.filter((s) => s !== sNum)
+                              : [...prev, sNum].sort((a, b) => a - b)
+                          );
+                        }}
+                        className={`py-1.5 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1 ${
+                          isSelected
+                            ? "bg-amber-500 text-black shadow-sm"
+                            : "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/50"
+                        }`}
+                      >
+                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                        <span>S{sNum}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Score indicator */}
-        <div className="py-2 mb-2">
+        <div className="py-1 mb-1">
           <div className="flex items-center justify-center gap-1.5 text-3xl font-black text-amber-400 font-mono">
             <Star className="w-7 h-7 fill-amber-400" />
             <span>{activeRating}/10</span>
@@ -136,7 +272,7 @@ export function QuickRatingModal({
                 type="button"
                 onMouseEnter={() => setHoveredNumber(num)}
                 onMouseLeave={() => setHoveredNumber(null)}
-                onClick={() => onSaveRating(num)}
+                onClick={() => handleSave(num)}
                 className={`py-2.5 rounded-xl text-sm font-black transition transform active:scale-95 ${
                   num === 10
                     ? "bg-gradient-to-tr from-amber-500 to-emerald-400 text-black hover:scale-105 shadow-md shadow-emerald-500/20"
@@ -157,7 +293,7 @@ export function QuickRatingModal({
         <div className="flex flex-col gap-2 pt-3 border-t border-slate-800/80 text-xs">
           <button
             type="button"
-            onClick={() => onSaveRating(undefined)}
+            onClick={() => handleSave(undefined)}
             className="w-full py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition font-medium"
           >
             Ohne Note als gesehen speichern
@@ -178,3 +314,4 @@ export function QuickRatingModal({
     </div>
   );
 }
+

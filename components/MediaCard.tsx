@@ -90,6 +90,8 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
       releaseYear: item.releaseYear,
       currentRating: myStatusObj?.rating,
       isWatched: myStatusObj?.status === "WATCHED",
+      watchedSeasons: myStatusObj?.watchedSeasons,
+      totalSeasons: myStatusObj?.totalSeasons,
     });
   };
 

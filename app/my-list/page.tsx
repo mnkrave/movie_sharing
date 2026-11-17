@@ -405,11 +405,38 @@ export default function MyListPage() {
 
                   {/* Rating Badge if rated */}
                   {item.rating && (
-                    <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-amber-400 font-extrabold text-xs border border-white/10 flex items-center gap-1 shadow">
+                    <div
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openRatingModal({
+                          tmdbId: item.tmdbId,
+                          mediaType: item.mediaType,
+                          title: item.title,
+                          posterPath: item.posterPath,
+                          releaseYear: item.releaseYear,
+                          currentRating: item.rating,
+                          isWatched: true,
+                          watchedSeasons: item.watchedSeasons,
+                          totalSeasons: item.totalSeasons,
+                        });
+                      }}
+                      className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-amber-400 font-extrabold text-xs border border-white/10 flex items-center gap-1 shadow cursor-pointer hover:bg-black"
+                      title="Bewertung oder Staffeln anpassen"
+                    >
                       <Star className="w-3 h-3 fill-amber-400" />
                       <span>{item.rating}/10</span>
                     </div>
                   )}
+
+                  {/* Partial seasons badge for series */}
+                  {item.mediaType === "tv" &&
+                    item.watchedSeasons &&
+                    item.totalSeasons &&
+                    item.watchedSeasons.length < item.totalSeasons && (
+                      <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
+                        <span>{item.watchedSeasons.length}/{item.totalSeasons} Staffeln</span>
+                      </div>
+                    )}
 
                   {/* Hover Quick Action Indicator */}
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition hidden [@media(hover:hover)]:flex items-center justify-center p-3 text-center">
@@ -451,6 +478,8 @@ export default function MyListPage() {
                             releaseYear: item.releaseYear,
                             currentRating: item.rating,
                             isWatched: false,
+                            watchedSeasons: item.watchedSeasons,
+                            totalSeasons: item.totalSeasons,
                           });
                         }}
                         className="flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[11px] sm:text-[10px] font-bold transition"

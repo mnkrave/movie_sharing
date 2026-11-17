@@ -77,6 +77,8 @@ interface MediaContextType {
     releaseYear?: string | null;
     status: "WATCHED" | "WATCHLIST" | "NONE";
     rating?: number | null;
+    watchedSeasons?: number[] | null;
+    totalSeasons?: number | null;
   }) => Promise<void>;
   submitRecommendation: (params: {
     tmdbId: number;
@@ -447,6 +449,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     releaseYear?: string | null;
     status: "WATCHED" | "WATCHLIST" | "NONE";
     rating?: number | null;
+    watchedSeasons?: number[] | null;
+    totalSeasons?: number | null;
   }) => {
     const myUserId = (session?.user as any)?.id || "user_lukas";
     const myName = session?.user?.name || "Lukas Reinle";
@@ -475,6 +479,14 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
           ...nextStatuses[matchIndex],
           status: params.status,
           rating: params.rating !== undefined ? params.rating : nextStatuses[matchIndex].rating,
+          watchedSeasons:
+            params.watchedSeasons !== undefined
+              ? params.watchedSeasons
+              : nextStatuses[matchIndex].watchedSeasons,
+          totalSeasons:
+            params.totalSeasons !== undefined
+              ? params.totalSeasons
+              : nextStatuses[matchIndex].totalSeasons,
           updatedAt: new Date().toISOString(),
         };
       } else {
@@ -490,6 +502,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
           releaseYear: params.releaseYear || null,
           status: params.status,
           rating: params.rating ?? null,
+          watchedSeasons: params.watchedSeasons ?? null,
+          totalSeasons: params.totalSeasons ?? null,
           updatedAt: new Date().toISOString(),
         });
       }
@@ -760,7 +774,11 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleSaveRating = async (rating?: number) => {
+  const handleSaveRating = async (
+    rating?: number,
+    watchedSeasons?: number[] | null,
+    totalSeasons?: number | null
+  ) => {
     if (!ratingTarget) return;
     await updateMediaStatus({
       tmdbId: ratingTarget.tmdbId,
@@ -770,6 +788,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       releaseYear: ratingTarget.releaseYear,
       status: "WATCHED",
       rating,
+      watchedSeasons,
+      totalSeasons,
     });
     setRatingTarget(null);
   };

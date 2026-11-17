@@ -27,6 +27,8 @@ export interface AppMediaStatus {
   releaseYear?: string | null;
   status: "WATCHED" | "WATCHLIST";
   rating?: number | null;
+  watchedSeasons?: number[] | null;
+  totalSeasons?: number | null;
   updatedAt: string;
 }
 
@@ -1603,7 +1605,7 @@ export async function getAllCommunityData(
     );
 
     return {
-      mediaStatuses: statuses.map((s) => ({
+      mediaStatuses: statuses.map((s: any) => ({
         id: s.id,
         userId: s.userId,
         userName: s.user.name,
@@ -1615,6 +1617,18 @@ export async function getAllCommunityData(
         releaseYear: s.releaseYear,
         status: s.status as "WATCHED" | "WATCHLIST",
         rating: s.rating,
+        watchedSeasons: s.watchedSeasons
+          ? typeof s.watchedSeasons === "string"
+            ? (() => {
+                try {
+                  return JSON.parse(s.watchedSeasons);
+                } catch {
+                  return null;
+                }
+              })()
+            : s.watchedSeasons
+          : null,
+        totalSeasons: s.totalSeasons ?? null,
         updatedAt: s.updatedAt.toISOString(),
       })),
       recommendations: visibleRecs,
@@ -1665,6 +1679,8 @@ export async function toggleMediaStatus(params: {
   releaseYear?: string | null;
   status: "WATCHED" | "WATCHLIST" | "NONE";
   rating?: number | null;
+  watchedSeasons?: number[] | null;
+  totalSeasons?: number | null;
 }) {
   if (await isPostgresAvailable()) {
     if (params.status === "NONE") {
@@ -1678,22 +1694,8 @@ export async function toggleMediaStatus(params: {
       return null;
     }
 
-    const upserted = await prisma.mediaStatus.upsert({
-      where: {
-        userId_tmdbId_mediaType: {
-          userId: params.userId,
-          tmdbId: params.tmdbId,
-          mediaType: params.mediaType,
-        },
-      },
-      update: {
-        status: params.status,
-        rating: params.rating !== undefined ? params.rating : undefined,
-        title: params.title,
-        posterPath: params.posterPath,
-        releaseYear: params.releaseYear,
-      },
-      create: {
+    try {
+      const upsertData: any = {
         userId: params.userId,
         tmdbId: params.tmdbId,
         mediaType: params.mediaType,
@@ -1702,9 +1704,70 @@ export async function toggleMediaStatus(params: {
         releaseYear: params.releaseYear,
         status: params.status,
         rating: params.rating ?? null,
-      },
-    });
-    return upserted;
+      };
+      if (params.watchedSeasons !== undefined) {
+        upsertData.watchedSeasons = params.watchedSeasons ? JSON.stringify(params.watchedSeasons) : null;
+      }
+      if (params.totalSeasons !== undefined) {
+        upsertData.totalSeasons = params.totalSeasons;
+      }
+
+      const updateData: any = {
+        status: params.status,
+        rating: params.rating !== undefined ? params.rating : undefined,
+        title: params.title,
+        posterPath: params.posterPath,
+        releaseYear: params.releaseYear,
+      };
+      if (params.watchedSeasons !== undefined) {
+        updateData.watchedSeasons = params.watchedSeasons ? JSON.stringify(params.watchedSeasons) : null;
+      }
+      if (params.totalSeasons !== undefined) {
+        updateData.totalSeasons = params.totalSeasons;
+      }
+
+      const upserted = await prisma.mediaStatus.upsert({
+        where: {
+          userId_tmdbId_mediaType: {
+            userId: params.userId,
+            tmdbId: params.tmdbId,
+            mediaType: params.mediaType,
+          },
+        },
+        update: updateData,
+        create: upsertData,
+      });
+      return upserted;
+    } catch {
+      // If table lacks new columns, retry with base fields
+      const fallbackUpserted = await prisma.mediaStatus.upsert({
+        where: {
+          userId_tmdbId_mediaType: {
+            userId: params.userId,
+            tmdbId: params.tmdbId,
+            mediaType: params.mediaType,
+          },
+        },
+        update: {
+          status: params.status,
+          rating: params.rating !== undefined ? params.rating : undefined,
+          title: params.title,
+          posterPath: params.posterPath,
+          releaseYear: params.releaseYear,
+        },
+        create: {
+          userId: params.userId,
+          tmdbId: params.tmdbId,
+          mediaType: params.mediaType,
+          title: params.title,
+          posterPath: params.posterPath,
+          releaseYear: params.releaseYear,
+          status: params.status,
+          rating: params.rating ?? null,
+        },
+      });
+      return fallbackUpserted;
+    }
   }
 
   const db = readLocalDb();
@@ -1724,6 +1787,8 @@ export async function toggleMediaStatus(params: {
   if (idx !== -1) {
     db.mediaStatuses[idx].status = params.status;
     if (params.rating !== undefined) db.mediaStatuses[idx].rating = params.rating;
+    if (params.watchedSeasons !== undefined) db.mediaStatuses[idx].watchedSeasons = params.watchedSeasons;
+    if (params.totalSeasons !== undefined) db.mediaStatuses[idx].totalSeasons = params.totalSeasons;
     db.mediaStatuses[idx].updatedAt = now;
   } else {
     db.mediaStatuses.unshift({
@@ -1738,6 +1803,8 @@ export async function toggleMediaStatus(params: {
       releaseYear: params.releaseYear,
       status: params.status,
       rating: params.rating ?? null,
+      watchedSeasons: params.watchedSeasons ?? null,
+      totalSeasons: params.totalSeasons ?? null,
       updatedAt: now,
     });
   }

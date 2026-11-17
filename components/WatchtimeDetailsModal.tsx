@@ -89,7 +89,17 @@ export function WatchtimeDetailsModal({
 
     watchedItems.forEach((item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const minutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      let minutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      if (item.mediaType === "tv") {
+        const total = item.totalSeasons || meta?.numberOfSeasons || 1;
+        const watched =
+          item.watchedSeasons && item.watchedSeasons.length > 0
+            ? item.watchedSeasons.length
+            : total;
+        if (total > 0 && watched < total) {
+          minutes = Math.round(minutes * (watched / total));
+        }
+      }
       totalMinutes += minutes;
 
       if (item.mediaType === "movie") {
@@ -134,7 +144,19 @@ export function WatchtimeDetailsModal({
   const contributors = useMemo(() => {
     const list = watchedItems.map((item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const minutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      let minutes = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      let seasonInfo: string | null = null;
+      if (item.mediaType === "tv") {
+        const total = item.totalSeasons || meta?.numberOfSeasons || 1;
+        const watched =
+          item.watchedSeasons && item.watchedSeasons.length > 0
+            ? item.watchedSeasons.length
+            : total;
+        if (total > 0 && watched < total) {
+          minutes = Math.round(minutes * (watched / total));
+          seasonInfo = `${watched}/${total} Staffeln`;
+        }
+      }
       const hours = Math.round((minutes / 60) * 10) / 10;
       const sharePercent =
         totalStats.totalMinutes > 0
@@ -147,6 +169,7 @@ export function WatchtimeDetailsModal({
         minutes,
         hours,
         sharePercent,
+        seasonInfo,
       };
     });
 
@@ -503,6 +526,11 @@ export function WatchtimeDetailsModal({
                           >
                             {isTv ? "Serie" : "Film"}
                           </span>
+                          {item.seasonInfo && (
+                            <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                              {item.seasonInfo}
+                            </span>
+                          )}
                           {item.releaseYear && (
                             <span className="text-xs text-slate-400 font-mono">
                               ({item.releaseYear})

@@ -39,6 +39,7 @@ import {
   User,
   Pencil,
   Trash2,
+  SlidersHorizontal,
 } from "lucide-react";
 import { RecommendationThread } from "./RecommendationThread";
 
@@ -227,6 +228,26 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       isMe(m.userId, m.userName, (m as any).userEmail)
   );
 
+  const [selectedTvSeasons, setSelectedTvSeasons] = useState<number[]>([]);
+  const [showTvSeasonEditor, setShowTvSeasonEditor] = useState<boolean>(false);
+
+  const totalTvSeasons = useMemo(() => {
+    return (
+      details?.numberOfSeasons ||
+      (details?.seasons ? details.seasons.length : myStatusObj?.totalSeasons || 1)
+    );
+  }, [details, myStatusObj]);
+
+  useEffect(() => {
+    if (isTv) {
+      if (myStatusObj?.watchedSeasons && myStatusObj.watchedSeasons.length > 0) {
+        setSelectedTvSeasons(myStatusObj.watchedSeasons);
+      } else {
+        setSelectedTvSeasons(Array.from({ length: totalTvSeasons }, (_, i) => i + 1));
+      }
+    }
+  }, [isTv, myStatusObj?.watchedSeasons, totalTvSeasons]);
+
   const handleStatusChange = async (status: "WATCHED" | "WATCHLIST" | "NONE", rating?: number) => {
     if (!session) {
       showToast("Bitte logge dich ein, um Filme auf deiner Liste zu speichern!", {
@@ -244,6 +265,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       releaseYear: details?.releaseYear || null,
       status,
       rating: rating ?? (status === "WATCHED" ? userRatingInput : undefined),
+      watchedSeasons: isTv && status === "WATCHED" ? selectedTvSeasons : undefined,
+      totalSeasons: isTv && status === "WATCHED" ? totalTvSeasons : undefined,
     });
     setShowRatingSelector(false);
   };
@@ -699,13 +722,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 my-5 p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
               <button
                 type="button"
-                onClick={() => {
-                  if (myStatusObj?.status === "WATCHED") {
-                    handleStatusChange("NONE");
-                  } else {
-                    setShowRatingSelector(!showRatingSelector);
-                  }
-                }}
+                onClick={() => setShowRatingSelector(!showRatingSelector)}
                 className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
                   myStatusObj?.status === "WATCHED"
                     ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
@@ -715,7 +732,14 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 <Check className="w-4 h-4 stroke-[2.5] flex-shrink-0" />
                 <span className="truncate">
                   {myStatusObj?.status === "WATCHED"
-                    ? `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10 ★` : "✓"})`
+                    ? isTv &&
+                      myStatusObj.watchedSeasons &&
+                      myStatusObj.totalSeasons &&
+                      myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
+                      ? `Gesehen (${myStatusObj.watchedSeasons.length}/${myStatusObj.totalSeasons} St. • ${
+                          myStatusObj.rating ? `${myStatusObj.rating}★` : "✓"
+                        })`
+                      : `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10 ★` : "✓"})`
                     : "Als gesehen markieren"}
                 </span>
               </button>
@@ -764,10 +788,10 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               </button>
             </div>
 
-            {/* Quick Rating Selector Drawer */}
+            {/* Quick Rating & Seasons Selector Drawer */}
             {showRatingSelector && (
-              <div className="p-4 mb-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 animate-in fade-in">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2">
+              <div className="p-4 mb-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 animate-in fade-in space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <span className="text-sm font-semibold text-emerald-300">
                     Wie fandest du {mediaNoun}? ({userRatingInput}/10)
                   </span>
@@ -788,19 +812,127 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     ))}
                   </div>
                 </div>
-                <div className="flex justify-end gap-2 mt-3">
-                  <button
-                    onClick={() => setShowRatingSelector(false)}
-                    className="text-xs text-slate-400 px-3 py-1.5"
-                  >
-                    Abbrechen
-                  </button>
-                  <button
-                    onClick={() => handleStatusChange("WATCHED", userRatingInput)}
-                    className="px-4 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400"
-                  >
-                    Speichern
-                  </button>
+
+                {/* TV Series Seasons Selector (Default: All) */}
+                {isTv && (
+                  <div className="p-3 rounded-xl bg-slate-900/90 border border-emerald-500/20 text-left">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <Tv className="w-3.5 h-3.5 text-cyan-400" />
+                        {selectedTvSeasons.length === totalTvSeasons ? (
+                          <span className="text-emerald-400 font-semibold">
+                            Alle {totalTvSeasons} {totalTvSeasons === 1 ? "Staffel" : "Staffeln"} gesehen ✓
+                          </span>
+                        ) : (
+                          <span className="text-amber-400 font-semibold">
+                            {selectedTvSeasons.length} von {totalTvSeasons} Staffeln gesehen
+                          </span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setShowTvSeasonEditor(!showTvSeasonEditor)}
+                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition flex items-center gap-1"
+                      >
+                        <SlidersHorizontal className="w-3 h-3" />
+                        <span>{showTvSeasonEditor ? "Fertig" : "Edit Staffeln"}</span>
+                      </button>
+                    </div>
+
+                    {showTvSeasonEditor && (
+                      <div className="mt-2.5 pt-2 border-t border-slate-800 space-y-2 animate-fadeIn">
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>Wähle deine gesehenen Staffeln:</span>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setSelectedTvSeasons(
+                                  Array.from({ length: totalTvSeasons }, (_, i) => i + 1)
+                                )
+                              }
+                              className="text-amber-400 hover:underline font-semibold"
+                            >
+                              Alle
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTvSeasons([1])}
+                              className="text-slate-400 hover:underline"
+                            >
+                              Nur S1
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-36 overflow-y-auto pt-1">
+                          {Array.from({ length: totalTvSeasons }, (_, i) => i + 1).map((sNum) => {
+                            const isSelected = selectedTvSeasons.includes(sNum);
+                            return (
+                              <button
+                                key={sNum}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedTvSeasons((prev) =>
+                                    prev.includes(sNum)
+                                      ? prev.filter((s) => s !== sNum)
+                                      : [...prev, sNum].sort((a, b) => a - b)
+                                  );
+                                }}
+                                className={`py-1.5 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1 ${
+                                  isSelected
+                                    ? "bg-amber-500 text-black shadow-sm"
+                                    : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700/50"
+                                }`}
+                              >
+                                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
+                                <span>S{sNum}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                  {myStatusObj?.status === "WATCHED" ? (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange("NONE")}
+                      className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-3 py-1.5 rounded-lg transition flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Von &apos;Gesehen&apos; entfernen</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange("WATCHED", undefined)}
+                      className="text-xs text-slate-400 hover:text-white transition"
+                    >
+                      Ohne Note speichern
+                    </button>
+                  )}
+
+                  <div className="flex items-center gap-2 ml-auto">
+                    <button
+                      type="button"
+                      onClick={() => setShowRatingSelector(false)}
+                      className="text-xs text-slate-400 hover:text-white px-3 py-1.5"
+                    >
+                      Abbrechen
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange("WATCHED", userRatingInput)}
+                      className="px-4 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 shadow-sm"
+                    >
+                      Speichern
+                    </button>
+                  </div>
                 </div>
               </div>
             )}

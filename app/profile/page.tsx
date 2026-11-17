@@ -235,8 +235,18 @@ function ProfileContent() {
   const totalMinutes = useMemo(() => {
     return watchedItems.reduce((acc, item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      if (meta?.runtimeMinutes) return acc + meta.runtimeMinutes;
-      return acc + (item.mediaType === "movie" ? 120 : 400);
+      let runtime = meta?.runtimeMinutes || (item.mediaType === "movie" ? 120 : 400);
+      if (item.mediaType === "tv") {
+        const total = item.totalSeasons || meta?.numberOfSeasons || 1;
+        const watched =
+          item.watchedSeasons && item.watchedSeasons.length > 0
+            ? item.watchedSeasons.length
+            : total;
+        if (total > 0 && watched < total) {
+          runtime = Math.round(runtime * (watched / total));
+        }
+      }
+      return acc + runtime;
     }, 0);
   }, [watchedItems, metaMap]);
 
@@ -1136,6 +1146,8 @@ function ProfileContent() {
                             releaseYear: item.releaseYear,
                             currentRating: item.rating,
                             isWatched: true,
+                            watchedSeasons: item.watchedSeasons,
+                            totalSeasons: item.totalSeasons,
                           });
                         }}
                         title="Deine Bewertung ändern"

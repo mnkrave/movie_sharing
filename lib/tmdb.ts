@@ -102,6 +102,13 @@ export interface MediaDetails extends MediaItem {
   runtime?: number;
   numberOfSeasons?: number;
   numberOfEpisodes?: number;
+  seasons?: {
+    id: number;
+    name: string;
+    seasonNumber: number;
+    episodeCount?: number;
+    posterPath?: string | null;
+  }[];
   genres: { id: number; name: string }[];
   tagline?: string;
   imdbId?: string;
@@ -976,6 +983,17 @@ export async function getMediaDetails(id: number, mediaType: "movie" | "tv"): Pr
     runtime: data.runtime || (data.episode_run_time ? data.episode_run_time[0] : undefined),
     numberOfSeasons: data.number_of_seasons,
     numberOfEpisodes: data.number_of_episodes,
+    seasons: Array.isArray(data.seasons)
+      ? data.seasons
+          .filter((s: any) => s.season_number > 0)
+          .map((s: any) => ({
+            id: s.id,
+            name: s.name || `Staffel ${s.season_number}`,
+            seasonNumber: s.season_number,
+            episodeCount: s.episode_count,
+            posterPath: s.poster_path || null,
+          }))
+      : undefined,
     genres: data.genres || [],
     tagline: data.tagline || "",
     imdbId: data.external_ids?.imdb_id || data.imdb_id,
