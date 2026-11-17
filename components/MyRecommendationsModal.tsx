@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
-import { AppRecommendation } from "@/lib/store";
+import type { AppRecommendation } from "@/lib/store";
 import {
   X,
   Flame,

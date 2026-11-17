@@ -14,7 +14,7 @@ import {
   ToastOptions,
   ToastStack,
 } from "./FeedbackOverlay";
-import { AppMediaStatus, AppRecommendation } from "@/lib/store";
+import type { AppMediaStatus, AppRecommendation } from "@/lib/store";
 import { useSession } from "next-auth/react";
 
 export interface FriendRequestItem {

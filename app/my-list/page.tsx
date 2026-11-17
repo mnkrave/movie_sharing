@@ -21,6 +21,7 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { formatWatchedSeasons } from "@/lib/seasons";
 
 export default function MyListPage() {
   const { data: session } = useSession();
@@ -434,7 +435,7 @@ export default function MyListPage() {
                     item.totalSeasons &&
                     item.watchedSeasons.length < item.totalSeasons && (
                       <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
-                        <span>{item.watchedSeasons.length}/{item.totalSeasons} Staffeln</span>
+                        <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
                       </div>
                     )}
 

@@ -32,6 +32,8 @@ export interface AppMediaStatus {
   updatedAt: string;
 }
 
+export { formatWatchedSeasons } from "./seasons";
+
 export interface AppRecommendation {
   id: string;
   userId: string;

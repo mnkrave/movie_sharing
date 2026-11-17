@@ -2,6 +2,7 @@
 
 import React from "react";
 import { MediaItem, formatGermanReleaseDate } from "@/lib/tmdb";
+import { formatWatchedSeasons } from "@/lib/seasons";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
@@ -183,7 +184,9 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
               <Check className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">
                 {myWatched && otherFriendsWatched.length === 0
-                  ? "Gesehen"
+                  ? item.mediaType === "tv" && myStatusObj?.watchedSeasons && myStatusObj.totalSeasons && myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
+                    ? `Gesehen (${formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)})`
+                    : "Gesehen"
                   : myWatched && otherFriendsWatched.length > 0
                   ? `Gesehen (+ ${otherFriendsWatched.length} ${
                       otherFriendsWatched.length === 1 ? "Freund" : "Freunde"
@@ -298,6 +301,12 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             <span className="truncate">
               {myStatusObj?.status === "WATCHED" && myWatched?.rating
                 ? `${myWatched.rating}/10`
+                : myStatusObj?.status === "WATCHED" &&
+                  item.mediaType === "tv" &&
+                  myStatusObj.watchedSeasons &&
+                  myStatusObj.totalSeasons &&
+                  myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
+                ? formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)
                 : "Gesehen"}
             </span>
           </button>

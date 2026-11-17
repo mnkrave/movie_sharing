@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { Star, X, Check, Film, Tv, Trash2, SlidersHorizontal } from "lucide-react";
+import { formatWatchedSeasons } from "@/lib/seasons";
 
 export interface RatingTarget {
   tmdbId: number;
@@ -181,7 +182,7 @@ export function QuickRatingModal({
                   </span>
                 ) : (
                   <span className="text-amber-400 font-semibold">
-                    {selectedSeasons.length} von {totalSeasons} Staffeln gesehen
+                    {formatWatchedSeasons(selectedSeasons, totalSeasons)} gesehen
                   </span>
                 )}
               </div>

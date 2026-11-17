@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useMedia } from "./MediaContext";
-import { AppRecommendation } from "@/lib/store";
+import type { AppRecommendation } from "@/lib/store";
 import {
   X,
   Star,

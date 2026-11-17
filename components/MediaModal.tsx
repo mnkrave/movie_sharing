@@ -13,6 +13,7 @@ import {
   formatGermanReleaseDate,
 } from "@/lib/tmdb";
 import { useMedia } from "./MediaContext";
+import { formatWatchedSeasons } from "@/lib/seasons";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import {
@@ -732,13 +733,11 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 <Check className="w-4 h-4 stroke-[2.5] flex-shrink-0" />
                 <span className="truncate">
                   {myStatusObj?.status === "WATCHED"
-                    ? isTv &&
-                      myStatusObj.watchedSeasons &&
-                      myStatusObj.totalSeasons &&
-                      myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
-                      ? `Gesehen (${myStatusObj.watchedSeasons.length}/${myStatusObj.totalSeasons} St. • ${
-                          myStatusObj.rating ? `${myStatusObj.rating}★` : "✓"
-                        })`
+                    ? isTv
+                      ? `Gesehen (${formatWatchedSeasons(
+                          myStatusObj.watchedSeasons,
+                          totalTvSeasons
+                        )}${myStatusObj.rating ? ` • ${myStatusObj.rating}★` : ""})`
                       : `Gesehen (${myStatusObj.rating ? `${myStatusObj.rating}/10 ★` : "✓"})`
                     : "Als gesehen markieren"}
                 </span>
@@ -825,7 +824,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                           </span>
                         ) : (
                           <span className="text-amber-400 font-semibold">
-                            {selectedTvSeasons.length} von {totalTvSeasons} Staffeln gesehen
+                            {formatWatchedSeasons(selectedTvSeasons, totalTvSeasons)} gesehen
                           </span>
                         )}
                       </div>
@@ -1676,10 +1675,20 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     {allWatched.length > 0 ? (
                       <div className="space-y-2">
                         {myWatched && (
-                          <div className="flex items-center justify-between text-sm py-1.5 border-b border-emerald-500/20 text-emerald-300 font-semibold">
-                            <span>Du (Selbst gesehen)</span>
+                          <div className="flex items-center justify-between text-sm py-1.5 border-b border-emerald-500/20 text-emerald-300 font-semibold gap-2">
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                              <span className="truncate">Du (Selbst gesehen)</span>
+                              {isTv && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                                  {formatWatchedSeasons(
+                                    myWatched.watchedSeasons,
+                                    myWatched.totalSeasons || totalTvSeasons
+                                  )}
+                                </span>
+                              )}
+                            </div>
                             {myWatched.rating && (
-                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
                                 {myWatched.rating}/10 ★
                               </span>
                             )}
@@ -1688,18 +1697,28 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                         {otherFriendsWatched.map((fw) => (
                           <div
                             key={fw.id}
-                            className="flex items-center justify-between text-sm py-1 border-b border-slate-800/40 last:border-0"
+                            className="flex items-center justify-between text-sm py-1.5 border-b border-slate-800/40 last:border-0 gap-2"
                           >
-                            <Link
-                              href={`/friends/${encodeURIComponent(fw.userId || fw.userName)}`}
-                              onClick={onClose}
-                              className="text-slate-200 hover:text-amber-400 font-medium transition-colors"
-                              title={`Profil von ${fw.userName} aufrufen`}
-                            >
-                              {fw.userName}
-                            </Link>
+                            <div className="flex items-center gap-2 flex-wrap min-w-0">
+                              <Link
+                                href={`/friends/${encodeURIComponent(fw.userId || fw.userName)}`}
+                                onClick={onClose}
+                                className="text-slate-200 hover:text-amber-400 font-medium transition-colors truncate"
+                                title={`Profil von ${fw.userName} aufrufen`}
+                              >
+                                {fw.userName}
+                              </Link>
+                              {isTv && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0">
+                                  {formatWatchedSeasons(
+                                    fw.watchedSeasons,
+                                    fw.totalSeasons || totalTvSeasons
+                                  )}
+                                </span>
+                              )}
+                            </div>
                             {fw.rating && (
-                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
                                 {fw.rating}/10 ★
                               </span>
                             )}

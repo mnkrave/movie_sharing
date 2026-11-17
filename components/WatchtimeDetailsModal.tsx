@@ -3,7 +3,8 @@
 import React, { useState, useMemo, useEffect } from "react";
 import Image from "next/image";
 import { useMedia } from "./MediaContext";
-import { AppMediaStatus } from "@/lib/store";
+import type { AppMediaStatus } from "@/lib/store";
+import { formatWatchedSeasons } from "@/lib/seasons";
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 import {
   X,
@@ -154,7 +155,7 @@ export function WatchtimeDetailsModal({
             : total;
         if (total > 0 && watched < total) {
           minutes = Math.round(minutes * (watched / total));
-          seasonInfo = `${watched}/${total} Staffeln`;
+          seasonInfo = formatWatchedSeasons(item.watchedSeasons, total);
         }
       }
       const hours = Math.round((minutes / 60) * 10) / 10;

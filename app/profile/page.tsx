@@ -21,7 +21,8 @@ import { AlgorithmRecommendations } from "@/components/AlgorithmRecommendations"
 import { WatchtimeDetailsModal } from "@/components/WatchtimeDetailsModal";
 import { EditRecommendationModal } from "@/components/EditRecommendationModal";
 import { MyRecommendationsModal } from "@/components/MyRecommendationsModal";
-import { AppRecommendation } from "@/lib/store";
+import type { AppRecommendation } from "@/lib/store";
+import { formatWatchedSeasons } from "@/lib/seasons";
 import {
   User,
   Star,
@@ -1156,6 +1157,16 @@ function ProfileContent() {
                         <Star className="w-3 h-3 fill-black" />
                         <span>{item.rating || "✓"}/10</span>
                       </button>
+
+                      {/* TV series partial seasons badge */}
+                      {item.mediaType === "tv" &&
+                        item.watchedSeasons &&
+                        item.totalSeasons &&
+                        item.watchedSeasons.length < item.totalSeasons && (
+                          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
+                            <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
+                          </div>
+                        )}
                     </div>
 
                     <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
