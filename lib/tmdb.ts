@@ -468,12 +468,24 @@ export async function getTopRatedTv(pages = 2): Promise<MediaItem[]> {
   }
 }
 
-export async function getTrendingAll(): Promise<MediaItem[]> {
+export async function getTrendingAll(pages = 2): Promise<MediaItem[]> {
   try {
-    const data = await tmdbFetch<{ results: any[] }>("/trending/all/week");
-    return (data.results || [])
-      .filter((r) => r.media_type === "movie" || r.media_type === "tv")
-      .map((item, idx) => mapRawItem(item, undefined, idx + 1));
+    const pagePromises = Array.from({ length: pages }, (_, i) =>
+      tmdbFetch<{ results: any[] }>("/trending/all/week", {
+        page: String(i + 1),
+      })
+    );
+    const responses = await Promise.all(pagePromises);
+    const allResults = responses.flatMap((r) => r.results || []);
+    const seen = new Set<string>();
+    const uniqueResults = allResults.filter((r) => {
+      if (r.media_type !== "movie" && r.media_type !== "tv") return false;
+      const key = `${r.media_type}_${r.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return uniqueResults.map((item, idx) => mapRawItem(item, undefined, idx + 1));
   } catch (err) {
     console.error("Error fetching trending:", err);
     return getOscarWinnersList();

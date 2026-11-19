@@ -45,9 +45,15 @@ export function HomeHero({
   const [isPaused, setIsPaused] = useState(false);
   const [matchedMovies, setMatchedMovies] = useState<MediaItem[]>([]);
   const [matchedTv, setMatchedTv] = useState<MediaItem[]>([]);
+  const [shuffleSeed, setShuffleSeed] = useState<number>(0);
   const touchStartXRef = useRef<number | null>(null);
 
   const myUserId = (session?.user as any)?.id;
+
+  // Set random seed after mount so every page visit picks fresh hero highlights
+  useEffect(() => {
+    setShuffleSeed(Math.floor(Math.random() * 100000) + 1);
+  }, []);
 
   // Filter user's watched items
   const watchedItems = useMemo(() => {
@@ -57,6 +63,14 @@ export function HomeHero({
         (myUserId ? m.userId === myUserId : true)
     );
   }, [communityData.mediaStatuses, myUserId]);
+
+  const watchedKeySet = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of watchedItems) {
+      s.add(`${m.mediaType}_${m.tmdbId}`);
+    }
+    return s;
+  }, [watchedItems]);
 
   // Fetch personalized match recommendations in background (without match indicators)
   useEffect(() => {
@@ -112,8 +126,8 @@ export function HomeHero({
             genreIds: r.genreIds,
           }));
 
-        setMatchedMovies(movies.slice(0, 3));
-        setMatchedTv(tvShows.slice(0, 1));
+        setMatchedMovies(movies.slice(0, 6));
+        setMatchedTv(tvShows.slice(0, 4));
       })
       .catch((err) => {
         console.error("Hero matches fetch error:", err);
@@ -124,70 +138,141 @@ export function HomeHero({
     };
   }, [watchedItems, userSubscriptions]);
 
-  // Assemble the 6-slide carousel:
-  // Slide 1: Generic Film (Trending Kinofilm)
-  // Slide 2: Generic Serie (Trending Serie)
-  // Slide 3: Matched Film 1 (or generic fallback)
-  // Slide 4: Matched Serie 1 (or generic fallback)
-  // Slide 5: Matched Film 2 (or generic fallback)
-  // Slide 6: Matched Film 3 (or generic fallback)
-  // Total: Exactly 4 Films + 2 Series!
+  // Assemble an 8-slide dynamic carousel from our rich pool (excluding already watched titles & duplicates)
   const slides: CarouselSlide[] = useMemo(() => {
-    const defaultM1 = initialGenericMovies[0] || heroItem;
-    const defaultT1 = initialGenericTv[0];
-    const defaultM2 = initialGenericMovies[1] || defaultM1;
-    const defaultT2 = initialGenericTv[1] || defaultT1;
-    const defaultM3 = initialGenericMovies[2] || defaultM2;
-    const defaultM4 = initialGenericMovies[3] || defaultM3;
-
-    if (!defaultM1) return [];
-
-    const slide1: CarouselSlide = {
-      item: defaultM1,
-      badgeLabel: "Trending diese Woche",
-      badgeStyle: "bg-amber-500/20 border-amber-500/40 text-amber-300",
-      badgeIcon: Flame,
+    const scoreWithSeed = (item: MediaItem, idx: number, salt: number) => {
+      if (shuffleSeed === 0) return idx;
+      const hash = ((item.id * 2654435761 + shuffleSeed * 40503 + salt * 97) >>> 0) % 10000;
+      return hash;
     };
 
-    const slide2: CarouselSlide = {
-      item: defaultT1 || defaultM2,
-      badgeLabel: defaultT1 ? "Top-Serie der Woche" : "Trending Highlight",
-      badgeStyle: "bg-cyan-500/20 border-cyan-500/40 text-cyan-300",
-      badgeIcon: Tv,
+    const usedKeys = new Set<string>();
+
+    const filterAndOrder = (items: MediaItem[], salt: number): MediaItem[] => {
+      const seenLocal = new Set<string>();
+      const valid = items.filter((it) => {
+        if (!it || !it.id) return false;
+        const key = `${it.mediaType}_${it.id}`;
+        if (seenLocal.has(key)) return false;
+        seenLocal.add(key);
+        // Prefer items with a backdrop image for the big hero banner
+        if (!it.backdropPath && items.length > 8) return false;
+        // Hide items the user already marked as WATCHED
+        if (watchedKeySet.has(key)) return false;
+        return true;
+      });
+      const pool = valid.length >= 4 ? valid : items.filter((it) => it && it.id);
+      if (shuffleSeed === 0) return pool;
+      return [...pool]
+        .map((item, idx) => ({ item, sortKey: scoreWithSeed(item, idx, salt) }))
+        .sort((a, b) => a.sortKey - b.sortKey)
+        .map((x) => x.item);
     };
 
-    const slide3: CarouselSlide = {
-      item: matchedMovies[0] || defaultM2,
-      badgeLabel: "Empfehlung für dich",
-      badgeStyle: "bg-purple-500/20 border-purple-500/40 text-purple-300",
-      badgeIcon: Sparkles,
+    const moviePool = filterAndOrder(initialGenericMovies, 1);
+    const tvPool = filterAndOrder(initialGenericTv, 2);
+    const matchedMoviePool = filterAndOrder(matchedMovies, 3);
+    const matchedTvPool = filterAndOrder(matchedTv, 4);
+
+    const pickNext = (pool: MediaItem[], fallbackPool?: MediaItem[]): MediaItem | undefined => {
+      for (const item of pool) {
+        const key = `${item.mediaType}_${item.id}`;
+        if (!usedKeys.has(key)) {
+          usedKeys.add(key);
+          return item;
+        }
+      }
+      if (fallbackPool) {
+        for (const item of fallbackPool) {
+          const key = `${item.mediaType}_${item.id}`;
+          if (!usedKeys.has(key)) {
+            usedKeys.add(key);
+            return item;
+          }
+        }
+      }
+      return undefined;
     };
 
-    const slide4: CarouselSlide = {
-      item: matchedTv[0] || defaultT2 || defaultM3,
-      badgeLabel: (matchedTv[0] || defaultT2)?.mediaType === "tv" ? "Serien-Highlight" : "Film-Highlight",
-      badgeStyle: "bg-indigo-500/20 border-indigo-500/40 text-indigo-300",
-      badgeIcon: Tv,
-    };
+    const m1 = pickNext(moviePool) || heroItem;
+    if (!m1) return [];
+    const t1 = pickNext(tvPool, moviePool);
+    const recM1 = pickNext(matchedMoviePool, moviePool);
+    const recT1 = pickNext(matchedTvPool, tvPool) || pickNext(moviePool);
+    const m2 = pickNext(moviePool);
+    const recM2 = pickNext(matchedMoviePool, moviePool);
+    const t2 = pickNext(tvPool, moviePool);
+    const m3 = pickNext(moviePool);
 
-    const slide5: CarouselSlide = {
-      item: matchedMovies[1] || defaultM3,
-      badgeLabel: "Kino-Highlight",
-      badgeStyle: "bg-emerald-500/20 border-emerald-500/40 text-emerald-300",
-      badgeIcon: Film,
-    };
+    const candidateSlides: (CarouselSlide | null)[] = [
+      m1
+        ? {
+            item: m1,
+            badgeLabel: m1.oscarInfo ? "Oscar-Meisterwerk" : "Trending diese Woche",
+            badgeStyle: "bg-amber-500/20 border-amber-500/40 text-amber-300",
+            badgeIcon: m1.oscarInfo ? Award : Flame,
+          }
+        : null,
+      t1
+        ? {
+            item: t1,
+            badgeLabel: t1.mediaType === "tv" ? "Top-Serie der Woche" : "Trending Highlight",
+            badgeStyle: "bg-cyan-500/20 border-cyan-500/40 text-cyan-300",
+            badgeIcon: Tv,
+          }
+        : null,
+      recM1
+        ? {
+            item: recM1,
+            badgeLabel: matchedMovies.length > 0 ? "Empfehlung für dich" : "Kino-Highlight",
+            badgeStyle: "bg-purple-500/20 border-purple-500/40 text-purple-300",
+            badgeIcon: Sparkles,
+          }
+        : null,
+      recT1
+        ? {
+            item: recT1,
+            badgeLabel: recT1.mediaType === "tv" ? "Serien-Highlight" : "Film-Highlight",
+            badgeStyle: "bg-indigo-500/20 border-indigo-500/40 text-indigo-300",
+            badgeIcon: Tv,
+          }
+        : null,
+      m2
+        ? {
+            item: m2,
+            badgeLabel: m2.oscarInfo ? "Prämiertes Highlight" : "Blockbuster-Tipp",
+            badgeStyle: "bg-emerald-500/20 border-emerald-500/40 text-emerald-300",
+            badgeIcon: Film,
+          }
+        : null,
+      recM2
+        ? {
+            item: recM2,
+            badgeLabel: "Must-Watch",
+            badgeStyle: "bg-rose-500/20 border-rose-500/40 text-rose-300",
+            badgeIcon: Star,
+          }
+        : null,
+      t2
+        ? {
+            item: t2,
+            badgeLabel: t2.mediaType === "tv" ? "Binge-Tipp" : "Publikumsliebling",
+            badgeStyle: "bg-sky-500/20 border-sky-500/40 text-sky-300",
+            badgeIcon: Tv,
+          }
+        : null,
+      m3
+        ? {
+            item: m3,
+            badgeLabel: "Geheimtipp & Klassiker",
+            badgeStyle: "bg-amber-500/20 border-amber-500/40 text-amber-300",
+            badgeIcon: Sparkles,
+          }
+        : null,
+    ];
 
-    const slide6: CarouselSlide = {
-      item: matchedMovies[2] || defaultM4,
-      badgeLabel: "Must-Watch",
-      badgeStyle: "bg-rose-500/20 border-rose-500/40 text-rose-300",
-      badgeIcon: Star,
-    };
-
-    return [slide1, slide2, slide3, slide4, slide5, slide6].filter(
-      (s) => s.item && s.item.id
-    );
-  }, [initialGenericMovies, initialGenericTv, heroItem, matchedMovies, matchedTv]);
+    return candidateSlides.filter((s): s is CarouselSlide => Boolean(s && s.item && s.item.id));
+  }, [initialGenericMovies, initialGenericTv, heroItem, matchedMovies, matchedTv, shuffleSeed, watchedKeySet]);
 
   // Auto-advance carousel every 7 seconds when not paused
   useEffect(() => {

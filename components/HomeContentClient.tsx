@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { MediaItem } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
-import { Award, Film, Tv, Flame, ArrowRight } from "lucide-react";
+import { useMedia } from "@/components/MediaContext";
+import { useSession } from "next-auth/react";
+import { Award, Film, Tv, Flame, ArrowRight, Sparkles, Dices, Gem } from "lucide-react";
 import Link from "next/link";
 
 interface HomeContentClientProps {
@@ -11,15 +13,120 @@ interface HomeContentClientProps {
   topTv: MediaItem[];
   trending: MediaItem[];
   oscarWinners: MediaItem[];
+  allOscarWinners?: MediaItem[];
 }
+
+type DiscoveryCategory = "MIX" | "TRENDING" | "GEMS" | "CLASSICS";
 
 export function HomeContentClient({
   topMovies,
   topTv,
   trending,
   oscarWinners,
+  allOscarWinners = [],
 }: HomeContentClientProps) {
   const [filterMode, setFilterMode] = useState<"ALL" | "movie" | "tv">("ALL");
+  const [discoveryCategory, setDiscoveryCategory] = useState<DiscoveryCategory>("MIX");
+  const [shuffleSeed, setShuffleSeed] = useState<number>(0);
+  const [isSpinning, setIsSpinning] = useState(false);
+
+  const { communityData } = useMedia();
+  const { data: session } = useSession();
+  const myUserId = (session?.user as any)?.id;
+
+  // Set initial random seed on client mount so every page visit shows a fresh mix
+  useEffect(() => {
+    setShuffleSeed(Math.floor(Math.random() * 100000) + 1);
+  }, []);
+
+  // Build set of watched items for the current user to prioritize unwatched titles in the discovery block
+  const watchedKeys = useMemo(() => {
+    const s = new Set<string>();
+    for (const m of communityData.mediaStatuses) {
+      if (m.status === "WATCHED" && (myUserId ? m.userId === myUserId : false)) {
+        s.add(`${m.mediaType}_${m.tmdbId}`);
+      }
+    }
+    return s;
+  }, [communityData.mediaStatuses, myUserId]);
+
+  const handleReshuffle = () => {
+    setIsSpinning(true);
+    setShuffleSeed((prev) => prev + Math.floor(Math.random() * 997) + 13);
+    setTimeout(() => setIsSpinning(false), 400);
+  };
+
+  // Assemble the dynamic first block ("Heute entdecken & Wechselnde Highlights")
+  const discoveryItems = useMemo(() => {
+    const oscarPool = allOscarWinners.length > 0 ? allOscarWinners : oscarWinners;
+
+    let rawPool: MediaItem[] = [];
+    if (discoveryCategory === "TRENDING") {
+      rawPool = [...trending];
+    } else if (discoveryCategory === "GEMS") {
+      // Geheimtipps & tiefere Perlen: Plätze 10–60 der Top-Listen + Oscar-Filme ab Platz 8
+      rawPool = [
+        ...topMovies.slice(10),
+        ...topTv.slice(10),
+        ...oscarPool.slice(8),
+      ];
+    } else if (discoveryCategory === "CLASSICS") {
+      // Meisterwerke & moderne Klassiker
+      rawPool = [
+        ...oscarPool,
+        ...topMovies.slice(0, 40),
+        ...topTv.slice(0, 35),
+      ];
+    } else {
+      // MIX: Großer kombinierter Pool aus Trends, Top-Filmen, Top-Serien & Oscar-Gewinnern
+      rawPool = [
+        ...trending,
+        ...oscarPool,
+        ...topMovies,
+        ...topTv,
+      ];
+    }
+
+    // Deduplicate and apply mediaType filterMode ("ALL" | "movie" | "tv")
+    const seen = new Set<string>();
+    const uniquePool: MediaItem[] = [];
+    for (const item of rawPool) {
+      if (!item || !item.id) continue;
+      if (filterMode !== "ALL" && item.mediaType !== filterMode) continue;
+      const key = `${item.mediaType}_${item.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      uniquePool.push(item);
+    }
+
+    // Prefer items the user hasn't watched yet
+    const unwatchedPool = uniquePool.filter((it) => !watchedKeys.has(`${it.mediaType}_${it.id}`));
+    const activePool = unwatchedPool.length >= 10 ? unwatchedPool : uniquePool;
+
+    if (shuffleSeed === 0) {
+      return activePool.slice(0, 10);
+    }
+
+    // Deterministic pseudo-random sort using shuffleSeed
+    const scored = activePool.map((item, idx) => {
+      const typeSalt = item.mediaType === "tv" ? 7919 : 3571;
+      const hash = ((item.id * 2654435761 + shuffleSeed * 40503 + idx * 131 + typeSalt) >>> 0) % 100000;
+      return { item, hash };
+    });
+
+    scored.sort((a, b) => a.hash - b.hash);
+    return scored.slice(0, 10).map((s) => s.item);
+  }, [
+    allOscarWinners,
+    oscarWinners,
+    topMovies,
+    topTv,
+    trending,
+    discoveryCategory,
+    filterMode,
+    shuffleSeed,
+    watchedKeys,
+  ]);
 
   const displayedTrending = trending.filter((item) => {
     if (filterMode === "ALL") return true;
@@ -93,6 +200,105 @@ export function HomeContentClient({
           </button>
         </div>
       </div>
+
+      {/* SECTION 1 (NEU): Heute entdecken & Wechselnde Highlights */}
+      <section className="space-y-5 animate-in fade-in duration-300">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="p-2.5 bg-purple-500/15 text-purple-400 rounded-2xl border border-purple-500/30 flex-shrink-0 shadow-inner">
+              <Sparkles className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight">
+                  Heute entdecken & Wechselnde Highlights
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  Dynamisch
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-400">
+                Bei jedem Besuch neu gemischt aus Trends, Geheimtipps & Meisterwerken – würfle jederzeit neue Vorschläge!
+              </p>
+            </div>
+          </div>
+
+          {/* Category Quick-Pills & Interactive Shuffle Button */}
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
+            <div className="flex items-center p-1 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <button
+                type="button"
+                onClick={() => setDiscoveryCategory("MIX")}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  discoveryCategory === "MIX"
+                    ? "bg-purple-500 text-white shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                🎲 Bunter Mix
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscoveryCategory("TRENDING")}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  discoveryCategory === "TRENDING"
+                    ? "bg-rose-500 text-white shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                🔥 Trends
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscoveryCategory("GEMS")}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                  discoveryCategory === "GEMS"
+                    ? "bg-emerald-500 text-slate-950 shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                <Gem className="w-3 h-3" />
+                <span>Geheimtipps</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setDiscoveryCategory("CLASSICS")}
+                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                  discoveryCategory === "CLASSICS"
+                    ? "bg-amber-500 text-slate-950 shadow-sm"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                🏆 Kult & Klassiker
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleReshuffle}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 border border-purple-400/30 transition active:scale-95 cursor-pointer"
+              title="10 neue Filme & Serien würfeln"
+            >
+              <Dices
+                className={`w-4 h-4 transition-transform duration-300 ${
+                  isSpinning ? "rotate-180 scale-110" : ""
+                }`}
+              />
+              <span>Neu würfeln</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+          {discoveryItems.map((item, idx) => (
+            <MediaCard
+              key={`discover_${item.mediaType}_${item.id}`}
+              item={item}
+              priority={idx < 5}
+            />
+          ))}
+        </div>
+      </section>
 
       {/* SECTION: Oscar-Gewinner (Nur bei ALL oder movie) */}
       {(filterMode === "ALL" || filterMode === "movie") && (
