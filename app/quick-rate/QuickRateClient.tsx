@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { MediaItem, OFFICIAL_MOVIE_GENRES, resolveItemGenres } from "@/lib/tmdb";
 import { useMedia } from "@/components/MediaContext";
+import { StreamingHistoryImporter } from "@/components/StreamingHistoryImporter";
 import {
   Zap,
   Star,
@@ -440,6 +441,9 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
           ))}
         </div>
       </div>
+
+      {/* Netflix / IMDb / Letterboxd 1-Click CSV Importer */}
+      <StreamingHistoryImporter />
 
       {candidateItems.length === 0 ? (
         <div className="p-12 rounded-3xl bg-slate-900/50 border border-slate-800 text-center space-y-4">
