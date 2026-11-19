@@ -1,0 +1,12 @@
+title = "Gitleaks configuration for movie_sharing"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore markdown documentation and agent instruction files"
+paths = [
+  '''^AGENTS\.md$''',
+  '''^\.agents/.*\.md$''',
+  '''^README\.md$''',
+]
