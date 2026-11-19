@@ -378,6 +378,21 @@ export function Navbar() {
                   </Link>
 
                   <Link
+                    href="/quick-rate"
+                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                      <span>Filme bewerten & Import</span>
+                    </div>
+                    {myWatchedCount < 250 && (
+                      <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/15 px-1.5 py-0.2 rounded">
+                        {myWatchedCount}/250
+                      </span>
+                    )}
+                  </Link>
+
+                  <Link
                     href="/my-list"
                     className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
                   >

@@ -162,6 +162,43 @@ export async function POST(req: Request) {
             ? null
             : undefined,
       });
+    } else if (action === "bulk_import_statuses") {
+      const rawItems = Array.isArray(body.items) ? body.items.slice(0, 300) : [];
+      let importedCount = 0;
+      for (const raw of rawItems) {
+        const tmdbId = Number(raw?.tmdbId);
+        if (!tmdbId || isNaN(tmdbId)) continue;
+        const mediaType = raw.mediaType === "tv" ? "tv" : "movie";
+        const title = String(raw.title || "").trim().slice(0, 300);
+        if (!title) continue;
+        const ratingNum = raw.rating ? Number(raw.rating) : undefined;
+        const cleanRating =
+          ratingNum && !isNaN(ratingNum)
+            ? Math.min(10, Math.max(1, Math.round(ratingNum)))
+            : undefined;
+        const watchedSeasons = Array.isArray(raw.watchedSeasons)
+          ? raw.watchedSeasons
+              .map((s: any) => Number(s))
+              .filter((s: number) => Number.isInteger(s) && s > 0 && s <= 100)
+              .slice(0, 60)
+          : undefined;
+
+        await toggleMediaStatus({
+          userId,
+          userName,
+          userImage,
+          tmdbId,
+          mediaType,
+          title,
+          posterPath: raw.posterPath ? String(raw.posterPath).slice(0, 250) : null,
+          releaseYear: raw.releaseYear ? String(raw.releaseYear).slice(0, 10) : null,
+          status: "WATCHED",
+          rating: cleanRating,
+          watchedSeasons: watchedSeasons && watchedSeasons.length > 0 ? watchedSeasons : undefined,
+        });
+        importedCount++;
+      }
+      actionMessage = `${importedCount} Titel erfolgreich in dein Profil importiert!`;
     } else if (action === "recommend") {
       const cleanRating = Math.min(10, Math.max(1, Math.round(Number(body.rating) || 9)));
       const cleanComment = String(body.comment || "").trim().slice(0, 2000);

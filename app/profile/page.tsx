@@ -21,6 +21,7 @@ import { AlgorithmRecommendations } from "@/components/AlgorithmRecommendations"
 import { WatchtimeDetailsModal } from "@/components/WatchtimeDetailsModal";
 import { EditRecommendationModal } from "@/components/EditRecommendationModal";
 import { MyRecommendationsModal } from "@/components/MyRecommendationsModal";
+import { StreamingHistoryImporter } from "@/components/StreamingHistoryImporter";
 import type { AppRecommendation } from "@/lib/store";
 import { formatWatchedSeasons, getItemRuntimeMinutes } from "@/lib/seasons";
 import {
@@ -844,6 +845,20 @@ function ProfileContent() {
             Abo-Matches
           </span>
         </button>
+
+        {/* Tab 5: Filme bewerten & Netflix Import */}
+        <Link
+          href="/quick-rate"
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap bg-slate-900/80 text-rose-300 hover:text-white hover:bg-slate-800 border border-rose-500/30"
+        >
+          <Star className="w-4 h-4 text-rose-400 fill-rose-400" />
+          <span>5. Filme bewerten & Netflix-Import</span>
+          {watchedItems.length < 250 && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
+              {watchedItems.length}/250
+            </span>
+          )}
+        </Link>
       </div>
 
       {/* TAB 1: 📊 STATISTIKEN (Kino-DNA, Genres, Histogramm, Universen) */}
@@ -1176,6 +1191,9 @@ function ProfileContent() {
             </div>
           ) : (
             <section className="space-y-5">
+              {/* Netflix / IMDb / Letterboxd CSV Importer directly on Profile Hall of Fame */}
+              <StreamingHistoryImporter />
+
               {/* Top Row: Title + Format Switcher (Alle / Filme / Serien) */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
