@@ -52,6 +52,9 @@ import {
   Trash2,
   ExternalLink,
   MessageSquare,
+  Search,
+  X,
+  ArrowUpDown,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -106,6 +109,11 @@ function ProfileContent() {
   const [metaMap, setMetaMap] = useState<Record<string, BatchMediaMeta>>({});
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [favFilter, setFavFilter] = useState<"ALL" | "movie" | "tv">("ALL");
+  const [hofSearch, setHofSearch] = useState("");
+  const [hofRatingFilter, setHofRatingFilter] = useState<"ALL" | "10" | "9_PLUS" | "8_PLUS" | "7_PLUS" | "LOW">("ALL");
+  const [hofGenreFilter, setHofGenreFilter] = useState<string>("ALL");
+  const [hofDecadeFilter, setHofDecadeFilter] = useState<"ALL" | "2020s" | "2010s" | "2000s" | "1990s" | "classic">("ALL");
+  const [hofSortBy, setHofSortBy] = useState<"rating_desc" | "rating_asc" | "date_desc" | "year_desc" | "year_asc" | "title_asc">("rating_desc");
   const [showWatchtimeModal, setShowWatchtimeModal] = useState(false);
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false);
   const [editingRecommendation, setEditingRecommendation] = useState<AppRecommendation | null>(null);
@@ -388,21 +396,115 @@ function ProfileContent() {
     }));
   }, [watchedItems, metaMap]);
 
-  // Favorite Movies & Series (Hall of Fame)
+  // Available genres across watched items for Hall of Fame filtering
+  const availableHofGenres = useMemo(() => {
+    const counts: Record<string, { name: string; emoji: string; count: number }> = {};
+    watchedItems.forEach((item) => {
+      if (favFilter !== "ALL" && item.mediaType !== favFilter) return;
+      const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
+      (meta?.genres || []).forEach((g) => {
+        if (!counts[g.name]) {
+          counts[g.name] = {
+            name: g.name,
+            emoji: getEmojiForGenreName(g.name, g.id),
+            count: 0,
+          };
+        }
+        counts[g.name].count += 1;
+      });
+    });
+    return Object.values(counts).sort((a, b) => b.count - a.count);
+  }, [watchedItems, metaMap, favFilter]);
+
+  // All Watched & Rated Movies & Series (Hall of Fame - complete list with filters)
   const favoriteItems = useMemo(() => {
+    const query = hofSearch.trim().toLowerCase();
+
     return [...watchedItems]
       .filter((item) => {
+        const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
+
+        // 1. Media type filter (ALL / movie / tv)
         if (favFilter !== "ALL" && item.mediaType !== favFilter) return false;
+
+        // 2. Rating filter
+        const r = item.rating || 0;
+        if (hofRatingFilter === "10" && r < 10) return false;
+        if (hofRatingFilter === "9_PLUS" && r < 9) return false;
+        if (hofRatingFilter === "8_PLUS" && r < 8) return false;
+        if (hofRatingFilter === "7_PLUS" && r < 7) return false;
+        if (hofRatingFilter === "LOW" && r >= 7) return false;
+
+        // 3. Genre filter
+        if (hofGenreFilter !== "ALL") {
+          const itemGenres = (meta?.genres || []).map((g) => g.name);
+          if (!itemGenres.includes(hofGenreFilter)) return false;
+        }
+
+        // 4. Decade filter
+        if (hofDecadeFilter !== "ALL") {
+          const yearStr = item.releaseYear || meta?.releaseYear || "";
+          const year = parseInt(yearStr, 10);
+          if (!year) return false;
+          if (hofDecadeFilter === "2020s" && year < 2020) return false;
+          if (hofDecadeFilter === "2010s" && (year < 2010 || year >= 2020)) return false;
+          if (hofDecadeFilter === "2000s" && (year < 2000 || year >= 2010)) return false;
+          if (hofDecadeFilter === "1990s" && (year < 1990 || year >= 2000)) return false;
+          if (hofDecadeFilter === "classic" && year >= 1990) return false;
+        }
+
+        // 5. Text search filter (Title, Director, Cast)
+        if (query) {
+          const titleMatch = item.title.toLowerCase().includes(query);
+          const dirMatch = (meta?.director || "").toLowerCase().includes(query);
+          const actorMatch = (meta?.actors || []).some((a) => a.toLowerCase().includes(query));
+          if (!titleMatch && !dirMatch && !actorMatch) return false;
+        }
+
         return true;
       })
       .sort((a, b) => {
         const rA = a.rating || 0;
         const rB = b.rating || 0;
+        const metaA = metaMap[`${a.mediaType}_${a.tmdbId}`];
+        const metaB = metaMap[`${b.mediaType}_${b.tmdbId}`];
+        const yA = parseInt(a.releaseYear || metaA?.releaseYear || "0", 10) || 0;
+        const yB = parseInt(b.releaseYear || metaB?.releaseYear || "0", 10) || 0;
+        const dA = new Date(a.updatedAt || 0).getTime();
+        const dB = new Date(b.updatedAt || 0).getTime();
+
+        if (hofSortBy === "rating_asc") {
+          if (rA !== rB) return rA - rB;
+          return dB - dA;
+        }
+        if (hofSortBy === "date_desc") {
+          return dB - dA;
+        }
+        if (hofSortBy === "year_desc") {
+          if (yB !== yA) return yB - yA;
+          return rB - rA;
+        }
+        if (hofSortBy === "year_asc") {
+          if (yA !== yB) return yA - yB;
+          return rB - rA;
+        }
+        if (hofSortBy === "title_asc") {
+          return a.title.localeCompare(b.title);
+        }
+        // Default: rating_desc
         if (rB !== rA) return rB - rA;
-        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-      })
-      .slice(0, 12);
-  }, [watchedItems, favFilter]);
+        return dB - dA;
+      });
+  }, [
+    watchedItems,
+    metaMap,
+    favFilter,
+    hofSearch,
+    hofRatingFilter,
+    hofGenreFilter,
+    hofDecadeFilter,
+    hofSortBy,
+  ]);
 
   // Collection Progress Highlights
   const collectionProgress = useMemo(() => {
@@ -658,7 +760,7 @@ function ProfileContent() {
               activeTab === "hall-of-fame" ? "bg-black/20 text-black" : "bg-slate-800 text-slate-400"
             }`}
           >
-            {favoriteItems.length}
+            {watchedItems.length}
           </span>
         </button>
 
@@ -1015,10 +1117,10 @@ function ProfileContent() {
         </div>
       )}
 
-      {/* TAB 2: 🏆 HALL OF FAME (Beste Filme & Serien) */}
+      {/* TAB 2: 🏆 HALL OF FAME (Alle gesehenen & bewerteten Filme & Serien mit Filtern) */}
       {activeTab === "hall-of-fame" && (
         <div className="space-y-6 animate-in fade-in duration-300">
-          {favoriteItems.length === 0 ? (
+          {watchedItems.length === 0 ? (
             <div className="p-12 rounded-3xl bg-slate-900/50 border border-slate-800 text-center space-y-4">
               <Trophy className="w-12 h-12 text-amber-400 mx-auto opacity-80" />
               <h2 className="text-xl font-bold text-white">
@@ -1038,158 +1140,339 @@ function ProfileContent() {
               </div>
             </div>
           ) : (
-          <section className="space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
-                  <Trophy className="w-6 h-6 text-amber-400" />
-                  <span>Deine Hall of Fame (Am besten bewertet)</span>
-                </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Deine persönlichen Meisterwerke sortiert nach deiner Bewertung (10★ bis 1★)
-                </p>
-              </div>
+            <section className="space-y-5">
+              {/* Top Row: Title + Format Switcher (Alle / Filme / Serien) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
+                      <Trophy className="w-6 h-6 text-amber-400" />
+                      <span>Deine komplette Hall of Fame</span>
+                    </h2>
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                      {favoriteItems.length} von {watchedItems.length} Titeln
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Alle deine gesehenen & bewerteten Filme und Serien – filterbar nach Bewertung, Genre, Jahrzehnt & Suche
+                  </p>
+                </div>
 
-              {/* Filter All / Movies / TV */}
-              <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800 self-start">
-                <button
-                  onClick={() => setFavFilter("ALL")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    favFilter === "ALL"
-                      ? "bg-amber-500 text-black"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  Alle ({watchedItems.length})
-                </button>
-                <button
-                  onClick={() => setFavFilter("movie")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    favFilter === "movie"
-                      ? "bg-amber-500 text-black"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  🎬 Filme ({watchedMoviesCount})
-                </button>
-                <button
-                  onClick={() => setFavFilter("tv")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                    favFilter === "tv"
-                      ? "bg-cyan-400 text-black"
-                      : "text-slate-400 hover:text-white"
-                  }`}
-                >
-                  📺 Serien ({watchedTvCount})
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {favoriteItems.map((item, idx) => {
-                const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-                const topGenres = (meta?.genres || []).slice(0, 2);
-
-                return (
-                  <div
-                    key={item.id}
-                    onClick={() =>
-                      openMediaModal({
-                        id: item.tmdbId,
-                        mediaType: item.mediaType,
-                        title: item.title,
-                        posterPath: item.posterPath,
-                      })
-                    }
-                    className="group cursor-pointer rounded-2xl bg-slate-900/70 border border-slate-800/90 hover:border-amber-500/50 overflow-hidden flex flex-col transition duration-300 hover:-translate-y-1 shadow-lg"
+                {/* Filter All / Movies / TV */}
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800 self-start">
+                  <button
+                    type="button"
+                    onClick={() => setFavFilter("ALL")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      favFilter === "ALL"
+                        ? "bg-amber-500 text-black"
+                        : "text-slate-400 hover:text-white"
+                    }`}
                   >
-                    <div className="relative aspect-[2/3] w-full bg-slate-950">
-                      {item.posterPath ? (
-                        <Image
-                          src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
-                          alt={item.title}
-                          fill
-                          sizes="200px"
-                          className="object-cover group-hover:scale-105 transition duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-600">
-                          <Film className="w-8 h-8" />
-                        </div>
-                      )}
+                    Alle ({watchedItems.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFavFilter("movie")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      favFilter === "movie"
+                        ? "bg-amber-500 text-black"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    🎬 Filme ({watchedMoviesCount})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFavFilter("tv")}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      favFilter === "tv"
+                        ? "bg-cyan-400 text-black"
+                        : "text-slate-400 hover:text-white"
+                    }`}
+                  >
+                    📺 Serien ({watchedTvCount})
+                  </button>
+                </div>
+              </div>
 
-                      {/* Rank Badge */}
-                      <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-400 font-black text-xs">
-                        #{idx + 1}
-                      </div>
-
-                      {/* Personal Rating Badge (Click to edit rating) */}
+              {/* Filter Panel: Search, Sort, Rating, Decade & Genres */}
+              <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/60 border border-slate-800/90 space-y-4 shadow-xl">
+                {/* Row 1: Search Input + Rating Filter + Decade Filter + Sort Dropdown */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
+                  {/* Text Search (Title, Director, Actor) */}
+                  <div className="relative sm:col-span-2 lg:col-span-4">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={hofSearch}
+                      onChange={(e) => setHofSearch(e.target.value)}
+                      placeholder="Titel, Regisseur oder Schauspieler suchen..."
+                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition"
+                    />
+                    {hofSearch && (
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openRatingModal({
-                            tmdbId: item.tmdbId,
+                        onClick={() => setHofSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Rating Quick Filter */}
+                  <div className="lg:col-span-3 flex items-center gap-2">
+                    <Star className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <select
+                      value={hofRatingFilter}
+                      onChange={(e) => setHofRatingFilter(e.target.value as any)}
+                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    >
+                      <option value="ALL">Alle Bewertungen (1–10 ★)</option>
+                      <option value="10">Nur 10 ★ Meisterwerke</option>
+                      <option value="9_PLUS">9–10 ★ (Absolute Favoriten)</option>
+                      <option value="8_PLUS">8–10 ★ (Sehr gut & besser)</option>
+                      <option value="7_PLUS">7–10 ★ (Sehenswert)</option>
+                      <option value="LOW">Unter 7 ★ (Kritisch bewertet)</option>
+                    </select>
+                  </div>
+
+                  {/* Decade Filter */}
+                  <div className="lg:col-span-2 flex items-center gap-2">
+                    <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                    <select
+                      value={hofDecadeFilter}
+                      onChange={(e) => setHofDecadeFilter(e.target.value as any)}
+                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    >
+                      <option value="ALL">Alle Jahrzehnte</option>
+                      <option value="2020s">2020er</option>
+                      <option value="2010s">2010er</option>
+                      <option value="2000s">2000er</option>
+                      <option value="1990s">1990er</option>
+                      <option value="classic">Klassiker (&lt; 1990)</option>
+                    </select>
+                  </div>
+
+                  {/* Sort Order */}
+                  <div className="lg:col-span-3 flex items-center gap-2">
+                    <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    <select
+                      value={hofSortBy}
+                      onChange={(e) => setHofSortBy(e.target.value as any)}
+                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                    >
+                      <option value="rating_desc">Beste Bewertung (10★ ➔ 1★)</option>
+                      <option value="rating_asc">Niedrigste Bewertung (1★ ➔ 10★)</option>
+                      <option value="date_desc">Zuletzt gesehen / bewertet</option>
+                      <option value="year_desc">Erscheinungsjahr (Neu ➔ Alt)</option>
+                      <option value="year_asc">Erscheinungsjahr (Alt ➔ Neu)</option>
+                      <option value="title_asc">Titel (A–Z)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Row 2: Genre Pills */}
+                {availableHofGenres.length > 0 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-800/80">
+                    <div className="flex items-center gap-1 text-xs font-bold text-slate-400 pr-2 flex-shrink-0">
+                      <Filter className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Genres:</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setHofGenreFilter("ALL")}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                        hofGenreFilter === "ALL"
+                          ? "bg-amber-500 text-black shadow-sm"
+                          : "bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Alle Genres
+                    </button>
+
+                    {availableHofGenres.map((g) => (
+                      <button
+                        key={g.name}
+                        type="button"
+                        onClick={() =>
+                          setHofGenreFilter((prev) => (prev === g.name ? "ALL" : g.name))
+                        }
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
+                          hofGenreFilter === g.name
+                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold"
+                            : "bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                        }`}
+                      >
+                        <span>{g.emoji}</span>
+                        <span>{g.name}</span>
+                        <span className="text-[10px] font-mono text-slate-500">({g.count})</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Active filter reset notice if any filter is active */}
+                {(favFilter !== "ALL" ||
+                  hofSearch.trim() !== "" ||
+                  hofRatingFilter !== "ALL" ||
+                  hofGenreFilter !== "ALL" ||
+                  hofDecadeFilter !== "ALL") && (
+                  <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
+                    <span>
+                      Zeige <strong className="text-white">{favoriteItems.length}</strong>{" "}
+                      {favoriteItems.length === 1 ? "Ergebnis" : "Ergebnisse"} für deine aktuellen Filter
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFavFilter("ALL");
+                        setHofSearch("");
+                        setHofRatingFilter("ALL");
+                        setHofGenreFilter("ALL");
+                        setHofDecadeFilter("ALL");
+                        setHofSortBy("rating_desc");
+                      }}
+                      className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      <span>Alle Filter zurücksetzen</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {favoriteItems.length === 0 ? (
+                <div className="p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-3">
+                  <Filter className="w-10 h-10 text-slate-600 mx-auto" />
+                  <h3 className="text-base font-bold text-white">
+                    Keine Titel für diese Filterkombination gefunden
+                  </h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Passe deine Suchbegriffe, die Bewertung oder das ausgewählte Genre an.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFavFilter("ALL");
+                      setHofSearch("");
+                      setHofRatingFilter("ALL");
+                      setHofGenreFilter("ALL");
+                      setHofDecadeFilter("ALL");
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition cursor-pointer"
+                  >
+                    Filter zurücksetzen
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                  {favoriteItems.map((item, idx) => {
+                    const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
+                    const topGenres = (meta?.genres || []).slice(0, 2);
+
+                    return (
+                      <div
+                        key={item.id}
+                        onClick={() =>
+                          openMediaModal({
+                            id: item.tmdbId,
                             mediaType: item.mediaType,
                             title: item.title,
                             posterPath: item.posterPath,
-                            releaseYear: item.releaseYear,
-                            currentRating: item.rating,
-                            isWatched: true,
-                            watchedSeasons: item.watchedSeasons,
-                            totalSeasons: item.totalSeasons,
-                          });
-                        }}
-                        title="Deine Bewertung ändern"
-                        className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500 text-black font-black text-xs shadow-lg hover:bg-emerald-400 transition"
+                          })
+                        }
+                        className="group cursor-pointer rounded-2xl bg-slate-900/70 border border-slate-800/90 hover:border-amber-500/50 overflow-hidden flex flex-col transition duration-300 hover:-translate-y-1 shadow-lg"
                       >
-                        <Star className="w-3 h-3 fill-black" />
-                        <span>{item.rating || "✓"}/10</span>
-                      </button>
+                        <div className="relative aspect-[2/3] w-full bg-slate-950">
+                          {item.posterPath ? (
+                            <Image
+                              src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
+                              alt={item.title}
+                              fill
+                              sizes="200px"
+                              className="object-cover group-hover:scale-105 transition duration-500"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-600">
+                              <Film className="w-8 h-8" />
+                            </div>
+                          )}
 
-                      {/* TV series partial seasons badge */}
-                      {item.mediaType === "tv" &&
-                        item.watchedSeasons &&
-                        item.totalSeasons &&
-                        item.watchedSeasons.length < item.totalSeasons && (
-                          <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
-                            <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
+                          {/* Rank Badge */}
+                          <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-400 font-black text-xs">
+                            #{idx + 1}
                           </div>
-                        )}
-                    </div>
 
-                    <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                      <div>
-                        <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-400 transition">
-                          {item.title}
-                        </p>
-                        <div className="flex items-center justify-between text-[11px] text-slate-400 mt-0.5">
-                          <span>{item.releaseYear || meta?.releaseYear || ""}</span>
-                          {meta?.tmdbVoteAverage ? (
-                            <span className="text-slate-500">TMDB {meta.tmdbVoteAverage}★</span>
-                          ) : null}
+                          {/* Personal Rating Badge (Click to edit rating) */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openRatingModal({
+                                tmdbId: item.tmdbId,
+                                mediaType: item.mediaType,
+                                title: item.title,
+                                posterPath: item.posterPath,
+                                releaseYear: item.releaseYear,
+                                currentRating: item.rating,
+                                isWatched: true,
+                                watchedSeasons: item.watchedSeasons,
+                                totalSeasons: item.totalSeasons,
+                              });
+                            }}
+                            title="Deine Bewertung ändern"
+                            className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500 text-black font-black text-xs shadow-lg hover:bg-emerald-400 transition"
+                          >
+                            <Star className="w-3 h-3 fill-black" />
+                            <span>{item.rating || "✓"}/10</span>
+                          </button>
+
+                          {/* TV series partial seasons badge */}
+                          {item.mediaType === "tv" &&
+                            item.watchedSeasons &&
+                            item.totalSeasons &&
+                            item.watchedSeasons.length < item.totalSeasons && (
+                              <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
+                                <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
+                              </div>
+                            )}
+                        </div>
+
+                        <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
+                          <div>
+                            <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-400 transition">
+                              {item.title}
+                            </p>
+                            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-0.5">
+                              <span>{item.releaseYear || meta?.releaseYear || ""}</span>
+                              {meta?.tmdbVoteAverage ? (
+                                <span className="text-slate-500">TMDB {meta.tmdbVoteAverage}★</span>
+                              ) : null}
+                            </div>
+                          </div>
+
+                          {topGenres.length > 0 && (
+                            <div className="flex flex-wrap gap-1 pt-1">
+                              {topGenres.map((g) => (
+                                <span
+                                  key={g.id}
+                                  className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 truncate max-w-full"
+                                >
+                                  {getEmojiForGenreName(g.name, g.id)} {g.name}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
-
-                      {topGenres.length > 0 && (
-                        <div className="flex flex-wrap gap-1 pt-1">
-                          {topGenres.map((g) => (
-                            <span
-                              key={g.id}
-                              className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 truncate max-w-full"
-                            >
-                              {getEmojiForGenreName(g.name, g.id)} {g.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-
+                    );
+                  })}
+                </div>
+              )}
+            </section>
           )}
         </div>
       )}
