@@ -13,7 +13,10 @@ import {
   Users,
   AlertCircle,
   ExternalLink,
+  Layers,
+  X,
 } from "lucide-react";
+import Link from "next/link";
 
 interface WhitelistEntry {
   id: string;
@@ -23,7 +26,7 @@ interface WhitelistEntry {
 
 export default function AdminPage() {
   const { data: session, status } = useSession();
-  const { confirmDialog } = useMedia();
+  const { confirmDialog, customCollections, approveCustomCollection, showToast } = useMedia();
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [newEmail, setNewEmail] = useState("");
@@ -147,10 +150,112 @@ export default function AdminPage() {
             Admin-Dashboard & Freundes-Whitelist
           </h1>
           <p className="text-xs sm:text-sm text-slate-400">
-            Schalte die E-Mail-Adressen deiner Freunde frei und erstelle personalisierte Einladungslinks.
+            Schalte die E-Mail-Adressen deiner Freunde frei, verwalte Einladungen und gib öffentliche Kollektionen frei.
           </p>
         </div>
       </div>
+
+      {/* Public Collections Approval Queue */}
+      {customCollections.filter((c) => c.visibility === "PUBLIC").length > 0 && (
+        <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-amber-500/30 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Layers className="w-5 h-5 text-amber-400" />
+              <span>
+                Öffentliche Freunde-Kollektionen & Freigaben (
+                {
+                  customCollections.filter(
+                    (c) => c.visibility === "PUBLIC" && c.approvalStatus === "PENDING"
+                  ).length
+                }{" "}
+                offen)
+              </span>
+            </h3>
+            <Link
+              href="/collections"
+              className="text-xs font-bold text-amber-400 hover:underline flex items-center gap-1"
+            >
+              <span>Zu allen Kollektionen</span>
+              <ExternalLink className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+
+          <div className="space-y-3">
+            {customCollections
+              .filter((c) => c.visibility === "PUBLIC")
+              .map((col) => (
+                <div
+                  key={col.id}
+                  className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={`/collections/${col.id}`}
+                        className="text-sm font-black text-white hover:text-amber-400 transition"
+                      >
+                        {col.emoji} {col.name}
+                      </Link>
+                      <span className="text-xs text-slate-400">
+                        von <strong className="text-slate-200">@{col.ownerName}</strong> ({col.movies.length} Titel)
+                      </span>
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
+                          col.approvalStatus === "APPROVED"
+                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+                            : col.approvalStatus === "REJECTED"
+                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
+                            : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        }`}
+                      >
+                        {col.approvalStatus === "APPROVED"
+                          ? "✓ Freigegeben"
+                          : col.approvalStatus === "REJECTED"
+                          ? "Abgelehnt"
+                          : "⏳ Wartet auf Freigabe"}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 line-clamp-2">{col.description}</p>
+                    <p className="text-[11px] text-slate-500">
+                      Enthält: {col.movies.map((m) => m.title).join(", ")}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {col.approvalStatus !== "APPROVED" && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await approveCustomCollection(col.id, "APPROVED");
+                          showToast(`„${col.name}“ öffentlich freigegeben!`, { type: "success" });
+                        }}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center gap-1 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>Approve</span>
+                      </button>
+                    )}
+                    {col.approvalStatus !== "REJECTED" && (
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await approveCustomCollection(col.id, "REJECTED");
+                          showToast(`Öffentliche Freigabe für „${col.name}“ entzogen.`, {
+                            type: "info",
+                          });
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Ablehnen</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      )}
 
       {/* Invite Form */}
       <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
