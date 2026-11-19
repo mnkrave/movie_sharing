@@ -78,6 +78,51 @@ export interface AppFriendGroup {
   updatedAt?: string;
 }
 
+export interface AppCustomCollectionMovie {
+  id: number;
+  title: string;
+  releaseYear: string;
+  posterPath: string | null;
+  backdropPath?: string | null;
+  voteAverage: number;
+  mediaType?: "movie" | "tv";
+  note?: string;
+}
+
+export interface AppCustomCollectionComment {
+  id: string;
+  collectionId: string;
+  userId: string;
+  userName: string;
+  userImage?: string | null;
+  text: string;
+  createdAt: string;
+}
+
+export interface AppCustomCollection {
+  id: string;
+  ownerId: string;
+  ownerName: string;
+  ownerImage?: string | null;
+  name: string;
+  tagline: string;
+  description: string;
+  emoji: string;
+  posterPath: string | null;
+  backdropPath: string | null;
+  movies: AppCustomCollectionMovie[];
+  visibility: "PRIVATE" | "FRIENDS" | "PUBLIC";
+  approvalStatus: "NONE" | "PENDING" | "APPROVED" | "REJECTED";
+  targetType?: "ALL" | "CUSTOM" | string;
+  targetNames?: string[];
+  targetGroupIds?: string[];
+  targetUserIds?: string[];
+  upvoterIds: string[];
+  comments: AppCustomCollectionComment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export function isSamePerson(nameA?: string | null, nameB?: string | null): boolean {
   if (!nameA || !nameB) return false;
   const a = nameA.toLowerCase().trim().replace(/^@/, "");
@@ -113,6 +158,7 @@ interface LocalDbFile {
   friendships: AppFriendship[];
   friendGroups?: AppFriendGroup[];
   recommendationReplies?: AppRecommendationReply[];
+  customCollections?: AppCustomCollection[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -2224,5 +2270,586 @@ export async function deleteRecommendationReply(
     );
     writeLocalDb(db);
   }
+  return true;
+}
+
+// --- Custom User & Friend Collections ---
+
+function parseJsonSafe<T>(val: any, fallback: T): T {
+  if (!val) return fallback;
+  if (typeof val !== "string") return val as T;
+  try {
+    return JSON.parse(val) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+function sanitizeCustomMoviesList(raw: any): AppCustomCollectionMovie[] {
+  if (!Array.isArray(raw)) return [];
+  const sanitized: AppCustomCollectionMovie[] = [];
+  const seen = new Set<string>();
+
+  for (const item of raw.slice(0, 150)) {
+    const id = Number(item?.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const mediaType: "movie" | "tv" = item?.mediaType === "tv" ? "tv" : "movie";
+    const key = `${mediaType}_${id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+
+    const title = String(item?.title || "").trim().slice(0, 250);
+    if (!title) continue;
+    const releaseYear = String(item?.releaseYear || "").trim().slice(0, 10);
+    const rawPoster = item?.posterPath ? String(item.posterPath).trim().slice(0, 200) : null;
+    const posterPath = rawPoster && rawPoster.startsWith("/") ? rawPoster : null;
+    const rawBackdrop = item?.backdropPath ? String(item.backdropPath).trim().slice(0, 200) : null;
+    const backdropPath = rawBackdrop && rawBackdrop.startsWith("/") ? rawBackdrop : null;
+    const voteAverage = Math.min(10, Math.max(0, Number(item?.voteAverage) || 8.0));
+
+    sanitized.push({
+      id,
+      title,
+      releaseYear,
+      posterPath,
+      backdropPath,
+      voteAverage,
+      mediaType,
+    });
+  }
+
+  return sanitized;
+}
+
+function mapRawCustomCollection(row: any): AppCustomCollection {
+  const movies = parseJsonSafe<AppCustomCollectionMovie[]>(row.moviesJson || row.movies, []);
+  const firstWithPoster = movies.find((m) => m.posterPath);
+  const firstWithBackdrop = movies.find((m) => m.backdropPath);
+
+  return {
+    id: row.id,
+    ownerId: row.ownerId,
+    ownerName: row.owner?.name || row.ownerName || "Kino-Freund",
+    ownerImage: row.owner?.image ?? row.ownerImage ?? null,
+    name: row.name,
+    tagline: row.tagline || `${movies.length} handverlesene Titel von ${row.owner?.name || row.ownerName || "Freund"}`,
+    description: row.description || "",
+    emoji: row.emoji || "🎬",
+    posterPath: row.posterPath || firstWithPoster?.posterPath || null,
+    backdropPath: row.backdropPath || firstWithBackdrop?.backdropPath || firstWithPoster?.posterPath || null,
+    movies,
+    visibility: (row.visibility as "PRIVATE" | "FRIENDS" | "PUBLIC") || "PRIVATE",
+    approvalStatus: (row.approvalStatus as "NONE" | "PENDING" | "APPROVED" | "REJECTED") || "NONE",
+    targetType: row.targetType || "ALL",
+    targetNames: parseStringList(row.targetNames),
+    targetGroupIds: parseStringList(row.targetGroupIds),
+    targetUserIds: parseStringList(row.targetUserIds),
+    upvoterIds: parseStringList(row.upvoterIds),
+    comments: parseJsonSafe<AppCustomCollectionComment[]>(row.commentsJson || row.comments, []),
+    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt || new Date().toISOString()),
+    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt || new Date().toISOString()),
+  };
+}
+
+function isCustomCollectionVisibleToUser(
+  col: AppCustomCollection,
+  currentUserId?: string,
+  currentUserName?: string,
+  isAdmin?: boolean,
+  friendIds?: Set<string>,
+  myGroupIds?: Set<string>,
+  myGroupNames?: Set<string>
+): boolean {
+  // 1. Admin sees everything (including PENDING collections to approve them) and owner always sees their own
+  if (currentUserId && col.ownerId === currentUserId) return true;
+  if (currentUserName && isSamePerson(col.ownerName, currentUserName)) return true;
+
+  // 2. Publicly shared & approved collections are visible to everyone
+  if (col.visibility === "PUBLIC" && col.approvalStatus === "APPROVED") {
+    return true;
+  }
+
+  // 3. Admin also sees all PUBLIC PENDING collections so they can review/approve them
+  if (isAdmin && col.visibility === "PUBLIC") {
+    return true;
+  }
+
+  // 4. Private collections are only visible to the owner
+  if (col.visibility === "PRIVATE" || !currentUserId) {
+    return false;
+  }
+
+  // 5. Shared with friends (or PUBLIC still pending approval, visible to friends in the meantime)
+  const isFriendOfOwner = friendIds ? friendIds.has(col.ownerId) : false;
+  if (!isFriendOfOwner && !isAdmin) {
+    return false;
+  }
+
+  return isRecommendationVisibleToUser(
+    {
+      userId: col.ownerId,
+      targetType: col.targetType || "ALL",
+      targetNames: col.targetNames || [],
+      targetGroupIds: col.targetGroupIds || [],
+      targetUserIds: col.targetUserIds || [],
+    },
+    currentUserId,
+    currentUserName,
+    myGroupIds,
+    myGroupNames
+  );
+}
+
+export async function getVisibleCustomCollections(
+  currentUserId?: string,
+  currentUserName?: string,
+  isAdmin?: boolean
+): Promise<AppCustomCollection[]> {
+  let friendIdSet = new Set<string>();
+  let myGroupIds = new Set<string>();
+  let myGroupNames = new Set<string>();
+
+  if (currentUserId) {
+    try {
+      const fIds = await getAcceptedFriendIds(currentUserId);
+      friendIdSet = new Set(fIds);
+      const myGroups = await getUserFriendGroups(currentUserId, currentUserName);
+      myGroupIds = new Set(myGroups.map((g) => g.id));
+      myGroupNames = new Set(myGroups.map((g) => g.name.toLowerCase()));
+    } catch {
+      // ignore
+    }
+  }
+
+  let allCollections: AppCustomCollection[] = [];
+
+  if (await isPostgresAvailable()) {
+    try {
+      const rows = await (prisma as any).customCollection.findMany({
+        include: { owner: true },
+        orderBy: { updatedAt: "desc" },
+      });
+      allCollections = rows.map(mapRawCustomCollection);
+    } catch {
+      const db = readLocalDb();
+      allCollections = (db.customCollections || []).map(mapRawCustomCollection);
+    }
+  } else {
+    const db = readLocalDb();
+    allCollections = (db.customCollections || []).map(mapRawCustomCollection);
+  }
+
+  return allCollections.filter((col) =>
+    isCustomCollectionVisibleToUser(
+      col,
+      currentUserId,
+      currentUserName,
+      isAdmin,
+      friendIdSet,
+      myGroupIds,
+      myGroupNames
+    )
+  );
+}
+
+export async function getCustomCollectionById(
+  collectionId: string,
+  currentUserId?: string,
+  currentUserName?: string,
+  isAdmin?: boolean
+): Promise<AppCustomCollection | null> {
+  const allVisible = await getVisibleCustomCollections(currentUserId, currentUserName, isAdmin);
+  return allVisible.find((c) => c.id === collectionId) || null;
+}
+
+export async function saveCustomCollection(params: {
+  id?: string;
+  userId: string;
+  userName: string;
+  userImage?: string | null;
+  isAdmin?: boolean;
+  name: string;
+  tagline?: string;
+  description: string;
+  emoji?: string;
+  posterPath?: string | null;
+  backdropPath?: string | null;
+  movies: AppCustomCollectionMovie[];
+  visibility: "PRIVATE" | "FRIENDS" | "PUBLIC";
+  targetType?: "ALL" | "CUSTOM" | string;
+  targetNames?: string[];
+  targetGroupIds?: string[];
+  targetUserIds?: string[];
+}): Promise<AppCustomCollection> {
+  const cleanName = params.name.trim().slice(0, 140) || "Meine Kollektion";
+  const cleanTagline = (params.tagline || "").trim().slice(0, 180);
+  const cleanDesc = params.description.trim().slice(0, 2500);
+  const cleanEmoji = (params.emoji || "🎬").trim().slice(0, 10);
+  const cleanMovies = sanitizeCustomMoviesList(params.movies);
+
+  const rawFirstPoster = params.posterPath ? String(params.posterPath).trim().slice(0, 200) : null;
+  const firstPoster =
+    (rawFirstPoster && rawFirstPoster.startsWith("/") ? rawFirstPoster : null) ||
+    cleanMovies.find((m) => m.posterPath)?.posterPath ||
+    null;
+
+  const rawFirstBackdrop = params.backdropPath ? String(params.backdropPath).trim().slice(0, 200) : null;
+  const firstBackdrop =
+    (rawFirstBackdrop && rawFirstBackdrop.startsWith("/") ? rawFirstBackdrop : null) ||
+    cleanMovies.find((m) => m.backdropPath)?.backdropPath ||
+    firstPoster ||
+    null;
+
+  const computeApprovalStatus = (
+    vis: "PRIVATE" | "FRIENDS" | "PUBLIC",
+    existingStatus?: string
+  ): "NONE" | "PENDING" | "APPROVED" | "REJECTED" => {
+    if (vis !== "PUBLIC") return "NONE";
+    if (params.isAdmin) return "APPROVED";
+    if (existingStatus === "APPROVED") return "PENDING";
+    return "PENDING";
+  };
+
+  const targetType = params.targetType === "CUSTOM" ? "CUSTOM" : "ALL";
+  const targetNames = (params.targetNames || [])
+    .slice(0, 50)
+    .map((n) => String(n).trim().slice(0, 100))
+    .filter(Boolean);
+  const targetGroupIds = (params.targetGroupIds || [])
+    .slice(0, 30)
+    .map((g) => String(g).trim().slice(0, 100))
+    .filter(Boolean);
+  const targetUserIds = (params.targetUserIds || [])
+    .slice(0, 50)
+    .map((u) => String(u).trim().slice(0, 100))
+    .filter(Boolean);
+
+  if (await isPostgresAvailable()) {
+    try {
+      if (params.id) {
+        const existing = await (prisma as any).customCollection.findUnique({
+          where: { id: params.id },
+        });
+        if (existing && (existing.ownerId === params.userId || params.isAdmin)) {
+          const nextApproval = computeApprovalStatus(params.visibility, existing.approvalStatus);
+          const updated = await (prisma as any).customCollection.update({
+            where: { id: params.id },
+            data: {
+              name: cleanName,
+              tagline: cleanTagline,
+              description: cleanDesc,
+              emoji: cleanEmoji,
+              posterPath: firstPoster,
+              backdropPath: firstBackdrop,
+              moviesJson: JSON.stringify(cleanMovies),
+              visibility: params.visibility,
+              approvalStatus: nextApproval,
+              targetType,
+              targetNames: JSON.stringify(targetNames),
+              targetGroupIds: JSON.stringify(targetGroupIds),
+              targetUserIds: JSON.stringify(targetUserIds),
+            },
+            include: { owner: true },
+          });
+          return mapRawCustomCollection(updated);
+        }
+      }
+
+      const newId = `ucol_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const approvalStatus = computeApprovalStatus(params.visibility);
+      const created = await (prisma as any).customCollection.create({
+        data: {
+          id: newId,
+          ownerId: params.userId,
+          ownerName: params.userName,
+          ownerImage: params.userImage || null,
+          name: cleanName,
+          tagline: cleanTagline,
+          description: cleanDesc,
+          emoji: cleanEmoji,
+          posterPath: firstPoster,
+          backdropPath: firstBackdrop,
+          moviesJson: JSON.stringify(cleanMovies),
+          visibility: params.visibility,
+          approvalStatus,
+          targetType,
+          targetNames: JSON.stringify(targetNames),
+          targetGroupIds: JSON.stringify(targetGroupIds),
+          targetUserIds: JSON.stringify(targetUserIds),
+          upvoterIds: JSON.stringify([params.userId]),
+          commentsJson: JSON.stringify([]),
+        },
+        include: { owner: true },
+      });
+      return mapRawCustomCollection(created);
+    } catch (err) {
+      console.warn("Prisma customCollection save fallback to local DB:", err);
+    }
+  }
+
+  const db = readLocalDb();
+  if (!db.customCollections) db.customCollections = [];
+  const now = new Date().toISOString();
+
+  if (params.id) {
+    const idx = db.customCollections.findIndex((c) => c.id === params.id);
+    if (idx !== -1 && (db.customCollections[idx].ownerId === params.userId || params.isAdmin)) {
+      const existing = db.customCollections[idx];
+      const updatedCol: AppCustomCollection = {
+        ...existing,
+        name: cleanName,
+        tagline: cleanTagline || `${cleanMovies.length} handverlesene Titel von ${existing.ownerName}`,
+        description: cleanDesc,
+        emoji: cleanEmoji,
+        posterPath: firstPoster,
+        backdropPath: firstBackdrop,
+        movies: cleanMovies,
+        visibility: params.visibility,
+        approvalStatus: computeApprovalStatus(params.visibility, existing.approvalStatus),
+        targetType,
+        targetNames,
+        targetGroupIds,
+        targetUserIds,
+        updatedAt: now,
+      };
+      db.customCollections[idx] = updatedCol;
+      writeLocalDb(db);
+      return updatedCol;
+    }
+  }
+
+  const newCol: AppCustomCollection = {
+    id: `ucol_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    ownerId: params.userId,
+    ownerName: params.userName,
+    ownerImage: params.userImage || null,
+    name: cleanName,
+    tagline: cleanTagline || `${cleanMovies.length} handverlesene Titel von ${params.userName}`,
+    description: cleanDesc,
+    emoji: cleanEmoji,
+    posterPath: firstPoster,
+    backdropPath: firstBackdrop,
+    movies: cleanMovies,
+    visibility: params.visibility,
+    approvalStatus: computeApprovalStatus(params.visibility),
+    targetType,
+    targetNames,
+    targetGroupIds,
+    targetUserIds,
+    upvoterIds: [params.userId],
+    comments: [],
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  db.customCollections.unshift(newCol);
+  writeLocalDb(db);
+  return newCol;
+}
+
+export async function deleteCustomCollection(
+  userId: string,
+  collectionId: string,
+  isAdmin?: boolean
+): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    try {
+      const existing = await (prisma as any).customCollection.findUnique({
+        where: { id: collectionId },
+      });
+      if (existing && (existing.ownerId === userId || isAdmin)) {
+        await (prisma as any).customCollection.delete({ where: { id: collectionId } });
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const db = readLocalDb();
+  if (!db.customCollections) return false;
+  const existing = db.customCollections.find((c) => c.id === collectionId);
+  if (existing && (existing.ownerId === userId || isAdmin)) {
+    db.customCollections = db.customCollections.filter((c) => c.id !== collectionId);
+    writeLocalDb(db);
+    return true;
+  }
+  return false;
+}
+
+export async function reviewCustomCollectionApproval(params: {
+  collectionId: string;
+  approvalStatus: "APPROVED" | "REJECTED";
+  isAdmin: boolean;
+}): Promise<boolean> {
+  if (!params.isAdmin) return false;
+
+  if (await isPostgresAvailable()) {
+    try {
+      await (prisma as any).customCollection.update({
+        where: { id: params.collectionId },
+        data: {
+          approvalStatus: params.approvalStatus,
+        },
+      });
+      return true;
+    } catch {
+      // ignore
+    }
+  }
+
+  const db = readLocalDb();
+  if (!db.customCollections) return false;
+  const col = db.customCollections.find((c) => c.id === params.collectionId);
+  if (col) {
+    col.approvalStatus = params.approvalStatus;
+    col.updatedAt = new Date().toISOString();
+    writeLocalDb(db);
+    return true;
+  }
+  return false;
+}
+
+export async function toggleCustomCollectionUpvote(
+  userId: string,
+  collectionId: string
+): Promise<{ upvoted: boolean }> {
+  // Verify user has visibility permission to this collection before allowing upvote
+  const visibleCol = await getCustomCollectionById(collectionId, userId, undefined, false);
+  if (!visibleCol) return { upvoted: false };
+
+  if (await isPostgresAvailable()) {
+    try {
+      const col = await (prisma as any).customCollection.findUnique({
+        where: { id: collectionId },
+      });
+      if (col) {
+        const upvoters = parseStringList(col.upvoterIds);
+        const idx = upvoters.indexOf(userId);
+        let upvoted = false;
+        if (idx !== -1) {
+          upvoters.splice(idx, 1);
+        } else {
+          upvoters.push(userId);
+          upvoted = true;
+        }
+        await (prisma as any).customCollection.update({
+          where: { id: collectionId },
+          data: { upvoterIds: JSON.stringify(upvoters) },
+        });
+        return { upvoted };
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const db = readLocalDb();
+  const col = (db.customCollections || []).find((c) => c.id === collectionId);
+  if (!col) return { upvoted: false };
+  const idx = col.upvoterIds.indexOf(userId);
+  let upvoted = false;
+  if (idx !== -1) {
+    col.upvoterIds.splice(idx, 1);
+  } else {
+    col.upvoterIds.push(userId);
+    upvoted = true;
+  }
+  writeLocalDb(db);
+  return { upvoted };
+}
+
+export async function addCustomCollectionComment(params: {
+  collectionId: string;
+  userId: string;
+  userName: string;
+  userImage?: string | null;
+  text: string;
+}): Promise<AppCustomCollectionComment | null> {
+  const cleanText = params.text.trim().slice(0, 1000);
+  if (!cleanText) return null;
+
+  // Verify user has visibility permission to this collection before allowing comment
+  const visibleCol = await getCustomCollectionById(
+    params.collectionId,
+    params.userId,
+    params.userName,
+    false
+  );
+  if (!visibleCol) return null;
+
+  const newComment: AppCustomCollectionComment = {
+    id: `cc_rep_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+    collectionId: params.collectionId,
+    userId: params.userId,
+    userName: params.userName.slice(0, 100),
+    userImage: params.userImage || null,
+    text: cleanText,
+    createdAt: new Date().toISOString(),
+  };
+
+  if (await isPostgresAvailable()) {
+    try {
+      const col = await (prisma as any).customCollection.findUnique({
+        where: { id: params.collectionId },
+      });
+      if (col) {
+        const comments = parseJsonSafe<AppCustomCollectionComment[]>(col.commentsJson, []).slice(-200);
+        comments.push(newComment);
+        await (prisma as any).customCollection.update({
+          where: { id: params.collectionId },
+          data: { commentsJson: JSON.stringify(comments) },
+        });
+        return newComment;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const db = readLocalDb();
+  const col = (db.customCollections || []).find((c) => c.id === params.collectionId);
+  if (!col) return null;
+  if (!col.comments) col.comments = [];
+  col.comments = col.comments.slice(-200);
+  col.comments.push(newComment);
+  writeLocalDb(db);
+  return newComment;
+}
+
+export async function deleteCustomCollectionComment(
+  userId: string,
+  collectionId: string,
+  commentId: string,
+  isAdmin?: boolean
+): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    try {
+      const col = await (prisma as any).customCollection.findUnique({
+        where: { id: collectionId },
+      });
+      if (col) {
+        const comments = parseJsonSafe<AppCustomCollectionComment[]>(col.commentsJson, []);
+        const filtered = comments.filter(
+          (c) => !(c.id === commentId && (c.userId === userId || col.ownerId === userId || isAdmin))
+        );
+        await (prisma as any).customCollection.update({
+          where: { id: collectionId },
+          data: { commentsJson: JSON.stringify(filtered) },
+        });
+        return true;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  const db = readLocalDb();
+  const col = (db.customCollections || []).find((c) => c.id === collectionId);
+  if (!col || !col.comments) return false;
+  col.comments = col.comments.filter(
+    (c) => !(c.id === commentId && (c.userId === userId || col.ownerId === userId || isAdmin))
+  );
+  writeLocalDb(db);
   return true;
 }

@@ -21,6 +21,7 @@ model User {
   recommendations Recommendation[]
   upvotes         RecommendationUpvote[]
   recommendationReplies RecommendationReply[]
+  customCollections CustomCollection[]
   sentFriendships     Friendship[] @relation("UserSentFriendships")
   receivedFriendships Friendship[] @relation("UserReceivedFriendships")
   createdAt       DateTime         @default(now())
@@ -121,4 +122,29 @@ model FriendGroup {
   memberNames String   // JSON array of strings e.g. '["Lukas Reinle", "Birgit Reinle", "Ralf Reinle"]'
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model CustomCollection {
+  id             String   @id @default(cuid())
+  ownerId        String
+  owner          User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerName      String
+  ownerImage     String?
+  name           String
+  tagline        String?
+  description    String
+  emoji          String   @default("🎬")
+  posterPath     String?
+  backdropPath   String?
+  moviesJson     String   // JSON array of CollectionMovie items
+  visibility     String   @default("PRIVATE") // "PRIVATE" | "FRIENDS" | "PUBLIC"
+  approvalStatus String   @default("NONE")    // "NONE" | "PENDING" | "APPROVED" | "REJECTED"
+  targetType     String?  @default("ALL")     // "ALL" | "CUSTOM"
+  targetNames    String?  // JSON array of target friend/group names
+  targetGroupIds String?  // JSON array of group IDs
+  targetUserIds  String?  // JSON array of user IDs
+  upvoterIds     String?  // JSON array of user IDs who liked the collection
+  commentsJson   String?  // JSON array of comment objects
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }

@@ -11,7 +11,12 @@ interface PageProps {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { id } = await params;
   const collection = getCollectionById(id);
-  if (!collection) return { title: "Kollektion nicht gefunden | CineCircle" };
+  if (!collection) {
+    if (id.startsWith("ucol_")) {
+      return { title: "Freunde-Kollektion | CineCircle" };
+    }
+    return { title: "Kollektion nicht gefunden | CineCircle" };
+  }
 
   return {
     title: `${collection.name} | CineCircle Kollektionen`,
@@ -30,9 +35,9 @@ export default async function CollectionDetailPage({ params }: PageProps) {
   const { id } = await params;
   const collection = getCollectionById(id);
 
-  if (!collection) {
+  if (!collection && !id.startsWith("ucol_")) {
     notFound();
   }
 
-  return <CollectionDetailClient collection={collection} />;
+  return <CollectionDetailClient collection={collection || null} customCollectionId={id} />;
 }

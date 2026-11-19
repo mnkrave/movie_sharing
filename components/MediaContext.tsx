@@ -14,7 +14,12 @@ import {
   ToastOptions,
   ToastStack,
 } from "./FeedbackOverlay";
-import type { AppMediaStatus, AppRecommendation } from "@/lib/store";
+import type {
+  AppMediaStatus,
+  AppRecommendation,
+  AppCustomCollection,
+  AppCustomCollectionMovie,
+} from "@/lib/store";
 import { useSession } from "next-auth/react";
 
 export interface FriendRequestItem {
@@ -67,7 +72,32 @@ interface MediaContextType {
       pendingReceived: FriendRequestItem[];
       pendingSent: FriendRequestItem[];
     };
+    customCollections?: AppCustomCollection[];
   };
+  customCollections: AppCustomCollection[];
+  saveCustomCollection: (params: {
+    id?: string;
+    name: string;
+    tagline?: string;
+    description: string;
+    emoji?: string;
+    posterPath?: string | null;
+    backdropPath?: string | null;
+    movies: AppCustomCollectionMovie[];
+    visibility: "PRIVATE" | "FRIENDS" | "PUBLIC";
+    targetType?: "ALL" | "CUSTOM" | string;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
+  }) => Promise<boolean>;
+  deleteCustomCollection: (collectionId: string) => Promise<boolean>;
+  approveCustomCollection: (
+    collectionId: string,
+    approvalStatus: "APPROVED" | "REJECTED"
+  ) => Promise<boolean>;
+  upvoteCustomCollection: (collectionId: string) => Promise<void>;
+  addCustomCollectionComment: (collectionId: string, text: string) => Promise<void>;
+  deleteCustomCollectionComment: (collectionId: string, commentId: string) => Promise<void>;
   refreshCommunity: () => Promise<void>;
   updateMediaStatus: (params: {
     tmdbId: number;
@@ -162,6 +192,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       pendingReceived: FriendRequestItem[];
       pendingSent: FriendRequestItem[];
     };
+    customCollections?: AppCustomCollection[];
   }>({
     mediaStatuses: [],
     recommendations: [],
@@ -170,6 +201,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       pendingReceived: [],
       pendingSent: [],
     },
+    customCollections: [],
   });
 
   // Load subscriptions, onlyMySubs & friendGroups from localStorage on start
@@ -655,6 +687,141 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const saveCustomCollection = async (params: {
+    id?: string;
+    name: string;
+    tagline?: string;
+    description: string;
+    emoji?: string;
+    posterPath?: string | null;
+    backdropPath?: string | null;
+    movies: AppCustomCollectionMovie[];
+    visibility: "PRIVATE" | "FRIENDS" | "PUBLIC";
+    targetType?: "ALL" | "CUSTOM" | string;
+    targetNames?: string[];
+    targetGroupIds?: string[];
+    targetUserIds?: string[];
+  }): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save_custom_collection", ...params }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Error saving custom collection:", err);
+      return false;
+    }
+  };
+
+  const deleteCustomCollection = async (collectionId: string): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete_custom_collection", collectionId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Error deleting custom collection:", err);
+      return false;
+    }
+  };
+
+  const approveCustomCollection = async (
+    collectionId: string,
+    approvalStatus: "APPROVED" | "REJECTED"
+  ): Promise<boolean> => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "approve_custom_collection",
+          collectionId,
+          approvalStatus,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+        return true;
+      }
+      return false;
+    } catch (err) {
+      console.error("Error approving custom collection:", err);
+      return false;
+    }
+  };
+
+  const upvoteCustomCollection = async (collectionId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "upvote_custom_collection", collectionId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error upvoting custom collection:", err);
+    }
+  };
+
+  const addCustomCollectionComment = async (collectionId: string, text: string) => {
+    if (!text.trim()) return;
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "add_custom_collection_comment",
+          collectionId,
+          text: text.trim(),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error adding custom collection comment:", err);
+    }
+  };
+
+  const deleteCustomCollectionComment = async (collectionId: string, commentId: string) => {
+    try {
+      const res = await fetch("/api/community", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "delete_custom_collection_comment",
+          collectionId,
+          commentId,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCommunityData(data);
+      }
+    } catch (err) {
+      console.error("Error deleting custom collection comment:", err);
+    }
+  };
+
   const sendFriendRequest = async (target: string) => {
     try {
       const res = await fetch("/api/community", {
@@ -933,6 +1100,13 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         updateFriendGroup,
         deleteFriendGroup,
         communityData,
+        customCollections: communityData.customCollections || [],
+        saveCustomCollection,
+        deleteCustomCollection,
+        approveCustomCollection,
+        upvoteCustomCollection,
+        addCustomCollectionComment,
+        deleteCustomCollectionComment,
         refreshCommunity,
         updateMediaStatus,
         submitRecommendation,

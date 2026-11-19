@@ -4,7 +4,9 @@ import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { CollectionUniverse, CollectionMovie } from "@/lib/collections";
+import type { AppCustomCollection } from "@/lib/store";
 import { useMedia } from "@/components/MediaContext";
+import { CustomCollectionModal } from "@/components/CustomCollectionModal";
 import { useSession } from "next-auth/react";
 import {
   ArrowLeft,
@@ -15,32 +17,91 @@ import {
   Trophy,
   Sparkles,
   Film,
-  Calendar,
   Layers,
-  Clock,
   Tv,
   Filter,
+  Heart,
+  MessageSquare,
+  Send,
+  Trash2,
+  Edit3,
+  Users,
+  Lock,
+  Globe,
+  Clock,
+  ShieldCheck,
+  X,
 } from "lucide-react";
 
 interface CollectionDetailClientProps {
-  collection: CollectionUniverse;
+  collection: CollectionUniverse | null;
+  customCollectionId?: string;
 }
 
-export function CollectionDetailClient({ collection }: CollectionDetailClientProps) {
+export function CollectionDetailClient({
+  collection: staticCollection,
+  customCollectionId,
+}: CollectionDetailClientProps) {
   const { data: session } = useSession();
-  const { communityData, updateMediaStatus, openMediaModal, openRatingModal, showToast } = useMedia();
+  const {
+    communityData,
+    customCollections,
+    updateMediaStatus,
+    openMediaModal,
+    openRatingModal,
+    upvoteCustomCollection,
+    addCustomCollectionComment,
+    deleteCustomCollectionComment,
+    approveCustomCollection,
+    showToast,
+    confirmDialog,
+  } = useMedia();
 
   const [filterMode, setFilterMode] = useState<"all" | "unwatched" | "watched">("all");
   const [selectedSubGroup, setSelectedSubGroup] = useState<string>("ALL");
   const [mediaTypeFilter, setMediaTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
-  const [sortBy, setSortBy] = useState<"year_asc" | "rating_desc">("year_asc");
+  const [sortBy, setSortBy] = useState<"custom_order" | "year_asc" | "rating_desc">("custom_order");
+  const [commentText, setCommentText] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+
+  const myId = (session?.user as any)?.id;
+  const myName = session?.user?.name;
+  const isAdmin =
+    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    (session?.user as any)?.role === "ADMIN";
+
+  // Find custom collection if staticCollection is null
+  const customCollection: AppCustomCollection | undefined = useMemo(() => {
+    if (staticCollection) return undefined;
+    return customCollections.find((c) => c.id === customCollectionId);
+  }, [staticCollection, customCollections, customCollectionId]);
+
+  const activeCollection: CollectionUniverse | null = useMemo(() => {
+    if (staticCollection) return staticCollection;
+    if (!customCollection) return null;
+    return {
+      id: customCollection.id,
+      name: customCollection.name,
+      tagline: customCollection.tagline,
+      description: customCollection.description,
+      category: "franchise",
+      posterPath: customCollection.posterPath,
+      backdropPath: customCollection.backdropPath,
+      movies: customCollection.movies.map((m) => ({
+        id: m.id,
+        title: m.title,
+        releaseYear: m.releaseYear,
+        posterPath: m.posterPath,
+        voteAverage: m.voteAverage,
+        mediaType: m.mediaType || "movie",
+      })),
+    };
+  }, [staticCollection, customCollection]);
 
   // Map of watched movies by current user
   const myWatchedMap = useMemo(() => {
     const map = new Map<number, { rating?: number | null }>();
-    const myId = (session?.user as any)?.id;
-    const myName = session?.user?.name;
-
     communityData.mediaStatuses.forEach((m) => {
       if (m.status === "WATCHED") {
         if ((myId && m.userId === myId) || (myName && m.userName === myName)) {
@@ -49,14 +110,11 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
       }
     });
     return map;
-  }, [communityData.mediaStatuses, session]);
+  }, [communityData.mediaStatuses, myId, myName]);
 
   // Set of watchlist movies by current user
   const myWatchlistSet = useMemo(() => {
     const set = new Set<number>();
-    const myId = (session?.user as any)?.id;
-    const myName = session?.user?.name;
-
     communityData.mediaStatuses.forEach((m) => {
       if (m.status === "WATCHLIST") {
         if ((myId && m.userId === myId) || (myName && m.userName === myName)) {
@@ -65,37 +123,38 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
       }
     });
     return set;
-  }, [communityData.mediaStatuses, session]);
+  }, [communityData.mediaStatuses, myId, myName]);
+
+  const moviesList = activeCollection?.movies || [];
 
   // SubGroups (e.g. Actors for Bond, Phases for Marvel)
   const availableSubGroups = useMemo(() => {
     const counts: Record<string, number> = {};
-    collection.movies.forEach((m) => {
+    moviesList.forEach((m) => {
       if (m.subGroup) {
         counts[m.subGroup] = (counts[m.subGroup] || 0) + 1;
       }
     });
     return Object.entries(counts).map(([name, count]) => ({ name, count }));
-  }, [collection.movies]);
+  }, [moviesList]);
 
-  // Check if collection contains TV series
   const hasTvSeries = useMemo(() => {
-    return collection.movies.some((m) => m.mediaType === "tv");
-  }, [collection.movies]);
+    return moviesList.some((m) => m.mediaType === "tv");
+  }, [moviesList]);
 
-  const movieCount = collection.movies.filter((m) => (m.mediaType || "movie") === "movie").length;
-  const tvCount = collection.movies.filter((m) => m.mediaType === "tv").length;
+  const movieCount = moviesList.filter((m) => (m.mediaType || "movie") === "movie").length;
+  const tvCount = moviesList.filter((m) => m.mediaType === "tv").length;
 
   // Progress stats
-  const totalCount = collection.movies.length;
-  const watchedCount = collection.movies.filter((m) => myWatchedMap.has(m.id)).length;
+  const totalCount = moviesList.length;
+  const watchedCount = moviesList.filter((m) => myWatchedMap.has(m.id)).length;
   const remainingCount = totalCount - watchedCount;
   const percent = totalCount > 0 ? Math.round((watchedCount / totalCount) * 100) : 0;
-  const isComplete = percent === 100;
+  const isComplete = totalCount > 0 && percent === 100;
 
   // Sorted and filtered movies
   const displayedMovies = useMemo(() => {
-    let list = [...collection.movies];
+    let list = [...moviesList];
 
     if (filterMode === "unwatched") {
       list = list.filter((m) => !myWatchedMap.has(m.id));
@@ -118,7 +177,36 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     }
 
     return list;
-  }, [collection.movies, filterMode, selectedSubGroup, mediaTypeFilter, sortBy, myWatchedMap]);
+  }, [moviesList, filterMode, selectedSubGroup, mediaTypeFilter, sortBy, myWatchedMap]);
+
+  if (!activeCollection) {
+    return (
+      <div className="max-w-xl mx-auto px-4 py-20 text-center space-y-4">
+        <div className="w-16 h-16 rounded-3xl bg-slate-900 border border-slate-800 flex items-center justify-center mx-auto text-slate-500">
+          <Layers className="w-8 h-8" />
+        </div>
+        <h2 className="text-2xl font-black text-white">Kollektion wird geladen oder ist privat</h2>
+        <p className="text-sm text-slate-400">
+          Falls es sich um eine private oder für Freunde geteilte Kollektion handelt, logge dich bitte ein.
+        </p>
+        <Link
+          href="/collections"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 text-black font-bold text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>Zurück zu den Kollektionen</span>
+        </Link>
+      </div>
+    );
+  }
+
+  const isCustom = Boolean(customCollection);
+  const isMine =
+    customCollection &&
+    ((myId && customCollection.ownerId === myId) ||
+      (myName && customCollection.ownerName.toLowerCase() === myName.toLowerCase()));
+  const hasUpvoted =
+    customCollection && myId ? customCollection.upvoterIds.includes(myId) : false;
 
   const handleToggleWatched = (movie: CollectionMovie, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -163,15 +251,32 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
     });
   };
 
+  const handleAddComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customCollection || !commentText.trim() || submittingComment) return;
+    if (!session) {
+      showToast("Bitte logge dich ein, um zu kommentieren!", {
+        type: "info",
+        actionLabel: "Einloggen",
+        actionHref: "/login",
+      });
+      return;
+    }
+    setSubmittingComment(true);
+    await addCustomCollectionComment(customCollection.id, commentText.trim());
+    setCommentText("");
+    setSubmittingComment(false);
+  };
+
   return (
     <div className="min-h-screen bg-[#07090e] text-slate-100 pb-24">
       {/* Hero Header with Backdrop */}
       <div className="relative border-b border-slate-800/80 bg-slate-950 overflow-hidden">
-        {collection.backdropPath && (
+        {activeCollection.backdropPath && (
           <div className="absolute inset-0 z-0">
             <Image
-              src={`https://image.tmdb.org/t/p/w1280${collection.backdropPath}`}
-              alt={collection.name}
+              src={`https://image.tmdb.org/t/p/w1280${activeCollection.backdropPath}`}
+              alt={activeCollection.name}
               fill
               priority
               className="object-cover opacity-25 filter blur-xs"
@@ -181,41 +286,176 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
         )}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-10">
-          {/* Back link */}
-          <Link
-            href="/collections"
-            className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition mb-6 px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Zurück zu allen Kollektionen</span>
-          </Link>
+          {/* Top navigation & edit button */}
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+            <Link
+              href="/collections"
+              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-400 hover:text-white transition px-3 py-1.5 rounded-xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-md"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Zurück zu allen Kollektionen</span>
+            </Link>
+
+            {customCollection && (isMine || isAdmin) && (
+              <button
+                type="button"
+                onClick={() => setIsEditModalOpen(true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition cursor-pointer"
+              >
+                <Edit3 className="w-3.5 h-3.5" />
+                <span>Kollektion bearbeiten</span>
+              </button>
+            )}
+          </div>
+
+          {/* Admin Approval Bar if Pending */}
+          {customCollection &&
+            isAdmin &&
+            customCollection.visibility === "PUBLIC" &&
+            customCollection.approvalStatus === "PENDING" && (
+              <div className="mb-6 p-4 rounded-2xl bg-amber-950/50 border border-amber-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 text-xs sm:text-sm text-amber-200 font-bold">
+                  <ShieldCheck className="w-5 h-5 text-amber-400 flex-shrink-0" />
+                  <span>
+                    @{customCollection.ownerName} möchte diese Kollektion öffentlich mit allen teilen. Jetzt freigeben?
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await approveCustomCollection(customCollection.id, "REJECTED");
+                      showToast("Öffentliche Freigabe abgelehnt.", { type: "info" });
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-rose-950 hover:bg-rose-900 text-rose-300 text-xs font-bold border border-rose-500/30 flex items-center gap-1 cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    <span>Ablehnen</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await approveCustomCollection(customCollection.id, "APPROVED");
+                      showToast("Kollektion ist jetzt für alle freigegeben!", { type: "success" });
+                    }}
+                    className="px-4 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-black flex items-center gap-1 shadow cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Freigeben (Approve)</span>
+                  </button>
+                </div>
+              </div>
+            )}
 
           <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-8">
             <div className="max-w-3xl">
-              <div className="flex items-center gap-2 mb-3">
-                <span
-                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md border ${
-                    collection.category === "franchise"
-                      ? "bg-purple-950/70 border-purple-500/40 text-purple-300"
-                      : "bg-sky-950/70 border-sky-500/40 text-sky-300"
-                  }`}
-                >
-                  <Layers className="w-3.5 h-3.5" />
-                  {collection.category === "franchise" ? "Universum / Filmreihe" : "Regisseur-Sammlung"}
-                </span>
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                {customCollection ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md bg-emerald-950/70 border border-emerald-500/40 text-emerald-300">
+                      <span>{customCollection.emoji}</span>
+                      <span>Kollektion von @{customCollection.ownerName}</span>
+                    </span>
+
+                    {customCollection.visibility === "PRIVATE" && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-slate-900 border border-slate-700 text-slate-300">
+                        <Lock className="w-3 h-3" />
+                        <span>Privat (Nur für dich)</span>
+                      </span>
+                    )}
+
+                    {customCollection.visibility === "FRIENDS" && (
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-950/80 border border-indigo-500/40 text-indigo-300">
+                        <Users className="w-3 h-3" />
+                        <span>
+                          {customCollection.targetType === "CUSTOM" &&
+                          customCollection.targetNames?.length
+                            ? `Geteilt mit: ${customCollection.targetNames.join(", ")}`
+                            : "Mit Freunden geteilt"}
+                        </span>
+                      </span>
+                    )}
+
+                    {customCollection.visibility === "PUBLIC" && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                          customCollection.approvalStatus === "APPROVED"
+                            ? "bg-purple-950/80 border-purple-500/40 text-purple-300"
+                            : "bg-amber-950/80 border-amber-500/40 text-amber-300"
+                        }`}
+                      >
+                        {customCollection.approvalStatus === "APPROVED" ? (
+                          <>
+                            <Globe className="w-3 h-3" />
+                            <span>Öffentlich (Freigegeben)</span>
+                          </>
+                        ) : (
+                          <>
+                            <Clock className="w-3 h-3" />
+                            <span>Wartet auf Lukas&apos; Freigabe</span>
+                          </>
+                        )}
+                      </span>
+                    )}
+                  </>
+                ) : (
+                  <span
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider backdrop-blur-md border ${
+                      activeCollection.category === "franchise"
+                        ? "bg-purple-950/70 border-purple-500/40 text-purple-300"
+                        : "bg-sky-950/70 border-sky-500/40 text-sky-300"
+                    }`}
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    {activeCollection.category === "franchise"
+                      ? "Universum / Filmreihe"
+                      : "Regisseur-Sammlung"}
+                  </span>
+                )}
                 <span className="text-xs text-slate-400">•</span>
                 <span className="text-xs font-bold text-slate-300">{totalCount} Titel</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
-                {collection.name}
+                {customCollection ? `${customCollection.emoji} ` : ""}
+                {activeCollection.name}
               </h1>
-              <p className="mt-2 text-base text-amber-400/90 font-medium italic">
-                &quot;{collection.tagline}&quot;
-              </p>
+              {activeCollection.tagline && (
+                <p className="mt-2 text-base text-amber-400/90 font-medium italic">
+                  &quot;{activeCollection.tagline}&quot;
+                </p>
+              )}
               <p className="mt-3 text-sm text-slate-300 leading-relaxed max-w-2xl">
-                {collection.description}
+                {activeCollection.description}
               </p>
+
+              {/* Like & Comment Quick Buttons for Custom Collections */}
+              {customCollection && (
+                <div className="flex flex-wrap items-center gap-3 mt-5">
+                  <button
+                    type="button"
+                    onClick={() => upvoteCustomCollection(customCollection.id)}
+                    className={`px-4 py-2 rounded-2xl text-xs font-bold flex items-center gap-2 border transition cursor-pointer ${
+                      hasUpvoted
+                        ? "bg-rose-500 text-white border-rose-400 shadow-lg shadow-rose-500/20"
+                        : "bg-slate-900/80 hover:bg-slate-800 text-slate-200 border-slate-700"
+                    }`}
+                  >
+                    <Heart className={`w-4 h-4 ${hasUpvoted ? "fill-white" : ""}`} />
+                    <span>
+                      {hasUpvoted ? "Gefällt dir" : "Kollektion liken"} ({customCollection.upvoterIds.length})
+                    </span>
+                  </button>
+
+                  <a
+                    href="#comments"
+                    className="px-4 py-2 rounded-2xl text-xs font-bold flex items-center gap-2 bg-slate-900/80 hover:bg-slate-800 text-slate-200 border border-slate-700 transition"
+                  >
+                    <MessageSquare className="w-4 h-4 text-emerald-400" />
+                    <span>Kommentare ({customCollection.comments.length})</span>
+                  </a>
+                </div>
+              )}
             </div>
 
             {/* Giant Progress Card */}
@@ -231,7 +471,11 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                 </div>
                 <span
                   className={`text-2xl font-black font-mono ${
-                    isComplete ? "text-emerald-400" : percent > 0 ? "text-amber-400" : "text-slate-500"
+                    isComplete
+                      ? "text-emerald-400"
+                      : percent > 0
+                      ? "text-amber-400"
+                      : "text-slate-500"
                   }`}
                 >
                   {percent}%
@@ -261,7 +505,9 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                   {isComplete ? (
                     <span className="text-emerald-400 font-bold">100% komplett! 🏆</span>
                   ) : (
-                    <span>Noch <strong>{remainingCount}</strong> übrig</span>
+                    <span>
+                      Noch <strong>{remainingCount}</strong> übrig
+                    </span>
                   )}
                 </span>
               </div>
@@ -321,7 +567,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
               </button>
             </div>
 
-            {/* Optional Type Filter for collections with series (like MCU) */}
+            {/* Optional Type Filter for collections with series */}
             {hasTvSeries && (
               <div className="flex items-center gap-1 sm:pl-2 sm:border-l sm:border-slate-800 overflow-x-auto scrollbar-none max-w-full">
                 <button
@@ -371,18 +617,19 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
               onChange={(e) => setSortBy(e.target.value as any)}
               className="bg-slate-950 border border-slate-700/80 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-400"
             >
+              <option value="custom_order">Reihenfolge der Kollektion</option>
               <option value="year_asc">Chronologisch (Erscheinungsjahr)</option>
               <option value="rating_desc">Höchstbewertet (TMDB / IMDb)</option>
             </select>
           </div>
         </div>
 
-        {/* Row 2: SubGroup Pills (e.g. James Bond Actors or Marvel Phases) */}
+        {/* Row 2: SubGroup Pills */}
         {availableSubGroups.length > 0 && (
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 pr-2 flex-shrink-0">
               <Filter className="w-3.5 h-3.5 text-amber-400" />
-              <span>{collection.subGroupLabel || "Filter"}:</span>
+              <span>{activeCollection.subGroupLabel || "Filter"}:</span>
             </div>
 
             <button
@@ -456,7 +703,7 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                   {/* Gradient overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition" />
 
-                  {/* Chronological order index */}
+                  {/* Order index */}
                   <div className="absolute top-2.5 left-2.5 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 text-[10px] font-black text-amber-400 font-mono">
                     #{idx + 1}
                   </div>
@@ -498,7 +745,9 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                       {movie.subGroup && (
                         <>
                           <span>•</span>
-                          <span className="truncate text-slate-300 font-medium">{movie.subGroup}</span>
+                          <span className="truncate text-slate-300 font-medium">
+                            {movie.subGroup}
+                          </span>
                         </>
                       )}
                     </div>
@@ -509,7 +758,11 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
                     <button
                       type="button"
                       onClick={(e) => handleToggleWatched(movie, e)}
-                      title={isWatched ? "Als ungesehen markieren" : "Als gesehen markieren & bewerten"}
+                      title={
+                        isWatched
+                          ? "Als ungesehen markieren"
+                          : "Als gesehen markieren & bewerten"
+                      }
                       className={`flex-1 py-2 sm:py-1 rounded-lg text-[11px] sm:text-[10px] font-bold flex items-center justify-center gap-1 transition ${
                         isWatched
                           ? "bg-emerald-500 text-black shadow-sm"
@@ -542,7 +795,140 @@ export function CollectionDetailClient({ collection }: CollectionDetailClientPro
             );
           })}
         </div>
+
+        {/* Comments & Likes Section for Custom/Friend Collections */}
+        {isCustom && customCollection && (
+          <div
+            id="comments"
+            className="mt-12 p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-6"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+              <div>
+                <h3 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+                  <MessageSquare className="w-5 h-5 text-emerald-400" />
+                  <span>
+                    Kommentare & Diskussion ({customCollection.comments.length})
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Tauscht euch über die Kollektion von @{customCollection.ownerName} aus oder gebt Tipps für weitere Filme!
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => upvoteCustomCollection(customCollection.id)}
+                className={`px-4 py-2 rounded-2xl text-xs font-bold flex items-center gap-2 border transition self-start cursor-pointer ${
+                  hasUpvoted
+                    ? "bg-rose-500 text-white border-rose-400 shadow-lg shadow-rose-500/20"
+                    : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
+                }`}
+              >
+                <Heart className={`w-4 h-4 ${hasUpvoted ? "fill-white" : ""}`} />
+                <span>{customCollection.upvoterIds.length} Likes</span>
+              </button>
+            </div>
+
+            {/* Comments list */}
+            {customCollection.comments.length === 0 ? (
+              <div className="p-8 rounded-2xl bg-slate-950/50 border border-dashed border-slate-800 text-center text-xs text-slate-500">
+                Noch keine Kommentare zu dieser Kollektion. Schreib als Erste(r), wie dir die Auswahl von @{customCollection.ownerName} gefällt!
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {customCollection.comments.map((c) => {
+                  const isMyComment =
+                    (myId && c.userId === myId) ||
+                    (myName && c.userName.toLowerCase() === myName.toLowerCase());
+
+                  return (
+                    <div
+                      key={c.id}
+                      className={`p-3.5 rounded-2xl border flex items-start justify-between gap-3 ${
+                        isMyComment
+                          ? "bg-emerald-950/20 border-emerald-500/30"
+                          : "bg-slate-950/80 border-slate-800"
+                      }`}
+                    >
+                      <div className="space-y-1 min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-xs font-black text-white">@{c.userName}</span>
+                          {c.userId === customCollection.ownerId && (
+                            <span className="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 text-[10px] font-bold border border-amber-500/30">
+                              Ersteller
+                            </span>
+                          )}
+                          <span className="text-[10px] text-slate-500">
+                            {new Date(c.createdAt).toLocaleDateString("de-DE", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        <p className="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-wrap">
+                          {c.text}
+                        </p>
+                      </div>
+
+                      {(isMyComment || isMine || isAdmin) && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const ok = await confirmDialog({
+                              title: "Kommentar löschen?",
+                              message: "Möchtest du diesen Kommentar wirklich löschen?",
+                              confirmLabel: "Löschen",
+                              dangerous: true,
+                            });
+                            if (ok) {
+                              await deleteCustomCollectionComment(customCollection.id, c.id);
+                            }
+                          }}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition cursor-pointer"
+                          title="Kommentar löschen"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Add Comment Form */}
+            <form onSubmit={handleAddComment} className="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <input
+                type="text"
+                value={commentText}
+                onChange={(e) => setCommentText(e.target.value)}
+                placeholder={`Kommentar oder Filmvorschlag an @${customCollection.ownerName} schreiben...`}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-slate-950 border border-slate-800 focus:border-emerald-400 text-xs sm:text-sm text-white placeholder-slate-500 focus:outline-none"
+              />
+              <button
+                type="submit"
+                disabled={!commentText.trim() || submittingComment}
+                className="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 disabled:opacity-40 text-black font-black text-xs flex items-center justify-center gap-1.5 shadow cursor-pointer"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>{submittingComment ? "Sende..." : "Kommentieren"}</span>
+              </button>
+            </form>
+          </div>
+        )}
       </div>
+
+      {/* Edit Custom Collection Modal */}
+      {customCollection && (
+        <CustomCollectionModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          editingCollection={customCollection}
+        />
+      )}
     </div>
   );
 }

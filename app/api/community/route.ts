@@ -24,34 +24,49 @@ import {
   syncUserFriendGroups,
   addRecommendationReply,
   deleteRecommendationReply,
+  getVisibleCustomCollections,
+  saveCustomCollection,
+  deleteCustomCollection,
+  reviewCustomCollectionApproval,
+  toggleCustomCollectionUpvote,
+  addCustomCollectionComment,
+  deleteCustomCollectionComment,
 } from "@/lib/store";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
   let userId: string | undefined = undefined;
+  let isAdmin = false;
 
   if (session?.user?.email) {
     const dbUser = await findUserByEmail(session.user.email);
     userId = dbUser?.id || (session.user as any)?.id;
+    isAdmin =
+      session.user.email.toLowerCase() === "lukasreinle0@gmail.com" ||
+      dbUser?.role === "ADMIN" ||
+      (session.user as any)?.role === "ADMIN";
   }
 
   if (!session?.user?.email || !userId) {
+    const publicCollections = await getVisibleCustomCollections(undefined, undefined, false);
     return NextResponse.json({
       mediaStatuses: [],
       recommendations: [],
       friends: [],
       friendRequests: { pendingReceived: [], pendingSent: [] },
       friendGroups: [],
+      customCollections: publicCollections,
     });
   }
 
   const currentUserName = session?.user?.name || undefined;
 
-  const [community, friends, friendRequests, friendGroups] = await Promise.all([
+  const [community, friends, friendRequests, friendGroups, customCollections] = await Promise.all([
     getAllCommunityData(userId, currentUserName),
     getAllFriendsWithStats(userId),
     getUserFriendRequests(userId),
     getUserFriendGroups(userId, currentUserName),
+    getVisibleCustomCollections(userId, currentUserName, isAdmin),
   ]);
 
   return NextResponse.json({
@@ -59,6 +74,7 @@ export async function GET() {
     friends,
     friendRequests,
     friendGroups,
+    customCollections,
   });
 }
 
@@ -81,6 +97,10 @@ export async function POST(req: Request) {
   }
   const userName = dbUser?.name || session.user.name || "Freund";
   const userImage = dbUser?.image || session.user.image || null;
+  const isAdmin =
+    session.user.email.toLowerCase() === "lukasreinle0@gmail.com" ||
+    dbUser?.role === "ADMIN" ||
+    (session.user as any)?.role === "ADMIN";
 
   try {
     const body = await req.json();
@@ -224,13 +244,80 @@ export async function POST(req: Request) {
       if (body.replyId) {
         await deleteRecommendationReply(userId, body.replyId);
       }
+    } else if (action === "save_custom_collection") {
+      await saveCustomCollection({
+        id: body.id ? String(body.id) : undefined,
+        userId,
+        userName,
+        userImage,
+        isAdmin,
+        name: String(body.name || ""),
+        tagline: body.tagline ? String(body.tagline) : undefined,
+        description: String(body.description || ""),
+        emoji: body.emoji ? String(body.emoji) : "🎬",
+        posterPath: body.posterPath || null,
+        backdropPath: body.backdropPath || null,
+        movies: Array.isArray(body.movies) ? body.movies : [],
+        visibility:
+          body.visibility === "PUBLIC"
+            ? "PUBLIC"
+            : body.visibility === "FRIENDS"
+            ? "FRIENDS"
+            : "PRIVATE",
+        targetType: body.targetType || "ALL",
+        targetNames: Array.isArray(body.targetNames) ? body.targetNames.slice(0, 50) : [],
+        targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds.slice(0, 30) : [],
+        targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds.slice(0, 50) : [],
+      });
+      actionMessage = body.id ? "Kollektion aktualisiert!" : "Kollektion erfolgreich erstellt!";
+    } else if (action === "delete_custom_collection") {
+      if (body.collectionId) {
+        await deleteCustomCollection(userId, String(body.collectionId), isAdmin);
+        actionMessage = "Kollektion gelöscht.";
+      }
+    } else if (action === "approve_custom_collection") {
+      if (body.collectionId && isAdmin) {
+        await reviewCustomCollectionApproval({
+          collectionId: String(body.collectionId),
+          approvalStatus: body.approvalStatus === "REJECTED" ? "REJECTED" : "APPROVED",
+          isAdmin,
+        });
+        actionMessage =
+          body.approvalStatus === "REJECTED"
+            ? "Öffentliche Freigabe abgelehnt."
+            : "Kollektion für alle freigegeben!";
+      }
+    } else if (action === "upvote_custom_collection") {
+      if (body.collectionId) {
+        await toggleCustomCollectionUpvote(userId, String(body.collectionId));
+      }
+    } else if (action === "add_custom_collection_comment") {
+      if (body.collectionId && body.text) {
+        await addCustomCollectionComment({
+          collectionId: String(body.collectionId),
+          userId,
+          userName,
+          userImage,
+          text: String(body.text),
+        });
+      }
+    } else if (action === "delete_custom_collection_comment") {
+      if (body.collectionId && body.commentId) {
+        await deleteCustomCollectionComment(
+          userId,
+          String(body.collectionId),
+          String(body.commentId),
+          isAdmin
+        );
+      }
     }
 
-    const [community, friends, friendRequests, friendGroups] = await Promise.all([
+    const [community, friends, friendRequests, friendGroups, customCollections] = await Promise.all([
       getAllCommunityData(userId, userName),
       getAllFriendsWithStats(userId),
       getUserFriendRequests(userId),
       getUserFriendGroups(userId, userName),
+      getVisibleCustomCollections(userId, userName, isAdmin),
     ]);
 
     return NextResponse.json({
@@ -238,6 +325,7 @@ export async function POST(req: Request) {
       friends,
       friendRequests,
       friendGroups,
+      customCollections,
       actionMessage,
     });
   } catch (err) {
