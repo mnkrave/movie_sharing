@@ -507,6 +507,61 @@ export function getOscarWinnersList(): MediaItem[] {
   }));
 }
 
+/**
+ * Fetches the most widely watched/voted movies & TV series of all time (`sort_by=vote_count.desc`)
+ * for the Speed-Rating / Onboarding flow so users can quickly rate hundreds of well-known titles.
+ */
+export async function getMostWatchedOnboardingMedia(
+  moviePages = 10,
+  tvPages = 4
+): Promise<MediaItem[]> {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+    const moviePromises = Array.from({ length: moviePages }, (_, i) =>
+      tmdbFetch<{ results: any[] }>("/discover/movie", {
+        sort_by: "vote_count.desc",
+        "primary_release_date.lte": today,
+        page: String(i + 1),
+      })
+    );
+    const tvPromises = Array.from({ length: tvPages }, (_, i) =>
+      tmdbFetch<{ results: any[] }>("/discover/tv", {
+        sort_by: "vote_count.desc",
+        "first_air_date.lte": today,
+        page: String(i + 1),
+      })
+    );
+
+    const [movieResponses, tvResponses] = await Promise.all([
+      Promise.all(moviePromises),
+      Promise.all(tvPromises),
+    ]);
+
+    const movies = movieResponses
+      .flatMap((r) => r.results || [])
+      .map((item) => mapRawItem(item, "movie"));
+    const tvShows = tvResponses
+      .flatMap((r) => r.results || [])
+      .map((item) => mapRawItem(item, "tv"));
+
+    // Interleave movies and series sorted by voteCount descending, deduplicating by mediaType+id
+    const combined = [...movies, ...tvShows].sort(
+      (a, b) => (b.voteCount || 0) - (a.voteCount || 0)
+    );
+    const seen = new Set<string>();
+    return combined.filter((item) => {
+      if (!item.posterPath) return false;
+      const key = `${item.mediaType}_${item.id}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  } catch (err) {
+    console.error("Error fetching onboarding media:", err);
+    return getTopRatedMovies(5);
+  }
+}
+
 export async function searchMultiMedia(query: string): Promise<MediaItem[]> {
   if (!query.trim()) return [];
   try {

@@ -25,6 +25,7 @@ import {
   Layers,
   User,
   BarChart3,
+  Zap,
 } from "lucide-react";
 
 export function Navbar() {
@@ -77,13 +78,23 @@ export function Navbar() {
     session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
     (session?.user as any)?.role === "ADMIN";
 
+  const myUserId = (session?.user as any)?.id || "user_lukas";
+  const myName = session?.user?.name?.toLowerCase();
+  const myWatchedCount = communityData.mediaStatuses.filter(
+    (m) =>
+      m.status === "WATCHED" &&
+      (m.userId === myUserId || (myName && m.userName?.toLowerCase() === myName))
+  ).length;
+  const showQuickRateNav = Boolean(session?.user && myWatchedCount < 250);
+
   const isDiscoverActive =
     pathname === "/" ||
     pathname === "/movies" ||
     pathname === "/tv" ||
     pathname.startsWith("/collections") ||
     pathname === "/oscars" ||
-    pathname.startsWith("/recommendations");
+    pathname.startsWith("/recommendations") ||
+    pathname === "/quick-rate";
 
   const mainNavLinks = [
     { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
@@ -96,6 +107,17 @@ export function Navbar() {
   }
 
   const discoverItems = [
+    ...(showQuickRateNav
+      ? [
+          {
+            href: "/quick-rate",
+            label: `Schnell-Bewerten (${myWatchedCount}/250)`,
+            sub: "Klassiker im Speed-Modus bewerten",
+            icon: Zap,
+            color: "text-amber-400 bg-amber-500/15",
+          },
+        ]
+      : []),
     {
       href: "/recommendations",
       label: "Empfehlungen",
@@ -218,6 +240,29 @@ export function Navbar() {
           </div>
 
           {/* Main Links (Freunde-Feed, Meine Liste, Freunde, Admin) */}
+          {showQuickRateNav && (
+            <Link
+              href="/quick-rate"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
+                pathname === "/quick-rate"
+                  ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
+                  : "bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+              }`}
+              title="Schnell Filme & Serien bewerten (verschwindet ab 250 Bewertungen)"
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>Bewerten</span>
+              <span
+                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
+                  pathname === "/quick-rate"
+                    ? "bg-black/20 text-black"
+                    : "bg-amber-500/20 text-amber-300"
+                }`}
+              >
+                {myWatchedCount}/250
+              </span>
+            </Link>
+          )}
           {mainNavLinks.map((link) => {
             const Icon = link.icon;
             const active = pathname === link.href;
