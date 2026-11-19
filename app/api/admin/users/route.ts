@@ -12,6 +12,6 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const users = await getAllFriendsWithStats();
+  const users = await getAllFriendsWithStats(undefined, { includeAllForAdmin: true });
   return NextResponse.json(users);
 }

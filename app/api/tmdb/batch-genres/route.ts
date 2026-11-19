@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { normalizeProviderKey } from "@/lib/tmdb";
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf36";
+const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
 export interface BatchMediaMeta {
@@ -22,13 +22,48 @@ export interface BatchMediaMeta {
   hasFlatrateDE?: boolean;
 }
 
-// In-memory cache for fast repeated lookups
-const metaCache = new Map<string, BatchMediaMeta>();
+// Bounded in-memory LRU cache with 24h TTL to prevent unbounded memory growth
+const MAX_CACHE_ENTRIES = 1000;
+const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const metaCache = new Map<string, { data: BatchMediaMeta; expiresAt: number }>();
+
+function getCachedMeta(key: string): BatchMediaMeta | undefined {
+  const entry = metaCache.get(key);
+  if (!entry) return undefined;
+  if (Date.now() > entry.expiresAt) {
+    metaCache.delete(key);
+    return undefined;
+  }
+  metaCache.delete(key);
+  metaCache.set(key, entry);
+  return entry.data;
+}
+
+function setCachedMeta(key: string, data: BatchMediaMeta) {
+  if (metaCache.has(key)) {
+    metaCache.delete(key);
+  } else if (metaCache.size >= MAX_CACHE_ENTRIES) {
+    const oldestKey = metaCache.keys().next().value;
+    if (oldestKey !== undefined) {
+      metaCache.delete(oldestKey);
+    }
+  }
+  metaCache.set(key, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+}
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const items: { id: number; type: "movie" | "tv" }[] = body.items || [];
+    const rawItems: any[] = Array.isArray(body.items) ? body.items.slice(0, 200) : [];
+    const items: { id: number; type: "movie" | "tv" }[] = rawItems
+      .filter(
+        (item) =>
+          item &&
+          (item.type === "movie" || item.type === "tv") &&
+          Number.isInteger(Number(item.id)) &&
+          Number(item.id) > 0
+      )
+      .map((item) => ({ id: Number(item.id), type: item.type }));
 
     const genresResult: Record<string, string[]> = {};
     const metaResult: Record<string, BatchMediaMeta> = {};
@@ -36,8 +71,8 @@ export async function POST(req: Request) {
 
     for (const item of items) {
       const key = `${item.type}_${item.id}`;
-      if (metaCache.has(key)) {
-        const cached = metaCache.get(key)!;
+      const cached = getCachedMeta(key);
+      if (cached) {
         if (item.type === "tv" && !cached.seasonEpisodes && (cached.numberOfSeasons || 0) > 1) {
           toFetch.push({ id: item.id, type: item.type, key });
         } else {
@@ -159,7 +194,7 @@ export async function POST(req: Request) {
                 hasFlatrateDE,
               };
 
-              metaCache.set(key, meta);
+              setCachedMeta(key, meta);
               genresResult[key] = genreNames;
               metaResult[key] = meta;
             } else {

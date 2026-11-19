@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import {
   normalizeProviderKey,
   resolveCollectionEntry,
@@ -9,7 +11,7 @@ import {
 // Allow up to 60 seconds execution time on Vercel for complex AI reasoning & TMDB lookups
 export const maxDuration = 60;
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf36";
+const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
@@ -322,23 +324,55 @@ async function lookupTmdbAndEnrich(
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const userPrompt: string = (body.prompt || "").trim();
-    const currentUserName: string = (body.currentUserName || "Lukas").trim();
-    const currentUserId: string = (body.currentUserId || "").trim();
-    const explicitParticipants: string[] = body.explicitParticipants || [];
-    const friendGroups: { id: string; name: string; emoji: string; memberNames: string[] }[] =
-      body.friendGroups || [];
-    const allMediaStatuses: any[] = body.mediaStatuses || [];
-    const allFriends: any[] = body.friends || [];
-    const mySubscriptions: string[] = body.userSubscriptions || [];
-    const callerWatchedTmdbIds: number[] = body.userWatchedTmdbIds || [];
-    const callerWatchedKeys: string[] = body.userWatchedKeys || [];
-    const callerWatchedTitles: string[] = body.userWatchedTitles || [];
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.email) {
+      return NextResponse.json(
+        { error: "Bitte logge dich ein, um den KI-Filmberater zu nutzen." },
+        { status: 401 }
+      );
+    }
 
+    const body = await req.json();
+    const userPrompt: string = String(body.prompt || "").trim();
     if (!userPrompt) {
       return NextResponse.json({ error: "Bitte gib eine Anfrage ein." }, { status: 400 });
     }
+    if (userPrompt.length > 600) {
+      return NextResponse.json(
+        { error: "Deine Anfrage ist zu lang (maximal 600 Zeichen)." },
+        { status: 400 }
+      );
+    }
+
+    const currentUserName: string = String(
+      session.user.name || body.currentUserName || "Kino-Fan"
+    )
+      .trim()
+      .slice(0, 80);
+    const currentUserId: string = String(
+      (session.user as any)?.id || body.currentUserId || ""
+    ).trim();
+    const explicitParticipants: string[] = Array.isArray(body.explicitParticipants)
+      ? body.explicitParticipants.slice(0, 20).map((p: any) => String(p).slice(0, 80))
+      : [];
+    const friendGroups: { id: string; name: string; emoji: string; memberNames: string[] }[] =
+      Array.isArray(body.friendGroups) ? body.friendGroups.slice(0, 30) : [];
+    const allMediaStatuses: any[] = Array.isArray(body.mediaStatuses)
+      ? body.mediaStatuses.slice(0, 2500)
+      : [];
+    const allFriends: any[] = Array.isArray(body.friends) ? body.friends.slice(0, 100) : [];
+    const mySubscriptions: string[] = Array.isArray(body.userSubscriptions)
+      ? body.userSubscriptions.slice(0, 25)
+      : [];
+    const callerWatchedTmdbIds: number[] = Array.isArray(body.userWatchedTmdbIds)
+      ? body.userWatchedTmdbIds.slice(0, 2000)
+      : [];
+    const callerWatchedKeys: string[] = Array.isArray(body.userWatchedKeys)
+      ? body.userWatchedKeys.slice(0, 2000)
+      : [];
+    const callerWatchedTitles: string[] = Array.isArray(body.userWatchedTitles)
+      ? body.userWatchedTitles.slice(0, 2000)
+      : [];
 
     // 1. Pre-detect mentioned groups or friends in natural language or /match syntax
     const lowerPrompt = userPrompt.toLowerCase();

@@ -1,6 +1,6 @@
 const fs = require("fs");
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf36";
+const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
 async function fetchItem(id, type = "movie") {

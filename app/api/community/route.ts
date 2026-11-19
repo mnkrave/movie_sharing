@@ -35,15 +35,23 @@ export async function GET() {
     userId = dbUser?.id || (session.user as any)?.id;
   }
 
+  if (!session?.user?.email || !userId) {
+    return NextResponse.json({
+      mediaStatuses: [],
+      recommendations: [],
+      friends: [],
+      friendRequests: { pendingReceived: [], pendingSent: [] },
+      friendGroups: [],
+    });
+  }
+
   const currentUserName = session?.user?.name || undefined;
 
   const [community, friends, friendRequests, friendGroups] = await Promise.all([
     getAllCommunityData(userId, currentUserName),
     getAllFriendsWithStats(userId),
-    userId
-      ? getUserFriendRequests(userId)
-      : Promise.resolve({ pendingReceived: [], pendingSent: [] }),
-    userId ? getUserFriendGroups(userId, currentUserName) : Promise.resolve([]),
+    getUserFriendRequests(userId),
+    getUserFriendGroups(userId, currentUserName),
   ]);
 
   return NextResponse.json({
@@ -64,7 +72,13 @@ export async function POST(req: Request) {
   }
 
   const dbUser = await findUserByEmail(session.user.email);
-  const userId = dbUser?.id || (session.user as any).id || "user_lukas";
+  const userId = dbUser?.id || (session.user as any)?.id;
+  if (!userId) {
+    return NextResponse.json(
+      { error: "Benutzerkonto konnte nicht verifiziert werden." },
+      { status: 401 }
+    );
+  }
   const userName = dbUser?.name || session.user.name || "Freund";
   const userImage = dbUser?.image || session.user.image || null;
 
@@ -129,36 +143,46 @@ export async function POST(req: Request) {
             : undefined,
       });
     } else if (action === "recommend") {
+      const cleanRating = Math.min(10, Math.max(1, Math.round(Number(body.rating) || 9)));
+      const cleanComment = String(body.comment || "").trim().slice(0, 2000);
+      const cleanTags = Array.isArray(body.tags)
+        ? body.tags.slice(0, 15).map((t: any) => String(t).trim().slice(0, 50)).filter(Boolean)
+        : [];
       await addRecommendation({
         userId,
         userName,
         userImage,
         tmdbId: Number(body.tmdbId),
-        mediaType: body.mediaType,
-        title: body.title,
-        posterPath: body.posterPath || null,
-        backdropPath: body.backdropPath || null,
-        releaseYear: body.releaseYear || null,
-        rating: Number(body.rating) || 9,
-        comment: (body.comment || "").trim(),
-        tags: Array.isArray(body.tags) ? body.tags : [],
+        mediaType: body.mediaType === "tv" ? "tv" : "movie",
+        title: String(body.title || "").slice(0, 300),
+        posterPath: body.posterPath ? String(body.posterPath).slice(0, 250) : null,
+        backdropPath: body.backdropPath ? String(body.backdropPath).slice(0, 250) : null,
+        releaseYear: body.releaseYear ? String(body.releaseYear).slice(0, 10) : null,
+        rating: cleanRating,
+        comment: cleanComment,
+        tags: cleanTags,
         targetType: body.targetType || "ALL",
-        targetNames: Array.isArray(body.targetNames) ? body.targetNames : [],
-        targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds : [],
-        targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds : [],
+        targetNames: Array.isArray(body.targetNames) ? body.targetNames.slice(0, 50) : [],
+        targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds.slice(0, 30) : [],
+        targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds.slice(0, 50) : [],
       });
     } else if (action === "update_recommendation") {
       if (body.recommendationId) {
+        const cleanRating = Math.min(10, Math.max(1, Math.round(Number(body.rating) || 9)));
+        const cleanComment = String(body.comment || "").trim().slice(0, 2000);
+        const cleanTags = Array.isArray(body.tags)
+          ? body.tags.slice(0, 15).map((t: any) => String(t).trim().slice(0, 50)).filter(Boolean)
+          : [];
         await updateRecommendation({
-          recommendationId: body.recommendationId,
+          recommendationId: String(body.recommendationId),
           userId,
-          rating: Number(body.rating) || 9,
-          comment: (body.comment || "").trim(),
-          tags: Array.isArray(body.tags) ? body.tags : [],
+          rating: cleanRating,
+          comment: cleanComment,
+          tags: cleanTags,
           targetType: body.targetType || "ALL",
-          targetNames: Array.isArray(body.targetNames) ? body.targetNames : [],
-          targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds : [],
-          targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds : [],
+          targetNames: Array.isArray(body.targetNames) ? body.targetNames.slice(0, 50) : [],
+          targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds.slice(0, 30) : [],
+          targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds.slice(0, 50) : [],
         });
       }
     } else if (action === "delete_recommendation") {

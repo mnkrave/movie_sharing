@@ -10,7 +10,7 @@ import {
   resolveItemGenres,
 } from "@/lib/tmdb";
 
-const TMDB_API_KEY = process.env.TMDB_API_KEY || "92dc1c6b15658b43e4c7a71b45addf36";
+const TMDB_API_KEY = process.env.TMDB_API_KEY || "";
 const TMDB_BASE_URL = "https://api.themoviedb.org/3";
 
 // Mapping from our subscription keys to official TMDB Watch Provider IDs in Germany (DE)

@@ -86,10 +86,14 @@ export function isSamePerson(nameA?: string | null, nameB?: string | null): bool
   if (a === b) return true;
   const aParts = a.split(/\s+/);
   const bParts = b.split(/\s+/);
-  if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) {
+  if (
+    aParts[0].length >= 3 &&
+    aParts[0] === bParts[0] &&
+    (aParts.length === 1 || bParts.length === 1)
+  ) {
     return true;
   }
-  return a.startsWith(b) || b.startsWith(a);
+  return false;
 }
 
 export interface AppFriendship {
@@ -114,7 +118,8 @@ interface LocalDbFile {
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
 
 function getSeedLocalDb(): LocalDbFile {
-  const defaultPass = bcrypt.hashSync("freunde123", 10);
+  const defaultPass =
+    process.env.NODE_ENV === "production" ? null : bcrypt.hashSync("freunde123", 10);
   const now = new Date().toISOString();
   return {
     friendGroups: [],
@@ -730,6 +735,13 @@ export async function saveFriendGroup(
     try {
       const existing = await (prisma as any).friendGroup.findUnique({ where: { id: groupId } });
       if (existing) {
+        const existingMembers = parseMemberNames(existing.memberNames);
+        const isAuthorized =
+          existing.ownerId === userId ||
+          existingMembers.some((m) => isSamePerson(m, userName));
+        if (!isAuthorized) {
+          throw new Error("Keine Berechtigung zum Bearbeiten dieser Gruppe.");
+        }
         await (prisma as any).friendGroup.update({
           where: { id: groupId },
           data: {
@@ -738,6 +750,8 @@ export async function saveFriendGroup(
             memberNames: JSON.stringify(groupObj.memberNames),
           },
         });
+        groupObj.ownerId = existing.ownerId;
+        groupObj.ownerName = existing.ownerName;
       } else {
         await (prisma as any).friendGroup.create({
           data: {
@@ -769,7 +783,19 @@ export async function saveFriendGroup(
   if (!db.friendGroups) db.friendGroups = [];
   const idx = db.friendGroups.findIndex((g) => g.id === groupId);
   if (idx !== -1) {
-    db.friendGroups[idx] = { ...db.friendGroups[idx], ...groupObj };
+    const existing = db.friendGroups[idx];
+    const isAuthorized =
+      existing.ownerId === userId ||
+      (existing.memberNames || []).some((m) => isSamePerson(m, userName));
+    if (!isAuthorized) {
+      return existing;
+    }
+    db.friendGroups[idx] = {
+      ...existing,
+      ...groupObj,
+      ownerId: existing.ownerId || userId,
+      ownerName: existing.ownerName || userName,
+    };
   } else {
     db.friendGroups.push(groupObj);
   }
@@ -851,27 +877,53 @@ export async function syncUserFriendGroups(
   return getUserFriendGroups(userId, userName);
 }
 
+const ALLOWED_AVATAR_HOSTS = new Set([
+  "image.tmdb.org",
+  "media.themoviedb.org",
+  "lh3.googleusercontent.com",
+]);
+
+export function sanitizeAvatarUrl(image: string | null | undefined): string | null {
+  if (!image || typeof image !== "string") return null;
+  const trimmed = image.trim();
+  if (!trimmed || trimmed.length > 500) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== "https:") return null;
+    if (!ALLOWED_AVATAR_HOSTS.has(parsed.hostname.toLowerCase())) return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
 export async function updateUserImage(userId: string, image: string | null): Promise<string | null> {
+  const safeImage = sanitizeAvatarUrl(image);
+  if (image && !safeImage) {
+    throw new Error(
+      "Ungültige Bild-URL. Erlaubt sind nur offizielle HTTPS-Bilder von TMDB oder Google."
+    );
+  }
   if (await isPostgresAvailable()) {
     await prisma.user.update({
       where: { id: userId },
-      data: { image },
+      data: { image: safeImage },
     });
-    return image;
+    return safeImage;
   }
   const db = readLocalDb();
   const u = db.users.find((x) => x.id === userId);
   if (u) {
-    u.image = image;
+    u.image = safeImage;
   }
   db.mediaStatuses.forEach((m) => {
-    if (m.userId === userId) m.userImage = image;
+    if (m.userId === userId) m.userImage = safeImage;
   });
   db.recommendations.forEach((r) => {
-    if (r.userId === userId) r.userImage = image;
+    if (r.userId === userId) r.userImage = safeImage;
   });
   writeLocalDb(db);
-  return image;
+  return safeImage;
 }
 
 export async function isEmailWhitelisted(email: string): Promise<boolean> {
@@ -1373,7 +1425,13 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
   });
 }
 
-export async function getAllFriendsWithStats(currentUserId?: string) {
+export async function getAllFriendsWithStats(
+  currentUserId?: string,
+  options?: { includeAllForAdmin?: boolean }
+) {
+  if (!currentUserId && !options?.includeAllForAdmin) {
+    return [];
+  }
   let friendIdSet: Set<string> | null = null;
   if (currentUserId) {
     const ids = await getAcceptedFriendIds(currentUserId);
@@ -1530,11 +1588,14 @@ export async function getAllCommunityData(
   mediaStatuses: AppMediaStatus[];
   recommendations: AppRecommendation[];
 }> {
-  let allowedUserIds: Set<string> | null = null;
-  if (currentUserId) {
-    const friendIds = await getAcceptedFriendIds(currentUserId);
-    allowedUserIds = new Set([currentUserId, ...friendIds]);
+  if (!currentUserId) {
+    return {
+      mediaStatuses: [],
+      recommendations: [],
+    };
   }
+  const friendIds = await getAcceptedFriendIds(currentUserId);
+  const allowedUserIds = new Set([currentUserId, ...friendIds]);
 
   let myGroupIds: Set<string> | undefined;
   let myGroupNames: Set<string> | undefined;
@@ -2028,7 +2089,17 @@ export async function deleteRecommendation(
 }
 
 export async function toggleRecommendationUpvote(userId: string, recommendationId: string) {
+  const friendIds = await getAcceptedFriendIds(userId);
+  const allowedAuthorIds = new Set([userId, ...friendIds]);
+
   if (await isPostgresAvailable()) {
+    const rec = await prisma.recommendation.findUnique({
+      where: { id: recommendationId },
+      select: { userId: true },
+    });
+    if (!rec || !allowedAuthorIds.has(rec.userId)) {
+      return { upvoted: false };
+    }
     const existing = await prisma.recommendationUpvote.findUnique({
       where: {
         userId_recommendationId: { userId, recommendationId },
@@ -2047,7 +2118,7 @@ export async function toggleRecommendationUpvote(userId: string, recommendationI
 
   const db = readLocalDb();
   const rec = db.recommendations.find((r) => r.id === recommendationId);
-  if (!rec) return { upvoted: false };
+  if (!rec || !allowedAuthorIds.has(rec.userId)) return { upvoted: false };
   const idx = rec.upvoterIds.indexOf(userId);
   if (idx !== -1) {
     rec.upvoterIds.splice(idx, 1);
@@ -2067,11 +2138,21 @@ export async function addRecommendationReply(params: {
   userImage?: string | null;
   text: string;
 }): Promise<AppRecommendationReply> {
-  const cleanText = params.text.trim();
+  const cleanText = params.text.trim().slice(0, 1000);
   if (!cleanText) throw new Error("Reply text cannot be empty");
+
+  const friendIds = await getAcceptedFriendIds(params.userId);
+  const allowedAuthorIds = new Set([params.userId, ...friendIds]);
 
   if (await isPostgresAvailable()) {
     try {
+      const rec = await prisma.recommendation.findUnique({
+        where: { id: params.recommendationId },
+        select: { userId: true },
+      });
+      if (!rec || !allowedAuthorIds.has(rec.userId)) {
+        throw new Error("Keine Berechtigung für diese Empfehlung.");
+      }
       const created = await (prisma as any).recommendationReply.create({
         data: {
           recommendationId: params.recommendationId,
@@ -2090,12 +2171,19 @@ export async function addRecommendationReply(params: {
         text: created.text,
         createdAt: created.createdAt.toISOString(),
       };
-    } catch (err) {
+    } catch (err: any) {
+      if (err?.message === "Keine Berechtigung für diese Empfehlung.") {
+        throw err;
+      }
       console.warn("Could not save to recommendationReply table, falling back to local DB:", err);
     }
   }
 
   const db = readLocalDb();
+  const rec = db.recommendations.find((r) => r.id === params.recommendationId);
+  if (!rec || !allowedAuthorIds.has(rec.userId)) {
+    throw new Error("Keine Berechtigung für diese Empfehlung.");
+  }
   if (!db.recommendationReplies) db.recommendationReplies = [];
   const newReply: AppRecommendationReply = {
     id: `reply_${Date.now()}`,

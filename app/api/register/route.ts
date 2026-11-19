@@ -10,9 +10,31 @@ export async function POST(req: Request) {
   try {
     const { name, email, password } = await req.json();
 
-    if (!name || !email || !password) {
+    if (
+      !name ||
+      !email ||
+      !password ||
+      typeof name !== "string" ||
+      typeof email !== "string" ||
+      typeof password !== "string"
+    ) {
       return NextResponse.json(
         { error: "Bitte fülle alle Felder aus." },
+        { status: 400 }
+      );
+    }
+
+    const cleanName = name.trim();
+    if (cleanName.length < 2 || cleanName.length > 60) {
+      return NextResponse.json(
+        { error: "Dein Name muss zwischen 2 und 60 Zeichen lang sein." },
+        { status: 400 }
+      );
+    }
+
+    if (password.length < 6 || password.length > 72) {
+      return NextResponse.json(
+        { error: "Das Passwort muss zwischen 6 und 72 Zeichen lang sein." },
         { status: 400 }
       );
     }

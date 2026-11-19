@@ -107,5 +107,5 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: "/login",
   },
-  secret: process.env.NEXTAUTH_SECRET || "movie_sharing_super_secret_key_2026",
+  secret: process.env.NEXTAUTH_SECRET,
 };

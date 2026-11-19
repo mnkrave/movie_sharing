@@ -110,21 +110,31 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // C. HTML Navigation Requests (Pages like /, /feed, /my-list)
+  // C. HTML Navigation Requests (Pages like /, /movies, /tv, /oscars)
   if (request.mode === "navigate") {
+    const isPrivateRoute =
+      url.pathname.startsWith("/admin") ||
+      url.pathname.startsWith("/profile") ||
+      url.pathname.startsWith("/friends") ||
+      url.pathname.startsWith("/my-list") ||
+      url.pathname.startsWith("/recommendations") ||
+      url.pathname.startsWith("/feed");
+
     event.respondWith(
       fetch(request)
         .then((response) => {
-          if (response && response.status === 200) {
+          if (response && response.status === 200 && !isPrivateRoute) {
             const clone = response.clone();
             caches.open(CACHE_NAME_PAGES).then((cache) => cache.put(request, clone));
           }
           return response;
         })
         .catch(async () => {
-          // If offline, check if this page was visited before
-          const cachedPage = await caches.match(request);
-          if (cachedPage) return cachedPage;
+          if (!isPrivateRoute) {
+            // If offline, check if this public page was visited before
+            const cachedPage = await caches.match(request);
+            if (cachedPage) return cachedPage;
+          }
 
           // Otherwise, serve dedicated offline fallback page
           const offlinePage = await caches.match("/offline");

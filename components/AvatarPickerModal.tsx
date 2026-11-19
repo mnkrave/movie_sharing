@@ -42,6 +42,7 @@ export function AvatarPickerModal({
   const [searchResults, setSearchResults] = useState<PersonSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [customUrl, setCustomUrl] = useState("");
+  const [customUrlError, setCustomUrlError] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -92,9 +93,33 @@ export function AvatarPickerModal({
     return avatar.category === activeTab;
   });
 
+  const ALLOWED_AVATAR_HOSTS = [
+    "image.tmdb.org",
+    "media.themoviedb.org",
+    "lh3.googleusercontent.com",
+  ];
+
   const handleApplyCustomUrl = () => {
-    if (customUrl.trim().startsWith("http")) {
-      setSelectedAvatar(customUrl.trim());
+    setCustomUrlError("");
+    const trimmed = customUrl.trim();
+    if (!trimmed || trimmed.length > 500) {
+      setCustomUrlError("Bitte gib eine gültige HTTPS-URL (max. 500 Zeichen) ein.");
+      return;
+    }
+    try {
+      const parsed = new URL(trimmed);
+      if (
+        parsed.protocol !== "https:" ||
+        !ALLOWED_AVATAR_HOSTS.includes(parsed.hostname.toLowerCase())
+      ) {
+        setCustomUrlError(
+          "Aus Datenschutzgründen sind nur offizielle HTTPS-Bild-URLs von TMDB (image.tmdb.org) oder Google erlaubt."
+        );
+        return;
+      }
+      setSelectedAvatar(parsed.toString());
+    } catch {
+      setCustomUrlError("Ungültiges URL-Format.");
     }
   };
 
@@ -342,28 +367,34 @@ export function AvatarPickerModal({
             <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 max-w-xl mx-auto text-center">
               <LinkIcon className="w-8 h-8 text-amber-400 mx-auto opacity-80" />
               <div>
-                <h3 className="text-sm font-bold text-white">Eigene Bild-URL einfügen</h3>
+                <h3 className="text-sm font-bold text-white">Offizielle TMDB / Google Bild-URL einfügen</h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Füge einen direkten Link zu einem Bild (.jpg, .png, .webp) ein.
+                  Füge einen direkten HTTPS-Link von <code className="text-amber-300">image.tmdb.org</code> oder <code className="text-amber-300">lh3.googleusercontent.com</code> ein.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
                   type="url"
                   value={customUrl}
-                  onChange={(e) => setCustomUrl(e.target.value)}
-                  placeholder="https://example.com/mein-bild.jpg"
+                  onChange={(e) => {
+                    setCustomUrl(e.target.value);
+                    if (customUrlError) setCustomUrlError("");
+                  }}
+                  placeholder="https://image.tmdb.org/t/p/w300/..."
                   className="flex-1 px-4 py-2 rounded-xl bg-slate-950 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-hidden focus:border-amber-500"
                 />
                 <button
                   type="button"
                   onClick={handleApplyCustomUrl}
-                  disabled={!customUrl.trim().startsWith("http")}
+                  disabled={!customUrl.trim().startsWith("https://")}
                   className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition disabled:opacity-50"
                 >
                   Vorschau
                 </button>
               </div>
+              {customUrlError && (
+                <p className="text-xs text-rose-400 font-medium">{customUrlError}</p>
+              )}
             </div>
           )}
         </div>
