@@ -89,6 +89,37 @@ function getEmojiForGenreName(name: string, id?: number): string {
 
 type ProfileTab = "stats" | "hall-of-fame" | "ai" | "matches";
 
+type HofRatingFilter =
+  | "ALL"
+  | "10"
+  | "9"
+  | "8"
+  | "7"
+  | "6"
+  | "5"
+  | "4"
+  | "3"
+  | "2"
+  | "1"
+  | "UNRATED"
+  | "9_PLUS"
+  | "8_PLUS"
+  | "7_PLUS"
+  | "LOW";
+
+const HOF_EXACT_RATINGS: Array<{ score: number; value: HofRatingFilter; label: string }> = [
+  { score: 10, value: "10", label: "Meisterwerk" },
+  { score: 9, value: "9", label: "Herausragend" },
+  { score: 8, value: "8", label: "Sehr gut" },
+  { score: 7, value: "7", label: "Gut & sehenswert" },
+  { score: 6, value: "6", label: "Ganz solide" },
+  { score: 5, value: "5", label: "Mittelmäßig" },
+  { score: 4, value: "4", label: "Unterdurchschnittlich" },
+  { score: 3, value: "3", label: "Schwach" },
+  { score: 2, value: "2", label: "Sehr schwach" },
+  { score: 1, value: "1", label: "Flop" },
+];
+
 function ProfileContent() {
   const { data: session } = useSession();
   const {
@@ -110,7 +141,7 @@ function ProfileContent() {
   const [loadingMeta, setLoadingMeta] = useState(false);
   const [favFilter, setFavFilter] = useState<"ALL" | "movie" | "tv">("ALL");
   const [hofSearch, setHofSearch] = useState("");
-  const [hofRatingFilter, setHofRatingFilter] = useState<"ALL" | "10" | "9_PLUS" | "8_PLUS" | "7_PLUS" | "LOW">("ALL");
+  const [hofRatingFilter, setHofRatingFilter] = useState<HofRatingFilter>("ALL");
   const [hofGenreFilter, setHofGenreFilter] = useState<string>("ALL");
   const [hofDecadeFilter, setHofDecadeFilter] = useState<"ALL" | "2020s" | "2010s" | "2000s" | "1990s" | "classic">("ALL");
   const [hofSortBy, setHofSortBy] = useState<"rating_desc" | "rating_asc" | "date_desc" | "year_desc" | "year_asc" | "title_asc">("rating_desc");
@@ -428,12 +459,16 @@ function ProfileContent() {
         if (favFilter !== "ALL" && item.mediaType !== favFilter) return false;
 
         // 2. Rating filter
-        const r = item.rating || 0;
-        if (hofRatingFilter === "10" && r < 10) return false;
+        const r = item.rating ? Math.min(10, Math.max(1, Math.round(item.rating))) : 0;
+        if (hofRatingFilter === "UNRATED" && r !== 0) return false;
         if (hofRatingFilter === "9_PLUS" && r < 9) return false;
         if (hofRatingFilter === "8_PLUS" && r < 8) return false;
         if (hofRatingFilter === "7_PLUS" && r < 7) return false;
-        if (hofRatingFilter === "LOW" && r >= 7) return false;
+        if (hofRatingFilter === "LOW" && (r === 0 || r >= 7)) return false;
+        const exactScore = Number(hofRatingFilter);
+        if (Number.isInteger(exactScore) && exactScore >= 1 && exactScore <= 10 && r !== exactScore) {
+          return false;
+        }
 
         // 3. Genre filter
         if (hofGenreFilter !== "ALL") {
@@ -1226,15 +1261,24 @@ function ProfileContent() {
                     <Star className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
                     <select
                       value={hofRatingFilter}
-                      onChange={(e) => setHofRatingFilter(e.target.value as any)}
+                      onChange={(e) => setHofRatingFilter(e.target.value as HofRatingFilter)}
                       className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
                     >
                       <option value="ALL">Alle Bewertungen (1–10 ★)</option>
-                      <option value="10">Nur 10 ★ Meisterwerke</option>
-                      <option value="9_PLUS">9–10 ★ (Absolute Favoriten)</option>
-                      <option value="8_PLUS">8–10 ★ (Sehr gut & besser)</option>
-                      <option value="7_PLUS">7–10 ★ (Sehenswert)</option>
-                      <option value="LOW">Unter 7 ★ (Kritisch bewertet)</option>
+                      <optgroup label="Einzelne Sterne (Exakt 1★ bis 10★)">
+                        {HOF_EXACT_RATINGS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.score} ★ ({opt.label})
+                          </option>
+                        ))}
+                        <option value="UNRATED">Ohne Bewertung</option>
+                      </optgroup>
+                      <optgroup label="Bewertungs-Bereiche">
+                        <option value="9_PLUS">9–10 ★ (Absolute Favoriten)</option>
+                        <option value="8_PLUS">8–10 ★ (Sehr gut & besser)</option>
+                        <option value="7_PLUS">7–10 ★ (Sehenswert)</option>
+                        <option value="LOW">Unter 7 ★ (Kritisch bewertet)</option>
+                      </optgroup>
                     </select>
                   </div>
 
