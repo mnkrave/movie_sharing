@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Image from "next/image";
+import { useSession } from "next-auth/react";
 import { useMedia } from "@/components/MediaContext";
 import { MediaItem } from "@/lib/tmdb";
 import {
@@ -182,14 +183,45 @@ function parseWatchHistoryCsv(text: string): {
 }
 
 export function StreamingHistoryImporter() {
+  const { data: session } = useSession();
   const { communityData, refreshCommunity, openMediaModal, showToast } = useMedia();
   const [isOpen, setIsOpen] = useState(false);
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [importMeta, setImportMeta] = useState<{ source: string; count: number } | null>(null);
   const [isMatching, setIsMatching] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [sourceLabel, setSourceLabel] = useState<string>("Netflix");
   const [rawRowCount, setRawRowCount] = useState(0);
   const [candidates, setCandidates] = useState<MatchedCandidate[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const userId = (session?.user as any)?.id || session?.user?.email || "default";
+  const storageKey = `cinecircle_csv_import_done_v1_${userId}`;
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+          setImportMeta({
+            source: String(parsed.source || "Netflix"),
+            count: Number(parsed.count || 0),
+          });
+          setIsMinimized(true);
+        }
+      }
+    } catch {}
+  }, [storageKey]);
+
+  const markImportCompleted = (source: string, count: number) => {
+    const meta = { source, count };
+    setImportMeta(meta);
+    setIsMinimized(true);
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ ...meta, importedAt: Date.now() }));
+    } catch {}
+  };
 
   const existingWatchedSet = new Set(
     communityData.mediaStatuses
@@ -239,6 +271,10 @@ export function StreamingHistoryImporter() {
         showToast("Alle erkannten Titel aus dieser Datei sind bereits in deiner Liste!", {
           type: "info",
         });
+        markImportCompleted(parsed.sourceName, importMeta?.count || 0);
+        setIsOpen(false);
+      } else {
+        setIsMinimized(false);
       }
     } catch (err) {
       console.error("CSV import error:", err);
@@ -289,6 +325,7 @@ export function StreamingHistoryImporter() {
           `${selectedCandidates.length} Titel aus ${sourceLabel} erfolgreich in dein Profil importiert!`,
           { type: "success" }
         );
+        markImportCompleted(sourceLabel, selectedCandidates.length);
         setCandidates([]);
         setIsOpen(false);
       } else {
@@ -303,6 +340,61 @@ export function StreamingHistoryImporter() {
       setIsSaving(false);
     }
   };
+
+  const hiddenFileInput = (
+    <input
+      ref={fileInputRef}
+      type="file"
+      accept=".csv,text/csv"
+      onChange={handleFileChange}
+      className="hidden"
+    />
+  );
+
+  // Subtle single-line compact bar once the user has already completed an import (or minimized it)
+  if (isMinimized && !isOpen && !isMatching && candidates.length === 0) {
+    return (
+      <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-slate-900/50 border border-slate-800/80 text-xs">
+        {hiddenFileInput}
+        <div className="flex items-center gap-2 text-slate-400">
+          <Check className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+          <span>
+            {importMeta && importMeta.count > 0 ? (
+              <>
+                <strong className="text-slate-200">{importMeta.source}-Verlauf</strong>{" "}
+                importiert ({importMeta.count} Titel)
+              </>
+            ) : (
+              <span>
+                <strong className="text-slate-200">Netflix / IMDb / Letterboxd</strong> CSV-Import
+              </span>
+            )}
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold border border-slate-700/80 transition cursor-pointer"
+          >
+            <Upload className="w-3 h-3 text-rose-400" />
+            <span>Erneut importieren</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsMinimized(false);
+              setIsOpen(true);
+            }}
+            className="px-2.5 py-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/70 transition cursor-pointer"
+          >
+            Anleitung
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rounded-3xl bg-gradient-to-br from-rose-950/35 via-slate-900/90 to-[#0b101d] border border-rose-500/30 shadow-xl overflow-hidden">
@@ -329,13 +421,7 @@ export function StreamingHistoryImporter() {
         </div>
 
         <div className="flex items-center gap-2 self-start sm:self-center flex-shrink-0">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={handleFileChange}
-            className="hidden"
-          />
+          {hiddenFileInput}
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -362,6 +448,18 @@ export function StreamingHistoryImporter() {
           >
             <span>Anleitung</span>
             {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setIsOpen(false);
+              setIsMinimized(true);
+            }}
+            title="Import-Banner einklappen"
+            className="px-2.5 py-2.5 rounded-xl bg-slate-900/70 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-800 text-xs transition cursor-pointer"
+          >
+            <ChevronUp className="w-4 h-4" />
           </button>
         </div>
       </div>
