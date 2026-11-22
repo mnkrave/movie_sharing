@@ -105,7 +105,7 @@ interface MediaContextType {
     title: string;
     posterPath?: string | null;
     releaseYear?: string | null;
-    status: "WATCHED" | "WATCHLIST" | "NONE";
+    status: "WATCHED" | "WATCHLIST" | "WATCHING" | "NONE";
     rating?: number | null;
     watchedSeasons?: number[] | null;
     totalSeasons?: number | null;
@@ -479,11 +479,13 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     title: string;
     posterPath?: string | null;
     releaseYear?: string | null;
-    status: "WATCHED" | "WATCHLIST" | "NONE";
+    status: "WATCHED" | "WATCHLIST" | "WATCHING" | "NONE";
     rating?: number | null;
     watchedSeasons?: number[] | null;
     totalSeasons?: number | null;
   }) => {
+    const safeStatus =
+      params.status === "WATCHING" && params.mediaType !== "tv" ? "WATCHED" : params.status;
     const myUserId = (session?.user as any)?.id || "user_lukas";
     const myName = session?.user?.name || "Lukas Reinle";
     const myImage = session?.user?.image || null;
@@ -502,14 +504,14 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
 
       let nextStatuses = [...prev.mediaStatuses];
 
-      if (params.status === "NONE") {
+      if (safeStatus === "NONE") {
         if (matchIndex >= 0) {
           nextStatuses.splice(matchIndex, 1);
         }
       } else if (matchIndex >= 0) {
         nextStatuses[matchIndex] = {
           ...nextStatuses[matchIndex],
-          status: params.status,
+          status: safeStatus,
           rating: params.rating !== undefined ? params.rating : nextStatuses[matchIndex].rating,
           watchedSeasons:
             params.watchedSeasons !== undefined
@@ -532,7 +534,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
           title: params.title,
           posterPath: params.posterPath || null,
           releaseYear: params.releaseYear || null,
-          status: params.status,
+          status: safeStatus,
           rating: params.rating ?? null,
           watchedSeasons: params.watchedSeasons ?? null,
           totalSeasons: params.totalSeasons ?? null,
@@ -551,7 +553,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch("/api/community", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "status", ...params }),
+        body: JSON.stringify({ action: "status", ...params, status: safeStatus }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -944,16 +946,19 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const handleSaveRating = async (
     rating?: number,
     watchedSeasons?: number[] | null,
-    totalSeasons?: number | null
+    totalSeasons?: number | null,
+    status: "WATCHED" | "WATCHING" = "WATCHED"
   ) => {
     if (!ratingTarget) return;
+    const effectiveStatus =
+      status === "WATCHING" && ratingTarget.mediaType === "tv" ? "WATCHING" : "WATCHED";
     await updateMediaStatus({
       tmdbId: ratingTarget.tmdbId,
       mediaType: ratingTarget.mediaType,
       title: ratingTarget.title,
       posterPath: ratingTarget.posterPath,
       releaseYear: ratingTarget.releaseYear,
-      status: "WATCHED",
+      status: effectiveStatus,
       rating,
       watchedSeasons,
       totalSeasons,

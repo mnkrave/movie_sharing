@@ -28,12 +28,23 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
     return false;
   };
 
-  // Watched: Me vs Friends
+  // Watched & Watching (TV only): Me vs Friends
   const allWatched = communityData.mediaStatuses.filter(
     (m) => m.tmdbId === item.id && m.mediaType === item.mediaType && m.status === "WATCHED"
   );
   const myWatched = allWatched.find((m) => isMe(m.userId, m.userName, (m as any).userEmail));
   const otherFriendsWatched = allWatched.filter(
+    (m) => !isMe(m.userId, m.userName, (m as any).userEmail)
+  );
+
+  const allWatching =
+    item.mediaType === "tv"
+      ? communityData.mediaStatuses.filter(
+          (m) => m.tmdbId === item.id && m.mediaType === "tv" && m.status === "WATCHING"
+        )
+      : [];
+  const myWatching = allWatching.find((m) => isMe(m.userId, m.userName, (m as any).userEmail));
+  const otherFriendsWatching = allWatching.filter(
     (m) => !isMe(m.userId, m.userName, (m as any).userEmail)
   );
 
@@ -91,6 +102,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
       releaseYear: item.releaseYear,
       currentRating: myStatusObj?.rating,
       isWatched: myStatusObj?.status === "WATCHED",
+      currentStatus: myStatusObj?.status,
       watchedSeasons: myStatusObj?.watchedSeasons,
       totalSeasons: myStatusObj?.totalSeasons,
     });
@@ -178,6 +190,20 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             </span>
           )}
 
+          {/* Currently Watching Badge (TV only) */}
+          {(myWatching || otherFriendsWatching.length > 0) && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/90 text-black text-[10px] font-bold backdrop-blur-md shadow truncate">
+              <Tv className="w-3 h-3 flex-shrink-0" />
+              <span className="truncate">
+                {myWatching
+                  ? `Schaue ich${myWatching.watchedSeasons?.length ? ` (${formatWatchedSeasons(myWatching.watchedSeasons, myWatching.totalSeasons)})` : ""}`
+                  : otherFriendsWatching.length === 1
+                  ? `${otherFriendsWatching[0].userName} schaut gerade`
+                  : `${otherFriendsWatching.length} Freunde schauen gerade`}
+              </span>
+            </span>
+          )}
+
           {/* Watched Badge */}
           {(myWatched || otherFriendsWatched.length > 0) && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600/90 text-white text-[10px] font-semibold backdrop-blur-md shadow truncate">
@@ -226,17 +252,25 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             type="button"
             onClick={handleQuickWatched}
             title={
-              myStatusObj?.status === "WATCHED"
+              myStatusObj?.status === "WATCHING"
+                ? "Aktuell am Schauen (Staffeln / Bewertung anpassen)"
+                : myStatusObj?.status === "WATCHED"
                 ? "Gesehen zurücknehmen"
                 : "Als gesehen markieren"
             }
             className={`p-3 rounded-full transition-all duration-200 shadow-lg ${
-              myStatusObj?.status === "WATCHED"
+              myStatusObj?.status === "WATCHING"
+                ? "bg-cyan-400 text-black hover:bg-cyan-300 scale-110 shadow-cyan-500/30 ring-2 ring-cyan-300/50"
+                : myStatusObj?.status === "WATCHED"
                 ? "bg-emerald-500 text-black hover:bg-emerald-400 scale-110 shadow-emerald-500/30 ring-2 ring-emerald-400/50"
                 : "bg-slate-800/90 text-white hover:bg-slate-700 hover:scale-110"
             }`}
           >
-            <Check className="w-5 h-5 stroke-[2.5]" />
+            {myStatusObj?.status === "WATCHING" ? (
+              <Tv className="w-5 h-5" />
+            ) : (
+              <Check className="w-5 h-5 stroke-[2.5]" />
+            )}
           </button>
         </div>
       </div>
@@ -287,19 +321,29 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             type="button"
             onClick={handleQuickWatched}
             aria-label={
-              myStatusObj?.status === "WATCHED"
-                ? "Gesehen-Status oder Bewertung bearbeiten"
+              myStatusObj?.status === "WATCHING" || myStatusObj?.status === "WATCHED"
+                ? "Status oder Bewertung bearbeiten"
                 : "Als gesehen markieren"
             }
             className={`flex-1 min-w-0 min-h-[36px] py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
-              myStatusObj?.status === "WATCHED"
+              myStatusObj?.status === "WATCHING"
+                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                : myStatusObj?.status === "WATCHED"
                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                 : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
             }`}
           >
-            <Check className="w-3.5 h-3.5 flex-shrink-0 stroke-[2.5]" />
+            {myStatusObj?.status === "WATCHING" ? (
+              <Tv className="w-3.5 h-3.5 flex-shrink-0" />
+            ) : (
+              <Check className="w-3.5 h-3.5 flex-shrink-0 stroke-[2.5]" />
+            )}
             <span className="truncate">
-              {myStatusObj?.status === "WATCHED" && myWatched?.rating
+              {myStatusObj?.status === "WATCHING"
+                ? myStatusObj.watchedSeasons?.length
+                  ? formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)
+                  : "Schaut"
+                : myStatusObj?.status === "WATCHED" && myWatched?.rating
                 ? `${myWatched.rating}/10`
                 : myStatusObj?.status === "WATCHED" &&
                   item.mediaType === "tv" &&

@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import Image from "next/image";
-import { Star, X, Check, Film, Tv, Trash2, SlidersHorizontal } from "lucide-react";
-import { formatWatchedSeasons } from "@/lib/seasons";
+import { Star, X, Film, Tv, Trash2 } from "lucide-react";
+import { resolveSelectedSeasons } from "@/lib/seasons";
+import { TvStatusToggle, TvSeasonSelector } from "@/components/TvSeasonControls";
 
 export interface RatingTarget {
   tmdbId: number;
@@ -13,6 +14,7 @@ export interface RatingTarget {
   releaseYear?: string | null;
   currentRating?: number | null;
   isWatched?: boolean;
+  currentStatus?: "WATCHED" | "WATCHLIST" | "WATCHING";
   watchedSeasons?: number[] | null;
   totalSeasons?: number | null;
 }
@@ -23,7 +25,8 @@ interface QuickRatingModalProps {
   onSaveRating: (
     rating: number | undefined,
     watchedSeasons?: number[] | null,
-    totalSeasons?: number | null
+    totalSeasons?: number | null,
+    status?: "WATCHED" | "WATCHING"
   ) => void;
   onRemoveWatched: () => void;
 }
@@ -35,20 +38,29 @@ export function QuickRatingModal({
   onRemoveWatched,
 }: QuickRatingModalProps) {
   const [hoveredNumber, setHoveredNumber] = useState<number | null>(null);
+  const [selectedStatus, setSelectedStatus] = useState<"WATCHED" | "WATCHING">(
+    target?.mediaType === "tv" && target?.currentStatus === "WATCHING" ? "WATCHING" : "WATCHED"
+  );
   const [totalSeasons, setTotalSeasons] = useState<number>(() => target?.totalSeasons || 1);
-  const [selectedSeasons, setSelectedSeasons] = useState<number[]>(() => {
-    if (target?.watchedSeasons && target.watchedSeasons.length > 0) {
-      return target.watchedSeasons;
-    }
-    const count = target?.totalSeasons || 1;
-    return Array.from({ length: count }, (_, i) => i + 1);
-  });
-  const [showSeasonEditor, setShowSeasonEditor] = useState<boolean>(false);
+  const [selectedSeasons, setSelectedSeasons] = useState<number[]>(() =>
+    resolveSelectedSeasons(
+      target?.watchedSeasons,
+      target?.totalSeasons || 1,
+      target?.mediaType === "tv" && target?.currentStatus === "WATCHING" ? "WATCHING" : "WATCHED"
+    )
+  );
+  const [showSeasonEditor, setShowSeasonEditor] = useState<boolean>(
+    target?.mediaType === "tv" && target?.currentStatus === "WATCHING"
+  );
   const [loadingSeasons, setLoadingSeasons] = useState<boolean>(false);
 
   // Sync state and fetch TV series total seasons if needed
   useEffect(() => {
     if (!target) return;
+    const initialStatus =
+      target.mediaType === "tv" && target.currentStatus === "WATCHING" ? "WATCHING" : "WATCHED";
+    setSelectedStatus(initialStatus);
+    setShowSeasonEditor(initialStatus === "WATCHING");
     if (target.mediaType === "tv") {
       let isMounted = true;
       setLoadingSeasons(true);
@@ -59,11 +71,9 @@ export function QuickRatingModal({
           const count = data.numberOfSeasons || (data.seasons ? data.seasons.length : 1);
           if (count > 0) {
             setTotalSeasons(count);
-            if (!target.watchedSeasons || target.watchedSeasons.length === 0) {
-              setSelectedSeasons(Array.from({ length: count }, (_, i) => i + 1));
-            } else {
-              setSelectedSeasons(target.watchedSeasons);
-            }
+            setSelectedSeasons(
+              resolveSelectedSeasons(target.watchedSeasons, count, initialStatus)
+            );
           }
         })
         .catch((err) => console.error("Error loading seasons in QuickRatingModal:", err))
@@ -92,13 +102,10 @@ export function QuickRatingModal({
 
   const handleSave = (score?: number) => {
     if (target.mediaType === "tv") {
-      const finalSeasons =
-        selectedSeasons.length === 0
-          ? Array.from({ length: totalSeasons }, (_, i) => i + 1)
-          : selectedSeasons;
-      onSaveRating(score, finalSeasons, totalSeasons);
+      const finalSeasons = resolveSelectedSeasons(selectedSeasons, totalSeasons, selectedStatus);
+      onSaveRating(score, finalSeasons, totalSeasons, selectedStatus);
     } else {
-      onSaveRating(score);
+      onSaveRating(score, undefined, undefined, "WATCHED");
     }
   };
 
@@ -174,85 +181,28 @@ export function QuickRatingModal({
           </div>
         </div>
 
-        {/* TV Series Seasons Selector (Default: All) */}
+        {/* TV Series Status Toggle + Seasons Selector (TV only!) */}
         {target.mediaType === "tv" && (
-          <div className="my-3 p-3 rounded-2xl bg-slate-900/90 border border-slate-800 text-left">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-1.5 text-xs font-bold">
-                <Tv className="w-3.5 h-3.5 text-cyan-400" />
-                {selectedSeasons.length === totalSeasons ? (
-                  <span className="text-emerald-400 font-semibold">
-                    Alle {totalSeasons} {totalSeasons === 1 ? "Staffel" : "Staffeln"} gesehen ✓
-                  </span>
-                ) : (
-                  <span className="text-amber-400 font-semibold">
-                    {formatWatchedSeasons(selectedSeasons, totalSeasons)} gesehen
-                  </span>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowSeasonEditor(!showSeasonEditor)}
-                className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition flex items-center gap-1"
-              >
-                <SlidersHorizontal className="w-3 h-3" />
-                <span>{showSeasonEditor ? "Fertig" : "Edit Staffeln"}</span>
-              </button>
-            </div>
-
-            {showSeasonEditor && (
-              <div className="mt-3 pt-2.5 border-t border-slate-800/80 space-y-2 animate-fadeIn">
-                <div className="flex items-center justify-between text-[11px] text-slate-400">
-                  <span>Wähle deine gesehenen Staffeln:</span>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setSelectedSeasons(Array.from({ length: totalSeasons }, (_, i) => i + 1))
-                      }
-                      className="text-amber-400 hover:underline font-semibold"
-                    >
-                      Alle
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSeasons([1])}
-                      className="text-slate-400 hover:underline"
-                    >
-                      Nur S1
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-4 sm:grid-cols-5 gap-1.5 max-h-36 overflow-y-auto pt-1">
-                  {Array.from({ length: totalSeasons }, (_, i) => i + 1).map((sNum) => {
-                    const isSelected = selectedSeasons.includes(sNum);
-                    return (
-                      <button
-                        key={sNum}
-                        type="button"
-                        onClick={() => {
-                          setSelectedSeasons((prev) =>
-                            prev.includes(sNum)
-                              ? prev.filter((s) => s !== sNum)
-                              : [...prev, sNum].sort((a, b) => a - b)
-                          );
-                        }}
-                        className={`py-1.5 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1 ${
-                          isSelected
-                            ? "bg-amber-500 text-black shadow-sm"
-                            : "bg-slate-800/80 text-slate-400 hover:text-white border border-slate-700/50"
-                        }`}
-                      >
-                        {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                        <span>S{sNum}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
+          <div className="my-3 space-y-2.5">
+            <TvStatusToggle
+              status={selectedStatus}
+              onSelectWatched={() => setSelectedStatus("WATCHED")}
+              onSelectWatching={() => {
+                setSelectedStatus("WATCHING");
+                setShowSeasonEditor(true);
+                if (!target.watchedSeasons && selectedSeasons.length === totalSeasons && totalSeasons > 1) {
+                  setSelectedSeasons([1]);
+                }
+              }}
+            />
+            <TvSeasonSelector
+              status={selectedStatus}
+              totalSeasons={totalSeasons}
+              selectedSeasons={selectedSeasons}
+              showEditor={showSeasonEditor}
+              onToggleEditor={() => setShowSeasonEditor((prev) => !prev)}
+              onChangeSeasons={setSelectedSeasons}
+            />
           </div>
         )}
 
@@ -301,17 +251,23 @@ export function QuickRatingModal({
             onClick={() => handleSave(undefined)}
             className="w-full py-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-900 transition font-medium"
           >
-            Ohne Note als gesehen speichern
+            {selectedStatus === "WATCHING" && target.mediaType === "tv"
+              ? "Ohne Note als 'Schaue ich gerade' speichern"
+              : "Ohne Note als gesehen speichern"}
           </button>
 
-          {target.isWatched && (
+          {(target.isWatched || target.currentStatus === "WATCHING") && (
             <button
               type="button"
               onClick={onRemoveWatched}
               className="w-full py-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 rounded-xl transition flex items-center justify-center gap-1.5 font-medium"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Von &apos;Gesehen&apos; entfernen</span>
+              <span>
+                {target.currentStatus === "WATCHING"
+                  ? "Von 'Schaue ich gerade' entfernen"
+                  : "Von 'Gesehen' entfernen"}
+              </span>
             </button>
           )}
         </div>

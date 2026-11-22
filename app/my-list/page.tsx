@@ -35,7 +35,7 @@ export default function MyListPage() {
     showToast,
   } = useMedia();
 
-  const [activeTab, setActiveTab] = useState<"WATCHLIST" | "WATCHED">("WATCHLIST");
+  const [activeTab, setActiveTab] = useState<"WATCHLIST" | "WATCHING" | "WATCHED">("WATCHLIST");
   const [mediaTypeFilter, setMediaTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
@@ -47,14 +47,30 @@ export default function MyListPage() {
   const myUserId = (session?.user as any)?.id || "user_lukas";
   const myName = session?.user?.name;
 
+  const myStatuses = useMemo(() => {
+    return communityData.mediaStatuses.filter(
+      (m) => m.userId === myUserId || (myName && m.userName === myName)
+    );
+  }, [communityData.mediaStatuses, myUserId, myName]);
+
   // Items for the current tab
   const allMyItems = useMemo(() => {
-    return communityData.mediaStatuses.filter(
-      (m) =>
-        (m.userId === myUserId || (myName && m.userName === myName)) &&
-        m.status === activeTab
+    return myStatuses.filter(
+      (m) => m.status === activeTab && (activeTab !== "WATCHING" || m.mediaType === "tv")
     );
-  }, [communityData.mediaStatuses, myUserId, myName, activeTab]);
+  }, [myStatuses, activeTab]);
+
+  const { watchlistTotal, watchingTotal, watchedTotal } = useMemo(() => {
+    let watchlist = 0;
+    let watching = 0;
+    let watched = 0;
+    for (const m of myStatuses) {
+      if (m.status === "WATCHLIST") watchlist++;
+      else if (m.status === "WATCHING" && m.mediaType === "tv") watching++;
+      else if (m.status === "WATCHED") watched++;
+    }
+    return { watchlistTotal: watchlist, watchingTotal: watching, watchedTotal: watched };
+  }, [myStatuses]);
 
   // Fetch genres for items in the user's list
   useEffect(() => {
@@ -167,14 +183,6 @@ export default function MyListPage() {
     );
   }
 
-  const watchlistTotal = communityData.mediaStatuses.filter(
-    (m) => (m.userId === myUserId || m.userName === myName) && m.status === "WATCHLIST"
-  ).length;
-
-  const watchedTotal = communityData.mediaStatuses.filter(
-    (m) => (m.userId === myUserId || m.userName === myName) && m.status === "WATCHED"
-  ).length;
-
   const handlePullRefresh = async () => {
     try {
       await refreshCommunity();
@@ -207,15 +215,15 @@ export default function MyListPage() {
         </button>
       </div>
 
-      {/* Main Tabs (Watchlist vs Bereits gesehen) */}
+      {/* Main Tabs (Watchlist vs Aktuell am Schauen [Serien] vs Bereits gesehen) */}
       <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto no-scrollbar">
           <button
             onClick={() => {
               setActiveTab("WATCHLIST");
               setSelectedCategory("ALL");
             }}
-            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               activeTab === "WATCHLIST"
                 ? "bg-sky-500 text-black shadow-lg shadow-sky-500/20"
                 : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -227,10 +235,26 @@ export default function MyListPage() {
 
           <button
             onClick={() => {
+              setActiveTab("WATCHING");
+              setSelectedCategory("ALL");
+              setMediaTypeFilter("ALL");
+            }}
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
+              activeTab === "WATCHING"
+                ? "bg-cyan-400 text-black shadow-lg shadow-cyan-500/20"
+                : "bg-slate-900 border border-slate-800 text-cyan-300 hover:text-white"
+            }`}
+          >
+            <Tv className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">Schaue ich ({watchingTotal})</span>
+          </button>
+
+          <button
+            onClick={() => {
               setActiveTab("WATCHED");
               setSelectedCategory("ALL");
             }}
-            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition ${
+            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               activeTab === "WATCHED"
                 ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
                 : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
@@ -241,44 +265,46 @@ export default function MyListPage() {
           </button>
         </div>
 
-        {/* Media Type Switcher (Alle / Filme / Serien) */}
-        <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full w-full sm:w-auto">
-          <button
-            type="button"
-            onClick={() => setMediaTypeFilter("ALL")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              mediaTypeFilter === "ALL"
-                ? "bg-amber-500 text-black font-bold shadow-sm"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Alle ({allMyItems.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => setMediaTypeFilter("movie")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              mediaTypeFilter === "movie"
-                ? "bg-amber-500 text-black font-bold shadow-sm"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Film className="w-3.5 h-3.5" />
-            <span>Filme ({movieCount})</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMediaTypeFilter("tv")}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-              mediaTypeFilter === "tv"
-                ? "bg-amber-500 text-black font-bold shadow-sm"
-                : "text-slate-400 hover:text-white"
-            }`}
-          >
-            <Tv className="w-3.5 h-3.5" />
-            <span>Serien ({tvCount})</span>
-          </button>
-        </div>
+        {/* Media Type Switcher (Alle / Filme / Serien - hidden on WATCHING since it's TV only) */}
+        {activeTab !== "WATCHING" && (
+          <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full w-full sm:w-auto">
+            <button
+              type="button"
+              onClick={() => setMediaTypeFilter("ALL")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mediaTypeFilter === "ALL"
+                  ? "bg-amber-500 text-black font-bold shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              Alle ({allMyItems.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setMediaTypeFilter("movie")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mediaTypeFilter === "movie"
+                  ? "bg-amber-500 text-black font-bold shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Film className="w-3.5 h-3.5" />
+              <span>Filme ({movieCount})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setMediaTypeFilter("tv")}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
+                mediaTypeFilter === "tv"
+                  ? "bg-amber-500 text-black font-bold shadow-sm"
+                  : "text-slate-400 hover:text-white"
+              }`}
+            >
+              <Tv className="w-3.5 h-3.5" />
+              <span>Serien ({tvCount})</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -416,7 +442,8 @@ export default function MyListPage() {
                           posterPath: item.posterPath,
                           releaseYear: item.releaseYear,
                           currentRating: item.rating,
-                          isWatched: true,
+                          isWatched: item.status === "WATCHED",
+                          currentStatus: item.status,
                           watchedSeasons: item.watchedSeasons,
                           totalSeasons: item.totalSeasons,
                         });
@@ -429,13 +456,23 @@ export default function MyListPage() {
                     </div>
                   )}
 
-                  {/* Partial seasons badge for series */}
+                  {/* Partial seasons / watching progress badge for series */}
                   {item.mediaType === "tv" &&
                     item.watchedSeasons &&
-                    item.totalSeasons &&
-                    item.watchedSeasons.length < item.totalSeasons && (
-                      <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
-                        <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
+                    item.watchedSeasons.length > 0 &&
+                    (item.status === "WATCHING" ||
+                      (item.totalSeasons && item.watchedSeasons.length < item.totalSeasons)) && (
+                      <div
+                        className={`absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] shadow backdrop-blur-sm ${
+                          item.status === "WATCHING"
+                            ? "bg-cyan-400/95 text-black"
+                            : "bg-purple-600/90 text-white"
+                        }`}
+                      >
+                        <span>
+                          {item.status === "WATCHING" ? "📺 " : ""}
+                          {formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}
+                        </span>
                       </div>
                     )}
 
@@ -465,7 +502,7 @@ export default function MyListPage() {
                   </div>
 
                   {/* Action Bar */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 gap-1">
                     {activeTab === "WATCHLIST" ? (
                       <button
                         type="button"
@@ -479,6 +516,7 @@ export default function MyListPage() {
                             releaseYear: item.releaseYear,
                             currentRating: item.rating,
                             isWatched: false,
+                            currentStatus: item.status,
                             watchedSeasons: item.watchedSeasons,
                             totalSeasons: item.totalSeasons,
                           });
@@ -489,6 +527,56 @@ export default function MyListPage() {
                         <Check className="w-3 h-3" />
                         <span>Gesehen</span>
                       </button>
+                    ) : activeTab === "WATCHING" ? (
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openRatingModal({
+                              tmdbId: item.tmdbId,
+                              mediaType: "tv",
+                              title: item.title,
+                              posterPath: item.posterPath,
+                              releaseYear: item.releaseYear,
+                              currentRating: item.rating,
+                              isWatched: false,
+                              currentStatus: "WATCHING",
+                              watchedSeasons: item.watchedSeasons,
+                              totalSeasons: item.totalSeasons,
+                            });
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-400 text-cyan-300 hover:text-black border border-cyan-500/30 text-[10px] font-bold transition"
+                          title="Staffel & Bewertung anpassen"
+                        >
+                          <Tv className="w-3 h-3" />
+                          <span>Stand</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            updateMediaStatus({
+                              tmdbId: item.tmdbId,
+                              mediaType: "tv",
+                              title: item.title,
+                              posterPath: item.posterPath,
+                              releaseYear: item.releaseYear,
+                              status: "WATCHED",
+                              rating: item.rating ?? undefined,
+                              watchedSeasons: item.totalSeasons
+                                ? Array.from({ length: item.totalSeasons }, (_, i) => i + 1)
+                                : item.watchedSeasons,
+                              totalSeasons: item.totalSeasons,
+                            });
+                          }}
+                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[10px] font-bold transition"
+                          title="Serie komplett abgeschlossen"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>Fertig</span>
+                        </button>
+                      </div>
                     ) : (
                       <button
                         type="button"
@@ -546,6 +634,8 @@ export default function MyListPage() {
               ? "Passe deine Filterkriterien an oder setze sie zurück."
               : activeTab === "WATCHLIST"
               ? "Klicke bei einem beliebigen Film auf '+', um ihn für später auf deine Watchlist zu setzen."
+              : activeTab === "WATCHING"
+              ? "Öffne eine Serie und wähle 'Schaue ich', um deine aktuelle Staffel & Bewertung festzuhalten."
               : "Markiere Filme als 'Gesehen' und bewerte sie, um deinen Freunden deine Highlights zu zeigen!"}
           </p>
           {(searchQuery || selectedCategory !== "ALL" || mediaTypeFilter !== "ALL") && (

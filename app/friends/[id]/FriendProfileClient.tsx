@@ -4,6 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
+import { formatWatchedSeasons } from "@/lib/seasons";
 import {
   User,
   Star,
@@ -48,7 +49,7 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
     confirmDialog,
   } = useMedia();
 
-  const [activeTab, setActiveTab] = useState<"watched" | "watchlist" | "recommendations">("watched");
+  const [activeTab, setActiveTab] = useState<"watched" | "watching" | "watchlist" | "recommendations">("watched");
   const [filterType, setFilterType] = useState<"ALL" | "movie" | "tv">("ALL");
   const [ratingFilter, setRatingFilter] = useState<"ALL" | "TOP" | "MID" | "LOW">("ALL");
   const [searchFilter, setSearchFilter] = useState<string>("");
@@ -89,6 +90,10 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
 
   const friendWatched = useMemo(() => {
     return friendStatuses.filter((m) => m.status === "WATCHED");
+  }, [friendStatuses]);
+
+  const friendWatching = useMemo(() => {
+    return friendStatuses.filter((m) => m.status === "WATCHING" && m.mediaType === "tv");
   }, [friendStatuses]);
 
   const friendWatchlist = useMemo(() => {
@@ -298,6 +303,123 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
   const friendAvatar = isMe ? currentUserAvatar || friend.image : friend.image;
   const sharedSubs = (friend.subscriptions || []).filter((s: string) => userSubscriptions.includes(s));
 
+  type FriendMediaItem = (typeof friendStatuses)[number];
+
+  const renderWatchlistToggleButton = (
+    item: FriendMediaItem,
+    {
+      onMyWatchlist,
+      labelAdded,
+      labelAdd,
+      buttonClass,
+      mediaTypeOverride,
+    }: {
+      onMyWatchlist: boolean;
+      labelAdded: string;
+      labelAdd: string;
+      buttonClass: string;
+      mediaTypeOverride?: "movie" | "tv";
+    }
+  ) => (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        updateMediaStatus({
+          tmdbId: item.tmdbId,
+          mediaType: mediaTypeOverride ?? item.mediaType,
+          title: item.title,
+          posterPath: item.posterPath,
+          releaseYear: item.releaseYear,
+          status: onMyWatchlist ? "NONE" : "WATCHLIST",
+        });
+      }}
+      className={`${buttonClass} font-bold border transition flex items-center gap-1 ${
+        onMyWatchlist
+          ? "bg-sky-500 text-black border-sky-400"
+          : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
+      }`}
+    >
+      <Plus className="w-3 h-3" />
+      <span>{onMyWatchlist ? labelAdded : labelAdd}</span>
+    </button>
+  );
+
+  const renderFriendMediaCard = (
+    item: FriendMediaItem,
+    {
+      accentColor,
+      badge,
+      topRightBadge,
+      footerContent,
+      mediaTypeOverride,
+      fallbackIcon,
+    }: {
+      accentColor: "emerald" | "cyan" | "sky";
+      badge: React.ReactNode;
+      topRightBadge?: React.ReactNode;
+      footerContent: React.ReactNode;
+      mediaTypeOverride?: "movie" | "tv";
+      fallbackIcon?: React.ReactNode;
+    }
+  ) => {
+    const borderHover =
+      accentColor === "emerald"
+        ? "hover:border-emerald-500/50"
+        : accentColor === "cyan"
+        ? "hover:border-cyan-400/50"
+        : "hover:border-sky-500/50";
+    const titleHover =
+      accentColor === "emerald"
+        ? "group-hover:text-emerald-300"
+        : accentColor === "cyan"
+        ? "group-hover:text-cyan-300"
+        : "group-hover:text-sky-300";
+
+    return (
+      <div
+        key={item.id}
+        onClick={() =>
+          openMediaModal({
+            id: item.tmdbId,
+            mediaType: mediaTypeOverride ?? item.mediaType,
+            title: item.title,
+            posterPath: item.posterPath,
+          })
+        }
+        className={`group cursor-pointer rounded-2xl bg-slate-900/70 border border-slate-800 ${borderHover} overflow-hidden flex flex-col justify-between transition duration-300 hover:-translate-y-1 shadow-lg`}
+      >
+        <div className="relative aspect-[2/3] w-full bg-slate-950 overflow-hidden">
+          {item.posterPath ? (
+            <Image
+              src={`https://image.tmdb.org/t/p/w342${item.posterPath}`}
+              alt={item.title}
+              fill
+              sizes="(max-width: 768px) 50vw, 20vw"
+              className="object-cover group-hover:scale-105 transition duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-slate-600">
+              {fallbackIcon ?? <Film className="w-8 h-8" />}
+            </div>
+          )}
+          {badge}
+          {topRightBadge}
+        </div>
+
+        <div className="p-3 space-y-2">
+          <div>
+            <p className="text-[11px] text-slate-400 font-semibold">{item.releaseYear || ""}</p>
+            <h3 className={`text-xs font-bold text-white ${titleHover} transition line-clamp-1`}>
+              {item.title}
+            </h3>
+          </div>
+          {footerContent}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8">
       {/* Top Back Nav & Quick Actions */}
@@ -454,6 +576,77 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
         </div>
       </div>
 
+      {/* Currently Watching TV Series Spotlight (TV only) */}
+      {friendWatching.length > 0 && (
+        <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-br from-cyan-950/35 via-slate-900/75 to-[#0d1322] border border-cyan-500/30 space-y-4 shadow-xl">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Tv className="w-5 h-5 text-cyan-400" />
+              <h2 className="text-base sm:text-lg font-black text-white">
+                @{friend.name} schaut gerade ({friendWatching.length}{" "}
+                {friendWatching.length === 1 ? "Serie" : "Serien"})
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setActiveTab("watching")}
+              className="text-xs font-bold text-cyan-300 hover:text-cyan-200 transition cursor-pointer"
+            >
+              Alle ansehen →
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {friendWatching.slice(0, 6).map((item) => (
+              <div
+                key={item.id}
+                onClick={() =>
+                  openMediaModal({
+                    id: item.tmdbId,
+                    mediaType: "tv",
+                    title: item.title,
+                    posterPath: item.posterPath,
+                  })
+                }
+                className="group cursor-pointer flex items-center gap-3 p-3 rounded-2xl bg-slate-950/80 border border-slate-800 hover:border-cyan-400/50 transition"
+              >
+                <div className="relative w-12 h-16 rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 border border-slate-800">
+                  {item.posterPath ? (
+                    <Image
+                      src={`https://image.tmdb.org/t/p/w185${item.posterPath}`}
+                      alt={item.title}
+                      fill
+                      sizes="48px"
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-600">
+                      <Tv className="w-5 h-5" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 min-w-0 space-y-1">
+                  <h3 className="text-xs sm:text-sm font-bold text-white group-hover:text-cyan-300 transition truncate">
+                    {item.title}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    <span className="px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 font-bold">
+                      {formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}
+                    </span>
+                    {item.rating && (
+                      <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold flex items-center gap-0.5">
+                        <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                        <span>{item.rating}★</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Taste Match Analysis Section */}
       {!isMe && (
         <div className="p-6 sm:p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
@@ -536,6 +729,19 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
 
             <button
               type="button"
+              onClick={() => setActiveTab("watching")}
+              className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex-shrink-0 ${
+                activeTab === "watching"
+                  ? "bg-cyan-400 text-black shadow-lg shadow-cyan-500/20 font-black"
+                  : "bg-slate-900/80 text-cyan-300 hover:text-white border border-slate-800"
+              }`}
+            >
+              <Tv className="w-4 h-4" />
+              <span>Schaut gerade ({friendWatching.length})</span>
+            </button>
+
+            <button
+              type="button"
               onClick={() => setActiveTab("watchlist")}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-bold transition whitespace-nowrap flex-shrink-0 ${
                 activeTab === "watchlist"
@@ -562,7 +768,7 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
           </div>
 
           {/* Quick Filters (Format & Ratings) */}
-          {activeTab !== "recommendations" && (
+          {(activeTab === "watched" || activeTab === "watchlist") && (
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800">
                 {(["ALL", "movie", "tv"] as const).map((t) => (
@@ -625,93 +831,86 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
                 {filteredWatched.map((item) => {
                   const key = `${item.mediaType}_${item.tmdbId}`;
                   const myWatched = myWatchedMap.get(key);
-                  const isWatchedByMe = !!myWatched;
-                  const myRating = myWatched?.rating;
                   const onMyWatchlist = myWatchlistSet.has(key);
 
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() =>
-                        openMediaModal({
-                          id: item.tmdbId,
-                          mediaType: item.mediaType,
-                          title: item.title,
-                          posterPath: item.posterPath,
-                        })
-                      }
-                      className="group cursor-pointer rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-emerald-500/50 overflow-hidden flex flex-col justify-between transition duration-300 hover:-translate-y-1 shadow-lg"
-                    >
-                      <div className="relative aspect-[2/3] w-full bg-slate-950 overflow-hidden">
-                        {item.posterPath ? (
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w342${item.posterPath}`}
-                            alt={item.title}
-                            fill
-                            sizes="(max-width: 768px) 50vw, 20vw"
-                            className="object-cover group-hover:scale-105 transition duration-300"
-                          />
+                  return renderFriendMediaCard(item, {
+                    accentColor: "emerald",
+                    badge: (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-300 text-xs font-black flex items-center gap-1 shadow">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span>{item.rating ? `${item.rating}★` : "Gesehen"}</span>
+                      </div>
+                    ),
+                    topRightBadge: (
+                      <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-slate-950/80 text-[10px] text-slate-300 font-bold uppercase tracking-wider">
+                        {item.mediaType === "movie" ? "Film" : "Serie"}
+                      </div>
+                    ),
+                    footerContent: (
+                      <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                        {myWatched ? (
+                          <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>Du: {myWatched.rating ? `${myWatched.rating}★` : "Gesehen"}</span>
+                          </span>
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-600">
-                            <Film className="w-8 h-8" />
-                          </div>
+                          renderWatchlistToggleButton(item, {
+                            onMyWatchlist,
+                            labelAdded: "Auf Merkliste ✓",
+                            labelAdd: "+ Merkliste",
+                            buttonClass: "px-2 py-0.5 rounded-md text-[10px]",
+                          })
                         )}
-
-                        {/* Friend's Rating Badge */}
-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-300 text-xs font-black flex items-center gap-1 shadow">
-                          <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                          <span>{item.rating ? `${item.rating}★` : "Gesehen"}</span>
-                        </div>
-
-                        {/* Format Badge */}
-                        <div className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md bg-slate-950/80 text-[10px] text-slate-300 font-bold uppercase tracking-wider">
-                          {item.mediaType === "movie" ? "Film" : "Serie"}
-                        </div>
                       </div>
+                    ),
+                  });
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-                      <div className="p-3 space-y-2">
-                        <div>
-                          <p className="text-[11px] text-slate-400 font-semibold">{item.releaseYear || ""}</p>
-                          <h3 className="text-xs font-bold text-white group-hover:text-emerald-300 transition line-clamp-1">
-                            {item.title}
-                          </h3>
-                        </div>
-
-                        {/* Comparison Indicator with Current User */}
-                        <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                          {isWatchedByMe ? (
-                            <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                              <Check className="w-3 h-3 stroke-[3]" />
-                              <span>Du: {myRating ? `${myRating}★` : "Gesehen"}</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateMediaStatus({
-                                  tmdbId: item.tmdbId,
-                                  mediaType: item.mediaType,
-                                  title: item.title,
-                                  posterPath: item.posterPath,
-                                  releaseYear: item.releaseYear,
-                                  status: onMyWatchlist ? "NONE" : "WATCHLIST",
-                                });
-                              }}
-                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition flex items-center gap-1 ${
-                                onMyWatchlist
-                                  ? "bg-sky-500 text-black border-sky-400"
-                                  : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
-                              }`}
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>{onMyWatchlist ? "Auf Merkliste ✓" : "+ Merkliste"}</span>
-                            </button>
-                          )}
-                        </div>
+        {/* Tab 1b: Currently Watching TV Series */}
+        {activeTab === "watching" && (
+          <div className="space-y-4">
+            {friendWatching.length === 0 ? (
+              <div className="p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-2">
+                <Tv className="w-8 h-8 text-slate-600 mx-auto" />
+                <p className="text-sm font-bold text-slate-300">
+                  Aktuell keine Serien im Status &bdquo;Schaue ich gerade&ldquo;.
+                </p>
+                <p className="text-xs text-slate-500">
+                  Sobald {friend.name} eine laufende Serie markiert, erscheint sie hier inkl. aktuellem Staffel-Stand.
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                {friendWatching.map((item) => {
+                  const onMyWatchlist = myWatchlistSet.has(`tv_${item.tmdbId}`);
+                  return renderFriendMediaCard(item, {
+                    accentColor: "cyan",
+                    mediaTypeOverride: "tv",
+                    fallbackIcon: <Tv className="w-8 h-8" />,
+                    badge: (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-cyan-400/95 text-black text-[10px] font-black shadow flex items-center gap-1">
+                        <Tv className="w-3 h-3" />
+                        <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
                       </div>
-                    </div>
-                  );
+                    ),
+                    topRightBadge: item.rating ? (
+                      <div className="absolute top-2 right-2 px-2 py-0.5 rounded-lg bg-black/80 border border-amber-500/40 text-amber-300 text-xs font-black flex items-center gap-1 shadow">
+                        <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        <span>{item.rating}★</span>
+                      </div>
+                    ) : null,
+                    footerContent: renderWatchlistToggleButton(item, {
+                      onMyWatchlist,
+                      labelAdded: "Auf Merkliste ✓",
+                      labelAdd: "+ Merkliste",
+                      buttonClass: "px-2.5 py-1 rounded-lg text-xs w-full justify-center",
+                      mediaTypeOverride: "tv",
+                    }),
+                  });
                 })}
               </div>
             )}
@@ -736,82 +935,32 @@ export function FriendProfileClient({ friendIdParam }: FriendProfileClientProps)
                   const isWatchedByMe = myWatchedMap.has(key);
                   const onMyWatchlist = myWatchlistSet.has(key);
 
-                  return (
-                    <div
-                      key={item.id}
-                      onClick={() =>
-                        openMediaModal({
-                          id: item.tmdbId,
-                          mediaType: item.mediaType,
-                          title: item.title,
-                          posterPath: item.posterPath,
-                        })
-                      }
-                      className="group cursor-pointer rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-sky-500/50 overflow-hidden flex flex-col justify-between transition duration-300 hover:-translate-y-1 shadow-lg"
-                    >
-                      <div className="relative aspect-[2/3] w-full bg-slate-950 overflow-hidden">
-                        {item.posterPath ? (
-                          <Image
-                            src={`https://image.tmdb.org/t/p/w342${item.posterPath}`}
-                            alt={item.title}
-                            fill
-                            sizes="(max-width: 768px) 50vw, 20vw"
-                            className="object-cover group-hover:scale-105 transition duration-300"
-                          />
+                  return renderFriendMediaCard(item, {
+                    accentColor: "sky",
+                    badge: (
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-sky-500/90 text-black text-[10px] font-black shadow flex items-center gap-1">
+                        <Bookmark className="w-3 h-3 fill-black" />
+                        <span>Will @{friend.name} schauen</span>
+                      </div>
+                    ),
+                    footerContent: (
+                      <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+                        {isWatchedByMe ? (
+                          <span className="text-emerald-400 font-semibold flex items-center gap-1">
+                            <Check className="w-3 h-3 stroke-[3]" />
+                            <span>Du hast ihn schon gesehen</span>
+                          </span>
                         ) : (
-                          <div className="w-full h-full flex items-center justify-center text-slate-600">
-                            <Film className="w-8 h-8" />
-                          </div>
+                          renderWatchlistToggleButton(item, {
+                            onMyWatchlist,
+                            labelAdded: "Auch auf deiner Liste ✓",
+                            labelAdd: "Auch merken +",
+                            buttonClass: "px-2.5 py-1 rounded-lg text-xs w-full justify-center",
+                          })
                         )}
-
-                        <div className="absolute top-2 left-2 px-2 py-0.5 rounded-lg bg-sky-500/90 text-black text-[10px] font-black shadow flex items-center gap-1">
-                          <Bookmark className="w-3 h-3 fill-black" />
-                          <span>Will @{friend.name} schauen</span>
-                        </div>
                       </div>
-
-                      <div className="p-3 space-y-2">
-                        <div>
-                          <p className="text-[11px] text-slate-400 font-semibold">{item.releaseYear || ""}</p>
-                          <h3 className="text-xs font-bold text-white group-hover:text-sky-300 transition line-clamp-1">
-                            {item.title}
-                          </h3>
-                        </div>
-
-                        <div className="pt-1 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-                          {isWatchedByMe ? (
-                            <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                              <Check className="w-3 h-3 stroke-[3]" />
-                              <span>Du hast ihn schon gesehen</span>
-                            </span>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                updateMediaStatus({
-                                  tmdbId: item.tmdbId,
-                                  mediaType: item.mediaType,
-                                  title: item.title,
-                                  posterPath: item.posterPath,
-                                  releaseYear: item.releaseYear,
-                                  status: onMyWatchlist ? "NONE" : "WATCHLIST",
-                                });
-                              }}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1 w-full justify-center ${
-                                onMyWatchlist
-                                  ? "bg-sky-500 text-black border-sky-400"
-                                  : "bg-slate-950 hover:bg-slate-800 text-slate-300 border-slate-800"
-                              }`}
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>{onMyWatchlist ? "Auch auf deiner Liste ✓" : "Auch merken +"}</span>
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
+                    ),
+                  });
                 })}
               </div>
             )}

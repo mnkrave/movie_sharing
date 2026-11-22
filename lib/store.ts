@@ -25,7 +25,7 @@ export interface AppMediaStatus {
   title: string;
   posterPath?: string | null;
   releaseYear?: string | null;
-  status: "WATCHED" | "WATCHLIST";
+  status: "WATCHED" | "WATCHLIST" | "WATCHING";
   rating?: number | null;
   watchedSeasons?: number[] | null;
   totalSeasons?: number | null;
@@ -1501,6 +1501,7 @@ export async function getAllFriendsWithStats(
       role: u.role,
       subscriptions: parseSubscriptions(u.subscriptions),
       watchedCount: u.mediaStatuses.filter((m) => m.status === "WATCHED").length,
+      watchingCount: u.mediaStatuses.filter((m) => m.status === "WATCHING" && m.mediaType === "tv").length,
       watchlistCount: u.mediaStatuses.filter((m) => m.status === "WATCHLIST").length,
       recommendationsCount: u.recommendations.length,
       createdAt: u.createdAt.toISOString(),
@@ -1520,6 +1521,7 @@ export async function getAllFriendsWithStats(
     role: u.role,
     subscriptions: u.subscriptions || ["netflix", "prime", "disney"],
     watchedCount: db.mediaStatuses.filter((m) => m.userId === u.id && m.status === "WATCHED").length,
+    watchingCount: db.mediaStatuses.filter((m) => m.userId === u.id && m.status === "WATCHING" && m.mediaType === "tv").length,
     watchlistCount: db.mediaStatuses.filter((m) => m.userId === u.id && m.status === "WATCHLIST").length,
     recommendationsCount: db.recommendations.filter((r) => r.userId === u.id).length,
     createdAt: u.createdAt,
@@ -1741,7 +1743,7 @@ export async function getAllCommunityData(
         title: s.title,
         posterPath: s.posterPath,
         releaseYear: s.releaseYear,
-        status: s.status as "WATCHED" | "WATCHLIST",
+        status: s.status as "WATCHED" | "WATCHLIST" | "WATCHING",
         rating: s.rating,
         watchedSeasons: s.watchedSeasons
           ? typeof s.watchedSeasons === "string"
@@ -1803,19 +1805,24 @@ export async function toggleMediaStatus(params: {
   title: string;
   posterPath?: string | null;
   releaseYear?: string | null;
-  status: "WATCHED" | "WATCHLIST" | "NONE";
+  status: "WATCHED" | "WATCHLIST" | "WATCHING" | "NONE";
   rating?: number | null;
   watchedSeasons?: number[] | null;
   totalSeasons?: number | null;
 }) {
+  // "WATCHING" is strictly reserved for TV series; never allow it on movies.
+  const effectiveStatus =
+    params.status === "WATCHING" && params.mediaType !== "tv" ? "WATCHED" : params.status;
+  const normalizedParams = { ...params, status: effectiveStatus };
+
   if (await isPostgresAvailable()) {
     await ensureMediaStatusColumns();
-    if (params.status === "NONE") {
+    if (normalizedParams.status === "NONE") {
       await prisma.mediaStatus.deleteMany({
         where: {
-          userId: params.userId,
-          tmdbId: params.tmdbId,
-          mediaType: params.mediaType,
+          userId: normalizedParams.userId,
+          tmdbId: normalizedParams.tmdbId,
+          mediaType: normalizedParams.mediaType,
         },
       });
       return null;
@@ -1823,42 +1830,42 @@ export async function toggleMediaStatus(params: {
 
     try {
       const upsertData: any = {
-        userId: params.userId,
-        tmdbId: params.tmdbId,
-        mediaType: params.mediaType,
-        title: params.title,
-        posterPath: params.posterPath,
-        releaseYear: params.releaseYear,
-        status: params.status,
-        rating: params.rating ?? null,
+        userId: normalizedParams.userId,
+        tmdbId: normalizedParams.tmdbId,
+        mediaType: normalizedParams.mediaType,
+        title: normalizedParams.title,
+        posterPath: normalizedParams.posterPath,
+        releaseYear: normalizedParams.releaseYear,
+        status: normalizedParams.status,
+        rating: normalizedParams.rating ?? null,
       };
-      if (params.watchedSeasons !== undefined) {
-        upsertData.watchedSeasons = params.watchedSeasons ? JSON.stringify(params.watchedSeasons) : null;
+      if (normalizedParams.watchedSeasons !== undefined) {
+        upsertData.watchedSeasons = normalizedParams.watchedSeasons ? JSON.stringify(normalizedParams.watchedSeasons) : null;
       }
-      if (params.totalSeasons !== undefined) {
-        upsertData.totalSeasons = params.totalSeasons;
+      if (normalizedParams.totalSeasons !== undefined) {
+        upsertData.totalSeasons = normalizedParams.totalSeasons;
       }
 
       const updateData: any = {
-        status: params.status,
-        rating: params.rating !== undefined ? params.rating : undefined,
-        title: params.title,
-        posterPath: params.posterPath,
-        releaseYear: params.releaseYear,
+        status: normalizedParams.status,
+        rating: normalizedParams.rating !== undefined ? normalizedParams.rating : undefined,
+        title: normalizedParams.title,
+        posterPath: normalizedParams.posterPath,
+        releaseYear: normalizedParams.releaseYear,
       };
-      if (params.watchedSeasons !== undefined) {
-        updateData.watchedSeasons = params.watchedSeasons ? JSON.stringify(params.watchedSeasons) : null;
+      if (normalizedParams.watchedSeasons !== undefined) {
+        updateData.watchedSeasons = normalizedParams.watchedSeasons ? JSON.stringify(normalizedParams.watchedSeasons) : null;
       }
-      if (params.totalSeasons !== undefined) {
-        updateData.totalSeasons = params.totalSeasons;
+      if (normalizedParams.totalSeasons !== undefined) {
+        updateData.totalSeasons = normalizedParams.totalSeasons;
       }
 
       const upserted = await prisma.mediaStatus.upsert({
         where: {
           userId_tmdbId_mediaType: {
-            userId: params.userId,
-            tmdbId: params.tmdbId,
-            mediaType: params.mediaType,
+            userId: normalizedParams.userId,
+            tmdbId: normalizedParams.tmdbId,
+            mediaType: normalizedParams.mediaType,
           },
         },
         update: updateData,
@@ -1870,27 +1877,27 @@ export async function toggleMediaStatus(params: {
       const fallbackUpserted = await prisma.mediaStatus.upsert({
         where: {
           userId_tmdbId_mediaType: {
-            userId: params.userId,
-            tmdbId: params.tmdbId,
-            mediaType: params.mediaType,
+            userId: normalizedParams.userId,
+            tmdbId: normalizedParams.tmdbId,
+            mediaType: normalizedParams.mediaType,
           },
         },
         update: {
-          status: params.status,
-          rating: params.rating !== undefined ? params.rating : undefined,
-          title: params.title,
-          posterPath: params.posterPath,
-          releaseYear: params.releaseYear,
+          status: normalizedParams.status,
+          rating: normalizedParams.rating !== undefined ? normalizedParams.rating : undefined,
+          title: normalizedParams.title,
+          posterPath: normalizedParams.posterPath,
+          releaseYear: normalizedParams.releaseYear,
         },
         create: {
-          userId: params.userId,
-          tmdbId: params.tmdbId,
-          mediaType: params.mediaType,
-          title: params.title,
-          posterPath: params.posterPath,
-          releaseYear: params.releaseYear,
-          status: params.status,
-          rating: params.rating ?? null,
+          userId: normalizedParams.userId,
+          tmdbId: normalizedParams.tmdbId,
+          mediaType: normalizedParams.mediaType,
+          title: normalizedParams.title,
+          posterPath: normalizedParams.posterPath,
+          releaseYear: normalizedParams.releaseYear,
+          status: normalizedParams.status,
+          rating: normalizedParams.rating ?? null,
         },
       });
       return fallbackUpserted;
@@ -1899,10 +1906,10 @@ export async function toggleMediaStatus(params: {
 
   const db = readLocalDb();
   const idx = db.mediaStatuses.findIndex(
-    (m) => m.userId === params.userId && m.tmdbId === params.tmdbId && m.mediaType === params.mediaType
+    (m) => m.userId === normalizedParams.userId && m.tmdbId === normalizedParams.tmdbId && m.mediaType === normalizedParams.mediaType
   );
 
-  if (params.status === "NONE") {
+  if (normalizedParams.status === "NONE") {
     if (idx !== -1) {
       db.mediaStatuses.splice(idx, 1);
       writeLocalDb(db);
@@ -1912,26 +1919,26 @@ export async function toggleMediaStatus(params: {
 
   const now = new Date().toISOString();
   if (idx !== -1) {
-    db.mediaStatuses[idx].status = params.status;
-    if (params.rating !== undefined) db.mediaStatuses[idx].rating = params.rating;
-    if (params.watchedSeasons !== undefined) db.mediaStatuses[idx].watchedSeasons = params.watchedSeasons;
-    if (params.totalSeasons !== undefined) db.mediaStatuses[idx].totalSeasons = params.totalSeasons;
+    db.mediaStatuses[idx].status = normalizedParams.status;
+    if (normalizedParams.rating !== undefined) db.mediaStatuses[idx].rating = normalizedParams.rating;
+    if (normalizedParams.watchedSeasons !== undefined) db.mediaStatuses[idx].watchedSeasons = normalizedParams.watchedSeasons;
+    if (normalizedParams.totalSeasons !== undefined) db.mediaStatuses[idx].totalSeasons = normalizedParams.totalSeasons;
     db.mediaStatuses[idx].updatedAt = now;
   } else {
     db.mediaStatuses.unshift({
       id: `ms_${Date.now()}`,
-      userId: params.userId,
-      userName: params.userName,
-      userImage: params.userImage,
-      tmdbId: params.tmdbId,
-      mediaType: params.mediaType,
-      title: params.title,
-      posterPath: params.posterPath,
-      releaseYear: params.releaseYear,
-      status: params.status,
-      rating: params.rating ?? null,
-      watchedSeasons: params.watchedSeasons ?? null,
-      totalSeasons: params.totalSeasons ?? null,
+      userId: normalizedParams.userId,
+      userName: normalizedParams.userName,
+      userImage: normalizedParams.userImage,
+      tmdbId: normalizedParams.tmdbId,
+      mediaType: normalizedParams.mediaType,
+      title: normalizedParams.title,
+      posterPath: normalizedParams.posterPath,
+      releaseYear: normalizedParams.releaseYear,
+      status: normalizedParams.status,
+      rating: normalizedParams.rating ?? null,
+      watchedSeasons: normalizedParams.watchedSeasons ?? null,
+      totalSeasons: normalizedParams.totalSeasons ?? null,
       updatedAt: now,
     });
   }
