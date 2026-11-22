@@ -13,7 +13,8 @@ import {
   formatGermanReleaseDate,
 } from "@/lib/tmdb";
 import { useMedia } from "./MediaContext";
-import { formatWatchedSeasons } from "@/lib/seasons";
+import { formatWatchedSeasons, resolveSelectedSeasons } from "@/lib/seasons";
+import { TvStatusToggle, TvSeasonSelector } from "./TvSeasonControls";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
 import {
@@ -40,7 +41,6 @@ import {
   User,
   Pencil,
   Trash2,
-  SlidersHorizontal,
 } from "lucide-react";
 import { RecommendationThread } from "./RecommendationThread";
 
@@ -131,6 +131,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   // Status rating dialog
   const [userRatingInput, setUserRatingInput] = useState<number>(8);
   const [showRatingSelector, setShowRatingSelector] = useState(false);
+  const [ratingDrawerMode, setRatingDrawerMode] = useState<"WATCHED" | "WATCHING">("WATCHED");
 
   // Thread dialogs in Modal
   const [openModalThreadIds, setOpenModalThreadIds] = useState<Set<string>>(new Set());
@@ -193,6 +194,17 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     (m) => !isMe(m.userId, m.userName, (m as any).userEmail)
   );
 
+  // Currently Watching (TV Series only)
+  const allWatching = isTv
+    ? communityData.mediaStatuses.filter(
+        (m) => m.tmdbId === media.id && m.mediaType === "tv" && m.status === "WATCHING"
+      )
+    : [];
+  const myWatching = allWatching.find((m) => isMe(m.userId, m.userName, (m as any).userEmail));
+  const otherFriendsWatching = allWatching.filter(
+    (m) => !isMe(m.userId, m.userName, (m as any).userEmail)
+  );
+
   // Watchlist: Other Friends
   const otherFriendsWatchlist = communityData.mediaStatuses.filter(
     (m) =>
@@ -252,15 +264,21 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   useEffect(() => {
     if (isTv) {
       if (hasUserEditedSeasonsRef.current) return;
-      if (myStatusObj?.watchedSeasons && myStatusObj.watchedSeasons.length > 0) {
-        setSelectedTvSeasons(myStatusObj.watchedSeasons);
-      } else {
-        setSelectedTvSeasons(Array.from({ length: totalTvSeasons }, (_, i) => i + 1));
-      }
+      setSelectedTvSeasons(
+        resolveSelectedSeasons(myStatusObj?.watchedSeasons, totalTvSeasons, "WATCHED")
+      );
     }
   }, [isTv, myStatusObj?.watchedSeasons, totalTvSeasons]);
 
-  const handleStatusChange = async (status: "WATCHED" | "WATCHLIST" | "NONE", rating?: number) => {
+  const handleSeasonEditorChange = (updater: number[] | ((prev: number[]) => number[])) => {
+    hasUserEditedSeasonsRef.current = true;
+    setSelectedTvSeasons(updater);
+  };
+
+  const handleStatusChange = async (
+    status: "WATCHED" | "WATCHLIST" | "WATCHING" | "NONE",
+    rating?: number
+  ) => {
     if (!session) {
       showToast("Bitte logge dich ein, um Filme auf deiner Liste zu speichern!", {
         type: "info",
@@ -269,11 +287,11 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
       });
       return;
     }
+    const safeStatus = status === "WATCHING" && !isTv ? "WATCHED" : status;
+    const isSeasonStatus = safeStatus === "WATCHED" || safeStatus === "WATCHING";
     const finalSeasons =
-      isTv && status === "WATCHED"
-        ? selectedTvSeasons.length === 0
-          ? Array.from({ length: totalTvSeasons }, (_, i) => i + 1)
-          : selectedTvSeasons
+      isTv && isSeasonStatus
+        ? resolveSelectedSeasons(selectedTvSeasons, totalTvSeasons, safeStatus)
         : undefined;
 
     setIsSavingStatus(true);
@@ -284,18 +302,20 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
         title: details?.title || media.title || "Titel",
         posterPath: details?.posterPath || media.posterPath || null,
         releaseYear: details?.releaseYear || null,
-        status,
-        rating: rating ?? (status === "WATCHED" ? userRatingInput : undefined),
+        status: safeStatus,
+        rating: rating ?? (isSeasonStatus ? userRatingInput : undefined),
         watchedSeasons: finalSeasons,
-        totalSeasons: isTv && status === "WATCHED" ? totalTvSeasons : undefined,
+        totalSeasons: isTv && isSeasonStatus ? totalTvSeasons : undefined,
       });
       hasUserEditedSeasonsRef.current = false;
       setShowRatingSelector(false);
       showToast(
-        status === "NONE"
+        safeStatus === "NONE"
           ? "Von deiner Liste entfernt"
           : isTv && finalSeasons
-          ? `Gespeichert (${formatWatchedSeasons(finalSeasons, totalTvSeasons)})`
+          ? safeStatus === "WATCHING"
+            ? `Aktuell am Schauen gespeichert (${formatWatchedSeasons(finalSeasons, totalTvSeasons)})`
+            : `Gespeichert (${formatWatchedSeasons(finalSeasons, totalTvSeasons)})`
           : "Status erfolgreich gespeichert!",
         { type: "success" }
       );
@@ -483,6 +503,67 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
   const myVpnMatches = rawVpnProviders.filter((prov) =>
     userSubscriptions.includes(prov.normalizedKey)
+  );
+
+  const renderStatusUserList = ({
+    myItem,
+    otherItems,
+    myLabel,
+    myRowClass,
+    myBadgeClass,
+    otherLinkHoverClass,
+    otherBadgeClass,
+  }: {
+    myItem: typeof myWatched;
+    otherItems: typeof otherFriendsWatched;
+    myLabel: string;
+    myRowClass: string;
+    myBadgeClass: string;
+    otherLinkHoverClass: string;
+    otherBadgeClass: string;
+  }) => (
+    <div className="space-y-2">
+      {[
+        ...(myItem ? [{ entry: myItem, isSelf: true }] : []),
+        ...otherItems.map((entry) => ({ entry, isSelf: false })),
+      ].map(({ entry, isSelf }) => (
+        <div
+          key={isSelf ? `self-${entry.id}` : entry.id}
+          className={`flex items-center justify-between text-sm py-1.5 border-b gap-2 ${
+            isSelf ? `${myRowClass} font-semibold` : "border-slate-800/40 last:border-0"
+          }`}
+        >
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            {isSelf ? (
+              <span className="truncate">{myLabel}</span>
+            ) : (
+              <Link
+                href={`/friends/${encodeURIComponent(entry.userId || entry.userName)}`}
+                onClick={onClose}
+                className={`text-slate-200 ${otherLinkHoverClass} font-medium transition-colors truncate`}
+                title={`Profil von ${entry.userName} aufrufen`}
+              >
+                {entry.userName}
+              </Link>
+            )}
+            {isTv && (
+              <span
+                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border shrink-0 ${
+                  isSelf ? myBadgeClass : otherBadgeClass
+                }`}
+              >
+                {formatWatchedSeasons(entry.watchedSeasons, entry.totalSeasons || totalTvSeasons)}
+              </span>
+            )}
+          </div>
+          {entry.rating && (
+            <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
+              {entry.rating}/10 ★
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
   );
 
   return (
@@ -754,11 +835,19 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               </div>
             </div>
 
-            {/* Quick Action Bar (Watched, Watchlist, Recommend) */}
+            {/* Quick Action Bar (Watched, Watching [TV only], Watchlist, Recommend) */}
             <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-3 my-5 p-3 rounded-2xl bg-slate-900/60 border border-slate-800">
               <button
                 type="button"
-                onClick={() => setShowRatingSelector(!showRatingSelector)}
+                onClick={() => {
+                  if (showRatingSelector && ratingDrawerMode === "WATCHED") {
+                    setShowRatingSelector(false);
+                  } else {
+                    setRatingDrawerMode("WATCHED");
+                    if (myStatusObj?.rating) setUserRatingInput(myStatusObj.rating);
+                    setShowRatingSelector(true);
+                  }
+                }}
                 className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
                   myStatusObj?.status === "WATCHED"
                     ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
@@ -767,7 +856,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
               >
                 <Check className="w-4 h-4 stroke-[2.5] flex-shrink-0" />
                 <span className="truncate">
-                  {myStatusObj?.status === "WATCHED" || (showRatingSelector && isTv)
+                  {myStatusObj?.status === "WATCHED" || (showRatingSelector && ratingDrawerMode === "WATCHED" && isTv)
                     ? isTv
                       ? `Gesehen (${formatWatchedSeasons(
                           showRatingSelector ? selectedTvSeasons : myStatusObj?.watchedSeasons,
@@ -777,6 +866,40 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     : "Als gesehen markieren"}
                 </span>
               </button>
+
+              {isTv && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (showRatingSelector && ratingDrawerMode === "WATCHING") {
+                      setShowRatingSelector(false);
+                    } else {
+                      setRatingDrawerMode("WATCHING");
+                      setShowTvSeasonEditor(true);
+                      if (myStatusObj?.rating) setUserRatingInput(myStatusObj.rating);
+                      if (!myStatusObj?.watchedSeasons && !hasUserEditedSeasonsRef.current && totalTvSeasons > 1) {
+                        setSelectedTvSeasons([1]);
+                      }
+                      setShowRatingSelector(true);
+                    }
+                  }}
+                  className={`flex items-center justify-center gap-2 px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ${
+                    myStatusObj?.status === "WATCHING"
+                      ? "bg-cyan-400 text-black shadow-lg shadow-cyan-500/25 ring-2 ring-cyan-300/50"
+                      : "bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-cyan-500/25"
+                  }`}
+                >
+                  <Tv className="w-4 h-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {myStatusObj?.status === "WATCHING"
+                      ? `Schaue ich (${formatWatchedSeasons(
+                          myStatusObj.watchedSeasons,
+                          totalTvSeasons
+                        )}${myStatusObj.rating ? ` • ${myStatusObj.rating}★` : ""})`
+                      : "Schaue ich"}
+                  </span>
+                </button>
+              )}
 
               <button
                 type="button"
@@ -824,10 +947,35 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
             {/* Quick Rating & Seasons Selector Drawer */}
             {showRatingSelector && (
-              <div className="p-4 mb-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 animate-in fade-in space-y-3">
+              <div
+                className={`p-4 mb-5 rounded-2xl border animate-in fade-in space-y-3 ${
+                  isTv && ratingDrawerMode === "WATCHING"
+                    ? "bg-cyan-950/30 border-cyan-500/35"
+                    : "bg-emerald-950/30 border-emerald-500/30"
+                }`}
+              >
+                {isTv && (
+                  <TvStatusToggle
+                    status={ratingDrawerMode}
+                    onSelectWatched={() => setRatingDrawerMode("WATCHED")}
+                    onSelectWatching={() => {
+                      setRatingDrawerMode("WATCHING");
+                      setShowTvSeasonEditor(true);
+                    }}
+                    className="rounded-xl bg-slate-900/90 border border-slate-800 max-w-sm"
+                    buttonPaddingClass="py-1.5 px-3 rounded-lg"
+                  />
+                )}
+
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                  <span className="text-sm font-semibold text-emerald-300">
-                    Wie fandest du {mediaNoun}? ({userRatingInput}/10)
+                  <span
+                    className={`text-sm font-semibold ${
+                      isTv && ratingDrawerMode === "WATCHING" ? "text-cyan-300" : "text-emerald-300"
+                    }`}
+                  >
+                    {isTv && ratingDrawerMode === "WATCHING"
+                      ? `Bisherige Bewertung bis zum aktuellen Stand (${userRatingInput}/10):`
+                      : `Wie fandest du ${mediaNoun}? (${userRatingInput}/10)`}
                   </span>
                   <div className="grid grid-cols-5 sm:flex sm:items-center gap-1.5 sm:gap-1">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
@@ -849,107 +997,38 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
                 {/* TV Series Seasons Selector (Default: All) */}
                 {isTv && (
-                  <div className="p-3 rounded-xl bg-slate-900/90 border border-emerald-500/20 text-left">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 text-xs font-bold">
-                        <Tv className="w-3.5 h-3.5 text-cyan-400" />
-                        {selectedTvSeasons.length === totalTvSeasons ? (
-                          <span className="text-emerald-400 font-semibold">
-                            Alle {totalTvSeasons} {totalTvSeasons === 1 ? "Staffel" : "Staffeln"} gesehen ✓
-                          </span>
-                        ) : (
-                          <span className="text-amber-400 font-semibold">
-                            {formatWatchedSeasons(selectedTvSeasons, totalTvSeasons)} gesehen
-                          </span>
-                        )}
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => setShowTvSeasonEditor(!showTvSeasonEditor)}
-                        className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700/80 transition flex items-center gap-1"
-                      >
-                        <SlidersHorizontal className="w-3 h-3" />
-                        <span>{showTvSeasonEditor ? "Fertig" : "Edit Staffeln"}</span>
-                      </button>
-                    </div>
-
-                    {showTvSeasonEditor && (
-                      <div className="mt-2.5 pt-2 border-t border-slate-800 space-y-2 animate-fadeIn">
-                        <div className="flex items-center justify-between text-[11px] text-slate-400">
-                          <span>Wähle deine gesehenen Staffeln:</span>
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                hasUserEditedSeasonsRef.current = true;
-                                setSelectedTvSeasons(
-                                  Array.from({ length: totalTvSeasons }, (_, i) => i + 1)
-                                );
-                              }}
-                              className="text-amber-400 hover:underline font-semibold"
-                            >
-                              Alle
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                hasUserEditedSeasonsRef.current = true;
-                                setSelectedTvSeasons([1]);
-                              }}
-                              className="text-slate-400 hover:underline"
-                            >
-                              Nur S1
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5 max-h-36 overflow-y-auto pt-1">
-                          {Array.from({ length: totalTvSeasons }, (_, i) => i + 1).map((sNum) => {
-                            const isSelected = selectedTvSeasons.includes(sNum);
-                            return (
-                              <button
-                                key={sNum}
-                                type="button"
-                                onClick={() => {
-                                  hasUserEditedSeasonsRef.current = true;
-                                  setSelectedTvSeasons((prev) =>
-                                    prev.includes(sNum)
-                                      ? prev.filter((s) => s !== sNum)
-                                      : [...prev, sNum].sort((a, b) => a - b)
-                                  );
-                                }}
-                                className={`py-1.5 px-2 rounded-xl text-xs font-black transition flex items-center justify-center gap-1 ${
-                                  isSelected
-                                    ? "bg-amber-500 text-black shadow-sm"
-                                    : "bg-slate-800 text-slate-400 hover:text-white border border-slate-700/50"
-                                }`}
-                              >
-                                {isSelected && <Check className="w-3 h-3 stroke-[3]" />}
-                                <span>S{sNum}</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <TvSeasonSelector
+                    status={ratingDrawerMode}
+                    totalSeasons={totalTvSeasons}
+                    selectedSeasons={selectedTvSeasons}
+                    showEditor={showTvSeasonEditor}
+                    onToggleEditor={() => setShowTvSeasonEditor((prev) => !prev)}
+                    onChangeSeasons={handleSeasonEditorChange}
+                    containerClassName="rounded-xl bg-slate-900/90 border border-emerald-500/20"
+                    gridColsClass="grid-cols-4 sm:grid-cols-6"
+                  />
                 )}
 
                 <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
-                  {myStatusObj?.status === "WATCHED" ? (
+                  {myStatusObj?.status === "WATCHED" || myStatusObj?.status === "WATCHING" ? (
                     <button
                       type="button"
                       onClick={() => handleStatusChange("NONE")}
                       className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-950/30 px-3 py-1.5 rounded-lg transition flex items-center gap-1"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>Von &apos;Gesehen&apos; entfernen</span>
+                      <span>
+                        {myStatusObj.status === "WATCHING"
+                          ? "Von 'Schaue ich gerade' entfernen"
+                          : "Von 'Gesehen' entfernen"}
+                      </span>
                     </button>
                   ) : (
                     <button
                       type="button"
-                      onClick={() => handleStatusChange("WATCHED", undefined)}
+                      onClick={() =>
+                        handleStatusChange(isTv ? ratingDrawerMode : "WATCHED", undefined)
+                      }
                       className="text-xs text-slate-400 hover:text-white transition"
                     >
                       Ohne Note speichern
@@ -967,8 +1046,14 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                     <button
                       type="button"
                       disabled={isSavingStatus}
-                      onClick={() => handleStatusChange("WATCHED", userRatingInput)}
-                      className="px-4 py-1.5 rounded-lg bg-emerald-500 text-black text-xs font-bold hover:bg-emerald-400 disabled:opacity-50 transition shadow-sm flex items-center gap-1.5"
+                      onClick={() =>
+                        handleStatusChange(isTv ? ratingDrawerMode : "WATCHED", userRatingInput)
+                      }
+                      className={`px-4 py-1.5 rounded-lg text-black text-xs font-bold disabled:opacity-50 transition shadow-sm flex items-center gap-1.5 ${
+                        isTv && ratingDrawerMode === "WATCHING"
+                          ? "bg-cyan-400 hover:bg-cyan-300"
+                          : "bg-emerald-500 hover:bg-emerald-400"
+                      }`}
                     >
                       {isSavingStatus ? <span>Speichern...</span> : <span>Speichern</span>}
                     </button>
@@ -1707,6 +1792,24 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
             {/* TAB 3: Friends & Recommendations */}
             {activeTab === "friends" && (
               <div className="space-y-6 pb-8">
+                {/* Friends currently watching (TV Series only) */}
+                {isTv && allWatching.length > 0 && (
+                  <div className="p-4 rounded-2xl bg-cyan-950/25 border border-cyan-500/30">
+                    <h5 className="text-xs font-bold uppercase tracking-wider text-cyan-300 mb-2.5 flex items-center gap-1.5">
+                      <Tv className="w-3.5 h-3.5" /> Schaut gerade ({allWatching.length})
+                    </h5>
+                    {renderStatusUserList({
+                      myItem: myWatching,
+                      otherItems: otherFriendsWatching,
+                      myLabel: "Du (Schaust gerade)",
+                      myRowClass: "border-cyan-500/20 text-cyan-200",
+                      myBadgeClass: "bg-cyan-500/20 text-cyan-300 border-cyan-500/30",
+                      otherLinkHoverClass: "hover:text-cyan-300",
+                      otherBadgeClass: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+                    })}
+                  </div>
+                )}
+
                 {/* Friends who watched / watchlist */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="p-4 rounded-2xl bg-slate-900/50 border border-slate-800">
@@ -1714,58 +1817,15 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                       <Check className="w-3.5 h-3.5" /> Bereits gesehen ({allWatched.length})
                     </h5>
                     {allWatched.length > 0 ? (
-                      <div className="space-y-2">
-                        {myWatched && (
-                          <div className="flex items-center justify-between text-sm py-1.5 border-b border-emerald-500/20 text-emerald-300 font-semibold gap-2">
-                            <div className="flex items-center gap-2 flex-wrap min-w-0">
-                              <span className="truncate">Du (Selbst gesehen)</span>
-                              {isTv && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
-                                  {formatWatchedSeasons(
-                                    myWatched.watchedSeasons,
-                                    myWatched.totalSeasons || totalTvSeasons
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                            {myWatched.rating && (
-                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
-                                {myWatched.rating}/10 ★
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {otherFriendsWatched.map((fw) => (
-                          <div
-                            key={fw.id}
-                            className="flex items-center justify-between text-sm py-1.5 border-b border-slate-800/40 last:border-0 gap-2"
-                          >
-                            <div className="flex items-center gap-2 flex-wrap min-w-0">
-                              <Link
-                                href={`/friends/${encodeURIComponent(fw.userId || fw.userName)}`}
-                                onClick={onClose}
-                                className="text-slate-200 hover:text-amber-400 font-medium transition-colors truncate"
-                                title={`Profil von ${fw.userName} aufrufen`}
-                              >
-                                {fw.userName}
-                              </Link>
-                              {isTv && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700/80 shrink-0">
-                                  {formatWatchedSeasons(
-                                    fw.watchedSeasons,
-                                    fw.totalSeasons || totalTvSeasons
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                            {fw.rating && (
-                              <span className="text-amber-400 font-bold text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 shrink-0">
-                                {fw.rating}/10 ★
-                              </span>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                      renderStatusUserList({
+                        myItem: myWatched,
+                        otherItems: otherFriendsWatched,
+                        myLabel: "Du (Selbst gesehen)",
+                        myRowClass: "border-emerald-500/20 text-emerald-300",
+                        myBadgeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
+                        otherLinkHoverClass: "hover:text-amber-400",
+                        otherBadgeClass: "bg-slate-800 text-slate-300 border-slate-700/80",
+                      })
                     ) : (
                       <p className="text-xs text-slate-500">
                         Noch kein Freund hat {mediaNoun} als gesehen markiert.

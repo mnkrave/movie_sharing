@@ -33,6 +33,20 @@ import {
   deleteCustomCollectionComment,
 } from "@/lib/store";
 
+function sanitizeWatchedSeasons(raw: unknown): number[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return Array.from(
+    new Set(
+      raw
+        .slice(0, 200)
+        .map((s) => Number(s))
+        .filter((s) => Number.isInteger(s) && s > 0 && s <= 100)
+    )
+  )
+    .sort((a, b) => a - b)
+    .slice(0, 60);
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions);
   let userId: string | undefined = undefined;
@@ -137,30 +151,62 @@ export async function POST(req: Request) {
       }
       actionMessage = "Freundschaft beendet.";
     } else if (action === "status") {
+      const requestedStatus = body.status;
+      if (!["WATCHED", "WATCHLIST", "WATCHING", "NONE"].includes(requestedStatus)) {
+        return NextResponse.json({ error: "Ungültiger Status." }, { status: 400 });
+      }
+      const mediaType = body.mediaType === "tv" ? "tv" : "movie";
+      if (requestedStatus === "WATCHING" && mediaType !== "tv") {
+        return NextResponse.json(
+          { error: "Der Status 'Aktuell am Schauen' ist nur für Serien verfügbar." },
+          { status: 400 }
+        );
+      }
+      const tmdbId = Number(body.tmdbId);
+      if (!Number.isInteger(tmdbId) || tmdbId <= 0) {
+        return NextResponse.json({ error: "Ungültige TMDB-ID." }, { status: 400 });
+      }
+      const parsedRating =
+        body.rating !== undefined && body.rating !== null && body.rating !== ""
+          ? Number(body.rating)
+          : NaN;
+      const rating = Number.isFinite(parsedRating)
+        ? Math.min(10, Math.max(1, Math.round(parsedRating)))
+        : undefined;
+
+      let watchedSeasons: number[] | null | undefined = undefined;
+      let totalSeasons: number | null | undefined = undefined;
+      if (mediaType === "tv") {
+        watchedSeasons = Array.isArray(body.watchedSeasons)
+          ? sanitizeWatchedSeasons(body.watchedSeasons)
+          : body.watchedSeasons === null
+          ? null
+          : undefined;
+
+        if (body.totalSeasons === null) {
+          totalSeasons = null;
+        } else if (body.totalSeasons !== undefined && body.totalSeasons !== "") {
+          const parsedTotal = Number(body.totalSeasons);
+          if (!Number.isInteger(parsedTotal) || parsedTotal < 1 || parsedTotal > 100) {
+            return NextResponse.json({ error: "Ungültige Staffelanzahl." }, { status: 400 });
+          }
+          totalSeasons = parsedTotal;
+        }
+      }
+
       await toggleMediaStatus({
         userId,
         userName,
         userImage,
-        tmdbId: Number(body.tmdbId),
-        mediaType: body.mediaType,
-        title: body.title,
-        posterPath: body.posterPath || null,
-        releaseYear: body.releaseYear || null,
-        status: body.status, // "WATCHED" | "WATCHLIST" | "NONE"
-        rating: body.rating ? Number(body.rating) : undefined,
-        watchedSeasons: Array.isArray(body.watchedSeasons)
-          ? body.watchedSeasons
-          : body.watchedSeasons === null
-          ? null
-          : undefined,
-        totalSeasons:
-          typeof body.totalSeasons === "number"
-            ? body.totalSeasons
-            : body.totalSeasons
-            ? Number(body.totalSeasons)
-            : body.totalSeasons === null
-            ? null
-            : undefined,
+        tmdbId,
+        mediaType,
+        title: String(body.title || "").slice(0, 300),
+        posterPath: body.posterPath ? String(body.posterPath).slice(0, 250) : null,
+        releaseYear: body.releaseYear ? String(body.releaseYear).slice(0, 10) : null,
+        status: requestedStatus,
+        rating,
+        watchedSeasons,
+        totalSeasons,
       });
     } else if (action === "bulk_import_statuses") {
       const rawItems = Array.isArray(body.items) ? body.items.slice(0, 300) : [];
@@ -176,12 +222,8 @@ export async function POST(req: Request) {
           ratingNum && !isNaN(ratingNum)
             ? Math.min(10, Math.max(1, Math.round(ratingNum)))
             : undefined;
-        const watchedSeasons = Array.isArray(raw.watchedSeasons)
-          ? raw.watchedSeasons
-              .map((s: any) => Number(s))
-              .filter((s: number) => Number.isInteger(s) && s > 0 && s <= 100)
-              .slice(0, 60)
-          : undefined;
+        const watchedSeasons =
+          mediaType === "tv" ? sanitizeWatchedSeasons(raw.watchedSeasons) : undefined;
 
         await toggleMediaStatus({
           userId,

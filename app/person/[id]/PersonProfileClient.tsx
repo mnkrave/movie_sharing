@@ -206,7 +206,7 @@ export function PersonProfileClient({
 
   // Map user statuses to media for fast lookup
   const myStatusMap = useMemo(() => {
-    const map = new Map<string, { status: "WATCHED" | "WATCHLIST"; rating?: number | null }>();
+    const map = new Map<string, { status: "WATCHED" | "WATCHLIST" | "WATCHING"; rating?: number | null }>();
     for (const m of communityData.mediaStatuses) {
       if (isMe(m.userId, m.userName, (m as any).userEmail)) {
         map.set(`${m.mediaType}-${m.tmdbId}`, {

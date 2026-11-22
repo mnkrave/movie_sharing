@@ -61,7 +61,7 @@ export default function OscarsPage() {
 
   // Map of current user's media statuses for movies
   const userStatusMap = useMemo(() => {
-    const map = new Map<number, { status: "WATCHED" | "WATCHLIST"; rating?: number | null }>();
+    const map = new Map<number, { status: "WATCHED" | "WATCHLIST" | "WATCHING"; rating?: number | null }>();
     if (!communityData?.mediaStatuses) return map;
     for (const m of communityData.mediaStatuses) {
       if (

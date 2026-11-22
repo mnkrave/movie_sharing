@@ -1,3 +1,18 @@
+export function resolveSelectedSeasons(
+  selectedSeasons: number[] | null | undefined,
+  totalSeasons: number,
+  status: "WATCHED" | "WATCHING" | string
+): number[] {
+  if (selectedSeasons && selectedSeasons.length > 0) {
+    return selectedSeasons;
+  }
+  if (status === "WATCHING") {
+    return [1];
+  }
+  const count = Math.max(1, totalSeasons || 1);
+  return Array.from({ length: count }, (_, i) => i + 1);
+}
+
 export function formatWatchedSeasons(
   watchedSeasons?: number[] | null,
   totalSeasons?: number | null

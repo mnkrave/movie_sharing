@@ -56,7 +56,7 @@ model MediaStatus {
   title       String
   posterPath  String?
   releaseYear String?
-  status         String   // "WATCHED" | "WATCHLIST"
+  status         String   // "WATCHED" | "WATCHLIST" | "WATCHING" (TV series only)
   rating         Int?     // 1-10 personal rating
   watchedSeasons String?  // JSON string: "[1, 2]"
   totalSeasons   Int?
