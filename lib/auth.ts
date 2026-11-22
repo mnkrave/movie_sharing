@@ -1,4 +1,4 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, getServerSession } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GoogleProvider from "next-auth/providers/google";
 import bcrypt from "bcryptjs";
@@ -109,3 +109,42 @@ export const authOptions: NextAuthOptions = {
   },
   secret: process.env.NEXTAUTH_SECRET,
 };
+
+/**
+ * Verifies the server session and resolves the authenticated user from the database.
+ */
+export async function requireUserSession() {
+  const session = await getServerSession(authOptions);
+  const email = session?.user?.email?.toLowerCase().trim();
+  if (!email) return null;
+
+  const dbUser = await findUserByEmail(email);
+  const userId = dbUser?.id || (session?.user as any)?.id || "";
+  if (!userId) return null;
+
+  return {
+    session,
+    email,
+    dbUser,
+    userId,
+    userName: dbUser?.name || session?.user?.name || "Lukas",
+  };
+}
+
+/**
+ * Verifies the server session and confirms admin privileges against the database user.
+ */
+export async function requireAdminSession() {
+  const auth = await requireUserSession();
+  if (!auth) return null;
+
+  const isAdmin = auth.email === "lukasreinle0@gmail.com" || auth.dbUser?.role === "ADMIN";
+  if (!isAdmin) return null;
+
+  return {
+    session: auth.session,
+    email: auth.email,
+    userId: auth.userId,
+    userName: auth.userName,
+  };
+}

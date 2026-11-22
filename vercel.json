@@ -1,0 +1,19 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "app/api/schedules/watchlist-alerts/route.ts": {
+      "experimentalTriggers": [
+        {
+          "type": "schedule/v1beta"
+        }
+      ]
+    }
+  },
+  "schedules": {
+    "watchlist-alerts": {
+      "schedule": "0 8 * * *",
+      "timezone": "Europe/Berlin",
+      "function": "api/schedules/watchlist-alerts"
+    }
+  }
+}

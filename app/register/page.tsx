@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Film, Lock, Mail, User, AlertCircle, CheckCircle } from "lucide-react";
+import { GoogleSignInButton } from "@/components/GoogleSignInButton";
 
 function RegisterForm() {
   const router = useRouter();
@@ -86,6 +87,16 @@ function RegisterForm() {
           <span>Account erfolgreich erstellt! Du wirst eingeloggt...</span>
         </div>
       )}
+
+      <GoogleSignInButton label="Direkt mit Google anmelden" />
+
+      <div className="flex items-center gap-3">
+        <div className="h-px bg-slate-800 flex-1" />
+        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-mono">
+          Oder mit Passwort
+        </span>
+        <div className="h-px bg-slate-800 flex-1" />
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>

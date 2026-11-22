@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
-import { Check, Tv, X, Filter } from "lucide-react";
+import { Bell, Check, Tv, X, Filter } from "lucide-react";
 import { useMedia } from "./MediaContext";
+import { useSession } from "next-auth/react";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -19,11 +20,50 @@ export function SubscriptionModal({
   onSave,
 }: SubscriptionModalProps) {
   const [current, setCurrent] = useState<string[]>(selectedSubscriptions);
-  const { onlyMySubs, toggleOnlyMySubs } = useMedia();
+  const { onlyMySubs, toggleOnlyMySubs, showToast } = useMedia();
+  const { data: session } = useSession();
+  const [watchlistAlerts, setWatchlistAlerts] = useState<boolean>(true);
+  const [savingAlerts, setSavingAlerts] = useState(false);
 
   useEffect(() => {
     setCurrent(selectedSubscriptions);
   }, [selectedSubscriptions, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !session?.user) return;
+    fetch("/api/user/notifications")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (typeof d?.watchlistAlertsEnabled === "boolean") {
+          setWatchlistAlerts(d.watchlistAlertsEnabled);
+        }
+      })
+      .catch(() => {});
+  }, [isOpen, session]);
+
+  const toggleWatchlistAlerts = async () => {
+    if (!session?.user || savingAlerts) return;
+    const next = !watchlistAlerts;
+    setWatchlistAlerts(next);
+    setSavingAlerts(true);
+    try {
+      const res = await fetch("/api/user/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ watchlistAlertsEnabled: next }),
+      });
+      if (!res.ok) throw new Error();
+      showToast(
+        next ? "Watchlist-E-Mail-Alarm aktiviert!" : "Watchlist-E-Mail-Alarm deaktiviert.",
+        { type: "info" }
+      );
+    } catch {
+      setWatchlistAlerts(!next);
+      showToast("Einstellung konnte nicht gespeichert werden.", { type: "error" });
+    } finally {
+      setSavingAlerts(false);
+    }
+  };
 
   useEffect(() => {
     if (!isOpen) return;
@@ -101,6 +141,32 @@ export function SubscriptionModal({
             {onlyMySubs ? "AKTIV (AN)" : "AUS"}
           </button>
         </div>
+
+        {session?.user && (
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/90 border border-slate-800 mb-3">
+            <div className="text-xs pr-2">
+              <p className="font-bold text-white flex items-center gap-1.5">
+                <Bell className="w-3.5 h-3.5 text-amber-400" />
+                Watchlist-E-Mail-Alarm
+              </p>
+              <p className="text-slate-400 mt-0.5">
+                Benachrichtigt dich per Mail, sobald ein Watchlist-Titel neu in deinen Abos startet.
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={savingAlerts}
+              onClick={toggleWatchlistAlerts}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition border flex-shrink-0 ${
+                watchlistAlerts
+                  ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
+                  : "bg-slate-800 border-slate-700 text-slate-400 hover:text-white"
+              }`}
+            >
+              {watchlistAlerts ? "AN" : "AUS"}
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 gap-2.5 my-5 max-h-[55dvh] overflow-y-auto overscroll-contain pr-1 flex-1">
           {POPULAR_SUBSCRIPTIONS.map((sub) => {
