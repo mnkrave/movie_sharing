@@ -15,6 +15,9 @@ import {
   ExternalLink,
   Layers,
   X,
+  Bell,
+  Send,
+  Play,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -35,6 +38,16 @@ export default function AdminPage() {
   const [emailSentNotice, setEmailSentNotice] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resendingEmail, setResendingEmail] = useState<string | null>(null);
+  const [alertStats, setAlertStats] = useState<{
+    configured: boolean;
+    fromEmail: string;
+    watchlistEntries: number;
+    uniqueWatchlistTitles: number;
+    trackedSnapshots: number;
+  } | null>(null);
+  const [alertRunning, setAlertRunning] = useState<string | null>(null);
+  const [alertSummary, setAlertSummary] = useState<any>(null);
 
   const isAdmin =
     session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
@@ -42,9 +55,10 @@ export default function AdminPage() {
 
   const fetchAdminData = async () => {
     try {
-      const [wlRes, usersRes] = await Promise.all([
+      const [wlRes, usersRes, alertsRes] = await Promise.all([
         fetch("/api/admin/whitelist"),
         fetch("/api/admin/users"),
+        fetch("/api/admin/watchlist-alerts"),
       ]);
       if (wlRes.ok) {
         const wlData = await wlRes.json();
@@ -53,6 +67,10 @@ export default function AdminPage() {
       if (usersRes.ok) {
         const uData = await usersRes.json();
         setUsers(uData);
+      }
+      if (alertsRes.ok) {
+        const aData = await alertsRes.json();
+        setAlertStats(aData);
       }
     } catch (err) {
       console.error("Admin fetch error:", err);
@@ -90,6 +108,61 @@ export default function AdminPage() {
       setError("Netzwerkfehler.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendInvite = async (email: string) => {
+    setResendingEmail(email);
+    try {
+      const res = await fetch("/api/admin/whitelist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, resendOnly: true }),
+      });
+      const data = await res.json();
+      if (res.ok && data.emailSent) {
+        showToast(`Einladungs-Mail an ${email} verschickt!`, { type: "success" });
+      } else {
+        showToast(data.emailError || "Mail konnte nicht gesendet werden.", { type: "error" });
+      }
+    } catch {
+      showToast("Netzwerkfehler beim Mailversand.", { type: "error" });
+    } finally {
+      setResendingEmail(null);
+    }
+  };
+
+  const handleWatchlistAlertAction = async (action: "dry_run" | "run_live" | "send_test") => {
+    setAlertRunning(action);
+    try {
+      const res = await fetch("/api/admin/watchlist-alerts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Aktion fehlgeschlagen.", { type: "error" });
+        return;
+      }
+      if (action === "send_test") {
+        showToast(`Test-Watchlist-Mail (${data.itemCount} Titel) an dich gesendet!`, {
+          type: "success",
+        });
+      } else {
+        setAlertSummary(data.summary);
+        fetchAdminData();
+        showToast(
+          action === "dry_run"
+            ? `Vorschau: ${data.summary.uniqueTitlesChecked} Titel geprüft, ${data.summary.usersMatched} Treffer.`
+            : `Live-Check fertig: ${data.summary.emailsSent} Mail(s) versendet.`,
+          { type: "success" }
+        );
+      }
+    } catch {
+      showToast("Netzwerkfehler beim Watchlist-Check.", { type: "error" });
+    } finally {
+      setAlertRunning(null);
     }
   };
 
@@ -362,6 +435,15 @@ export default function AdminPage() {
                     <td className="py-3 px-4 text-right space-x-2">
                       <button
                         type="button"
+                        onClick={() => handleResendInvite(item.email)}
+                        disabled={resendingEmail === item.email}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-[11px] disabled:opacity-50"
+                      >
+                        <Send className="w-3 h-3" />
+                        <span>{resendingEmail === item.email ? "Sendet..." : "Mail"}</span>
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => copyToClipboard(inviteUrl)}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"
                       >
@@ -384,6 +466,102 @@ export default function AdminPage() {
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Watchlist Streaming Alerts Panel */}
+      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h3 className="text-lg font-bold text-white flex items-center gap-2">
+              <Bell className="w-5 h-5 text-amber-400" />
+              <span>Watchlist-Streaming-Alarm (Resend)</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Prüft täglich um 08:00 Uhr, ob Watchlist-Titel ohne Anbieter neu in den Abos deiner Freunde starten.
+            </p>
+          </div>
+          {alertStats && (
+            <span
+              className={`px-3 py-1 rounded-full text-[11px] font-bold self-start sm:self-auto ${
+                alertStats.configured
+                  ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                  : "bg-rose-500/15 text-rose-300 border border-rose-500/30"
+              }`}
+            >
+              {alertStats.configured ? `✓ Aktiv (${alertStats.fromEmail})` : "RESEND_API_KEY fehlt"}
+            </span>
+          )}
+        </div>
+
+        {alertStats && (
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+              <div className="text-lg font-black text-white">{alertStats.watchlistEntries}</div>
+              <div className="text-[11px] text-slate-400">Watchlist-Einträge</div>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+              <div className="text-lg font-black text-amber-400">{alertStats.uniqueWatchlistTitles}</div>
+              <div className="text-[11px] text-slate-400">Einzigartige Titel</div>
+            </div>
+            <div className="p-3 rounded-2xl bg-slate-950/70 border border-slate-800">
+              <div className="text-lg font-black text-sky-400">{alertStats.trackedSnapshots}</div>
+              <div className="text-[11px] text-slate-400">Provider-Snapshots</div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            type="button"
+            disabled={alertRunning !== null}
+            onClick={() => handleWatchlistAlertAction("send_test")}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition disabled:opacity-50"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{alertRunning === "send_test" ? "Sendet..." : "Test-Mail an mich senden"}</span>
+          </button>
+          <button
+            type="button"
+            disabled={alertRunning !== null}
+            onClick={() => handleWatchlistAlertAction("dry_run")}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition disabled:opacity-50"
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>{alertRunning === "dry_run" ? "Prüft..." : "Vorschau (Dry-Run)"}</span>
+          </button>
+          <button
+            type="button"
+            disabled={alertRunning !== null}
+            onClick={() => handleWatchlistAlertAction("run_live")}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 font-bold text-xs transition disabled:opacity-50"
+          >
+            <Play className="w-3.5 h-3.5" />
+            <span>{alertRunning === "run_live" ? "Läuft..." : "Jetzt prüfen & Mails senden"}</span>
+          </button>
+        </div>
+
+        {alertSummary && (
+          <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 text-xs text-slate-300 space-y-1.5">
+            <div className="font-bold text-white">
+              Ergebnis ({alertSummary.dryRun ? "Vorschau – nichts verändert" : "Live-Lauf"}):
+            </div>
+            <div>
+              Geprüfte Titel: <strong>{alertSummary.uniqueTitlesChecked}</strong> · Neue Baselines:{" "}
+              <strong>{alertSummary.newBaselinesCreated}</strong> · Neu im Stream (vorher 0):{" "}
+              <strong>{alertSummary.titlesTransitionedFromNone}</strong> · Mails gesendet:{" "}
+              <strong className="text-emerald-400">{alertSummary.emailsSent}</strong>
+            </div>
+            {Array.isArray(alertSummary.matches) && alertSummary.matches.length > 0 && (
+              <ul className="list-disc list-inside text-slate-400 pt-1">
+                {alertSummary.matches.slice(0, 10).map((m: any, idx: number) => (
+                  <li key={idx}>
+                    {m.userEmail}: <strong className="text-slate-200">{m.title}</strong> ({m.providers.join(", ")})
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Registered Users Overview */}

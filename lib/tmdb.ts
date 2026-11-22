@@ -1500,3 +1500,55 @@ export async function getPersonDetails(id: number): Promise<PersonDetails | null
   }
 }
 
+export interface DeStreamingProvider {
+  key: string;
+  displayName: string;
+  logoPath: string | null;
+  color: string;
+  streamType: "flatrate" | "free";
+}
+
+const SUB_COLOR_BY_KEY = new Map(POPULAR_SUBSCRIPTIONS.map((s) => [s.key, s.color]));
+
+/**
+ * Normalizes and deduplicates German flatrate/free streaming providers from TMDB's `watch/providers` country entry.
+ */
+export function extractDeStreamingProviders(deRaw: any): DeStreamingProvider[] {
+  if (!deRaw) return [];
+  const combined: Array<WatchProviderItem & { streamType: "flatrate" | "free" }> = [
+    ...(deRaw.flatrate || []).map((p: WatchProviderItem) => ({ ...p, streamType: "flatrate" as const })),
+    ...(deRaw.free || []).map((p: WatchProviderItem) => ({ ...p, streamType: "free" as const })),
+    ...(deRaw.ads || []).map((p: WatchProviderItem) => ({ ...p, streamType: "free" as const })),
+  ];
+
+  const byKey = new Map<string, DeStreamingProvider>();
+  for (const p of combined) {
+    if (!p?.provider_name) continue;
+    const lower = p.provider_name.toLowerCase();
+    if (lower.includes("amazon channel") || lower.includes("apple tv channel")) continue;
+
+    const { key, displayName } = normalizeProviderKey(p.provider_name);
+    if (!byKey.has(key)) {
+      byKey.set(key, {
+        key,
+        displayName,
+        logoPath: p.logo_path || null,
+        color: SUB_COLOR_BY_KEY.get(key) || "#f59e0b",
+        streamType: p.streamType,
+      });
+    }
+  }
+  return Array.from(byKey.values());
+}
+
+/**
+ * Fetches current German streaming availability (`flatrate` + `free`) for a TMDB movie or TV series.
+ */
+export async function fetchDeStreamingProviders(
+  id: number,
+  mediaType: "movie" | "tv"
+): Promise<DeStreamingProvider[]> {
+  const data = await tmdbFetch<any>(`/${mediaType}/${id}/watch/providers`, {});
+  return extractDeStreamingProviders(data?.results?.DE);
+}
+

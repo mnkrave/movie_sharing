@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
+import { fetchDeStreamingProviders } from "./tmdb";
 
 export interface AppUser {
   id: string;
@@ -11,6 +12,7 @@ export interface AppUser {
   image?: string | null;
   role: string;
   subscriptions: string[];
+  watchlistAlertsEnabled?: boolean;
   friendGroups?: { id: string; name: string; emoji: string; memberNames: string[] }[];
   createdAt: string;
 }
@@ -29,6 +31,7 @@ export interface AppMediaStatus {
   rating?: number | null;
   watchedSeasons?: number[] | null;
   totalSeasons?: number | null;
+  alertedAt?: string | null;
   updatedAt: string;
 }
 
@@ -150,6 +153,13 @@ export interface AppFriendship {
   updatedAt: string;
 }
 
+export interface StreamingSnapshotEntry {
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  providersDE: string[];
+  checkedAt: string;
+}
+
 interface LocalDbFile {
   users: AppUser[];
   whitelist: { id: string; email: string; createdAt: string }[];
@@ -159,6 +169,7 @@ interface LocalDbFile {
   friendGroups?: AppFriendGroup[];
   recommendationReplies?: AppRecommendationReply[];
   customCollections?: AppCustomCollection[];
+  streamingSnapshots?: StreamingSnapshotEntry[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -486,6 +497,33 @@ function parseFriendGroups(val?: any): { id: string; name: string; emoji: string
 
 // --- User & Whitelist Operations ---
 
+let watchlistAlertSchemaEnsured = false;
+async function ensureWatchlistAlertSchema() {
+  if (watchlistAlertSchemaEnsured) return;
+  try {
+    await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "watchlistAlertsEnabled" BOOLEAN NOT NULL DEFAULT true`;
+    await prisma.$executeRaw`ALTER TABLE "MediaStatus" ADD COLUMN IF NOT EXISTS "alertedAt" TIMESTAMP(3)`;
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "StreamingProviderSnapshot" (
+        "id" TEXT NOT NULL,
+        "tmdbId" INTEGER NOT NULL,
+        "mediaType" TEXT NOT NULL,
+        "providersDE" TEXT NOT NULL DEFAULT '[]',
+        "checkedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "StreamingProviderSnapshot_pkey" PRIMARY KEY ("id")
+      )
+    `;
+    await prisma.$executeRaw`
+      CREATE UNIQUE INDEX IF NOT EXISTS "StreamingProviderSnapshot_tmdbId_mediaType_key"
+      ON "StreamingProviderSnapshot"("tmdbId", "mediaType")
+    `;
+    watchlistAlertSchemaEnsured = true;
+  } catch {
+    // ignore if permissions or DB unavailable
+  }
+}
+
 export async function findUserByEmail(email: string): Promise<AppUser | null> {
   const emailLower = email.toLowerCase().trim();
   if (await isPostgresAvailable()) {
@@ -499,6 +537,7 @@ export async function findUserByEmail(email: string): Promise<AppUser | null> {
       image: u.image,
       role: u.role,
       subscriptions: parseSubscriptions(u.subscriptions),
+      watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
       friendGroups: parseFriendGroups(u.friendGroups),
       createdAt: u.createdAt.toISOString(),
     };
@@ -519,6 +558,7 @@ export async function findUserById(id: string): Promise<AppUser | null> {
       image: u.image,
       role: u.role,
       subscriptions: parseSubscriptions(u.subscriptions),
+      watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
       friendGroups: parseFriendGroups(u.friendGroups),
       createdAt: u.createdAt.toISOString(),
     };
@@ -1817,6 +1857,7 @@ export async function toggleMediaStatus(params: {
 
   if (await isPostgresAvailable()) {
     await ensureMediaStatusColumns();
+    await ensureWatchlistAlertSchema();
     if (normalizedParams.status === "NONE") {
       await prisma.mediaStatus.deleteMany({
         where: {
@@ -1852,6 +1893,7 @@ export async function toggleMediaStatus(params: {
         title: normalizedParams.title,
         posterPath: normalizedParams.posterPath,
         releaseYear: normalizedParams.releaseYear,
+        ...(normalizedParams.status === "WATCHLIST" ? { alertedAt: null } : {}),
       };
       if (normalizedParams.watchedSeasons !== undefined) {
         updateData.watchedSeasons = normalizedParams.watchedSeasons ? JSON.stringify(normalizedParams.watchedSeasons) : null;
@@ -1871,6 +1913,9 @@ export async function toggleMediaStatus(params: {
         update: updateData,
         create: upsertData,
       });
+      if (normalizedParams.status === "WATCHLIST") {
+        void seedSnapshotIfMissing(normalizedParams.tmdbId, normalizedParams.mediaType);
+      }
       return upserted;
     } catch {
       // If table lacks new columns, retry with base fields
@@ -1920,6 +1965,7 @@ export async function toggleMediaStatus(params: {
   const now = new Date().toISOString();
   if (idx !== -1) {
     db.mediaStatuses[idx].status = normalizedParams.status;
+    if (normalizedParams.status === "WATCHLIST") db.mediaStatuses[idx].alertedAt = null;
     if (normalizedParams.rating !== undefined) db.mediaStatuses[idx].rating = normalizedParams.rating;
     if (normalizedParams.watchedSeasons !== undefined) db.mediaStatuses[idx].watchedSeasons = normalizedParams.watchedSeasons;
     if (normalizedParams.totalSeasons !== undefined) db.mediaStatuses[idx].totalSeasons = normalizedParams.totalSeasons;
@@ -1943,6 +1989,9 @@ export async function toggleMediaStatus(params: {
     });
   }
   writeLocalDb(db);
+  if (normalizedParams.status === "WATCHLIST") {
+    void seedSnapshotIfMissing(normalizedParams.tmdbId, normalizedParams.mediaType);
+  }
   return true;
 }
 
@@ -2859,4 +2908,208 @@ export async function deleteCustomCollectionComment(
   );
   writeLocalDb(db);
   return true;
+}
+
+// --- Watchlist Streaming Alerts & Notification Preferences ---
+
+export interface WatchlistAlertCandidate {
+  mediaStatusId: string;
+  userId: string;
+  userName: string;
+  userEmail: string;
+  subscriptions: string[];
+  watchlistAlertsEnabled: boolean;
+  tmdbId: number;
+  mediaType: "movie" | "tv";
+  title: string;
+  posterPath: string | null;
+  releaseYear: string | null;
+  alertedAt: string | null;
+}
+
+export async function getUserWatchlistAlertsEnabled(userId: string): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    await ensureWatchlistAlertSchema();
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { watchlistAlertsEnabled: true },
+    });
+    return u?.watchlistAlertsEnabled ?? true;
+  }
+  const db = readLocalDb();
+  const user = db.users.find((u) => u.id === userId);
+  return user?.watchlistAlertsEnabled ?? true;
+}
+
+export async function updateUserWatchlistAlerts(userId: string, enabled: boolean): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    await ensureWatchlistAlertSchema();
+    await prisma.user.update({
+      where: { id: userId },
+      data: { watchlistAlertsEnabled: enabled },
+    });
+    return enabled;
+  }
+  const db = readLocalDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (user) {
+    user.watchlistAlertsEnabled = enabled;
+    writeLocalDb(db);
+  }
+  return enabled;
+}
+
+export async function getWatchlistAlertContext(): Promise<{
+  candidates: WatchlistAlertCandidate[];
+  snapshots: Map<string, string[]>;
+}> {
+  const snapshots = new Map<string, string[]>();
+
+  if (await isPostgresAvailable()) {
+    await ensureWatchlistAlertSchema();
+    const [rows, snapshotRows] = await Promise.all([
+      prisma.mediaStatus.findMany({
+        where: { status: "WATCHLIST" },
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              subscriptions: true,
+              watchlistAlertsEnabled: true,
+            },
+          },
+        },
+      }),
+      prisma.streamingProviderSnapshot.findMany(),
+    ]);
+
+    for (const s of snapshotRows) {
+      snapshots.set(`${s.mediaType}:${s.tmdbId}`, parseJsonSafe<string[]>(s.providersDE, []));
+    }
+
+    const candidates: WatchlistAlertCandidate[] = rows
+      .filter((r) => Boolean(r.user?.email))
+      .map((r) => ({
+        mediaStatusId: r.id,
+        userId: r.user.id,
+        userName: r.user.name,
+        userEmail: r.user.email,
+        subscriptions: parseSubscriptions(r.user.subscriptions),
+        watchlistAlertsEnabled: r.user.watchlistAlertsEnabled ?? true,
+        tmdbId: r.tmdbId,
+        mediaType: r.mediaType === "tv" ? "tv" : "movie",
+        title: r.title,
+        posterPath: r.posterPath || null,
+        releaseYear: r.releaseYear || null,
+        alertedAt: r.alertedAt ? r.alertedAt.toISOString() : null,
+      }));
+
+    return { candidates, snapshots };
+  }
+
+  const db = readLocalDb();
+  for (const s of db.streamingSnapshots || []) {
+    snapshots.set(`${s.mediaType}:${s.tmdbId}`, s.providersDE || []);
+  }
+  const usersById = new Map(db.users.map((u) => [u.id, u]));
+  const candidates: WatchlistAlertCandidate[] = [];
+  for (const m of db.mediaStatuses) {
+    if (m.status !== "WATCHLIST") continue;
+    const u = usersById.get(m.userId);
+    if (!u?.email) continue;
+    candidates.push({
+      mediaStatusId: m.id,
+      userId: u.id,
+      userName: u.name,
+      userEmail: u.email,
+      subscriptions: u.subscriptions || ["netflix", "prime", "disney"],
+      watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
+      tmdbId: m.tmdbId,
+      mediaType: m.mediaType === "tv" ? "tv" : "movie",
+      title: m.title,
+      posterPath: m.posterPath || null,
+      releaseYear: m.releaseYear || null,
+      alertedAt: m.alertedAt || null,
+    });
+  }
+  return { candidates, snapshots };
+}
+
+export async function hasStreamingSnapshot(tmdbId: number, mediaType: "movie" | "tv"): Promise<boolean> {
+  if (await isPostgresAvailable()) {
+    await ensureWatchlistAlertSchema();
+    const existing = await prisma.streamingProviderSnapshot.findUnique({
+      where: { tmdbId_mediaType: { tmdbId, mediaType } },
+      select: { id: true },
+    });
+    return Boolean(existing);
+  }
+  const db = readLocalDb();
+  return (db.streamingSnapshots || []).some((s) => s.tmdbId === tmdbId && s.mediaType === mediaType);
+}
+
+async function seedSnapshotIfMissing(tmdbId: number, mediaType: "movie" | "tv"): Promise<void> {
+  try {
+    if (await hasStreamingSnapshot(tmdbId, mediaType)) return;
+    const providers = await fetchDeStreamingProviders(tmdbId, mediaType);
+    await upsertStreamingSnapshot(
+      tmdbId,
+      mediaType,
+      providers.map((p) => p.key)
+    );
+  } catch {
+    // non-critical background seed
+  }
+}
+
+export async function upsertStreamingSnapshot(
+  tmdbId: number,
+  mediaType: "movie" | "tv",
+  providersDE: string[]
+): Promise<void> {
+  const uniqueKeys = Array.from(new Set(providersDE));
+  if (await isPostgresAvailable()) {
+    await ensureWatchlistAlertSchema();
+    await prisma.streamingProviderSnapshot.upsert({
+      where: { tmdbId_mediaType: { tmdbId, mediaType } },
+      update: { providersDE: JSON.stringify(uniqueKeys), checkedAt: new Date() },
+      create: { tmdbId, mediaType, providersDE: JSON.stringify(uniqueKeys) },
+    });
+    return;
+  }
+  const db = readLocalDb();
+  if (!db.streamingSnapshots) db.streamingSnapshots = [];
+  const idx = db.streamingSnapshots.findIndex((s) => s.tmdbId === tmdbId && s.mediaType === mediaType);
+  const entry: StreamingSnapshotEntry = {
+    tmdbId,
+    mediaType,
+    providersDE: uniqueKeys,
+    checkedAt: new Date().toISOString(),
+  };
+  if (idx !== -1) db.streamingSnapshots[idx] = entry;
+  else db.streamingSnapshots.push(entry);
+  writeLocalDb(db);
+}
+
+export async function markWatchlistItemsAlerted(mediaStatusIds: string[]): Promise<void> {
+  if (mediaStatusIds.length === 0) return;
+  if (await isPostgresAvailable()) {
+    await ensureWatchlistAlertSchema();
+    await prisma.mediaStatus.updateMany({
+      where: { id: { in: mediaStatusIds } },
+      data: { alertedAt: new Date() },
+    });
+    return;
+  }
+  const db = readLocalDb();
+  const idSet = new Set(mediaStatusIds);
+  const now = new Date().toISOString();
+  for (const m of db.mediaStatuses) {
+    if (idSet.has(m.id)) {
+      m.alertedAt = now;
+    }
+  }
+  writeLocalDb(db);
 }
