@@ -1511,10 +1511,222 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
   });
 }
 
+export interface AppUserWithStats {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  role: string;
+  subscriptions: string[];
+  watchedCount: number;
+  watchingCount: number;
+  watchlistCount: number;
+  ratedCount: number;
+  avgRating: number | null;
+  recommendationsCount: number;
+  lastActivityAt: string;
+  createdAt: string;
+}
+
+export interface AdminUserProfile {
+  user: AppUserWithStats & {
+    watchlistAlertsEnabled: boolean;
+    isFriendWithAdmin: boolean;
+  };
+  mediaStatuses: AppMediaStatus[];
+  recommendations: AppRecommendation[];
+  customCollections: AppCustomCollection[];
+  friendGroups: AppFriendGroup[];
+  friends: Array<{
+    id: string;
+    name: string;
+    email: string;
+    image: string | null;
+    role: string;
+  }>;
+}
+
+function toIsoString(val: Date | string | null | undefined): string {
+  if (val instanceof Date) return val.toISOString();
+  return typeof val === "string" && val ? val : new Date().toISOString();
+}
+
+function computeUserActivityStats(
+  createdAt: Date | string,
+  mediaStatuses: Array<{
+    status: string;
+    mediaType: string;
+    rating?: number | null;
+    updatedAt?: Date | string;
+  }>,
+  recommendations: Array<{ createdAt?: Date | string }>
+) {
+  let watchedCount = 0;
+  let watchingCount = 0;
+  let watchlistCount = 0;
+  let ratedCount = 0;
+  let ratingSum = 0;
+  let latestTs = new Date(createdAt).getTime() || 0;
+
+  for (const m of mediaStatuses) {
+    if (m.status === "WATCHED") watchedCount++;
+    else if (m.status === "WATCHING" && m.mediaType === "tv") watchingCount++;
+    else if (m.status === "WATCHLIST") watchlistCount++;
+
+    if (typeof m.rating === "number" && m.rating > 0) {
+      ratedCount++;
+      ratingSum += m.rating;
+    }
+    if (m.updatedAt) {
+      const ts = new Date(m.updatedAt).getTime();
+      if (ts > latestTs) latestTs = ts;
+    }
+  }
+
+  for (const r of recommendations) {
+    if (r.createdAt) {
+      const ts = new Date(r.createdAt).getTime();
+      if (ts > latestTs) latestTs = ts;
+    }
+  }
+
+  return {
+    watchedCount,
+    watchingCount,
+    watchlistCount,
+    ratedCount,
+    avgRating: ratedCount > 0 ? Math.round((ratingSum / ratedCount) * 10) / 10 : null,
+    recommendationsCount: recommendations.length,
+    lastActivityAt: latestTs > 0 ? new Date(latestTs).toISOString() : toIsoString(createdAt),
+  };
+}
+
+function mapRawMediaStatus(
+  s: any,
+  fallbackUser?: { name: string; image?: string | null }
+): AppMediaStatus {
+  return {
+    id: s.id,
+    userId: s.userId,
+    userName: s.user?.name ?? fallbackUser?.name ?? s.userName ?? "Nutzer",
+    userImage: s.user?.image ?? fallbackUser?.image ?? s.userImage ?? null,
+    tmdbId: s.tmdbId,
+    mediaType: s.mediaType as "movie" | "tv",
+    title: s.title,
+    posterPath: s.posterPath ?? null,
+    releaseYear: s.releaseYear ?? null,
+    status: s.status as "WATCHED" | "WATCHLIST" | "WATCHING",
+    rating: s.rating ?? null,
+    watchedSeasons: s.watchedSeasons ? parseJsonSafe<number[] | null>(s.watchedSeasons, null) : null,
+    totalSeasons: s.totalSeasons ?? null,
+    updatedAt: toIsoString(s.updatedAt),
+  };
+}
+
+function mapRawRecommendation(
+  r: any,
+  fallbackUser?: { name: string; image?: string | null }
+): AppRecommendation {
+  return {
+    id: r.id,
+    userId: r.userId,
+    userName: r.user?.name ?? fallbackUser?.name ?? r.userName ?? "Nutzer",
+    userImage: r.user?.image ?? fallbackUser?.image ?? r.userImage ?? null,
+    tmdbId: r.tmdbId,
+    mediaType: r.mediaType as "movie" | "tv",
+    title: r.title,
+    posterPath: r.posterPath ?? null,
+    backdropPath: r.backdropPath ?? null,
+    releaseYear: r.releaseYear ?? null,
+    rating: r.rating,
+    comment: r.comment,
+    tags: Array.isArray(r.tags) ? r.tags : r.tags ? String(r.tags).split(",").filter(Boolean) : [],
+    upvoterIds: Array.isArray(r.upvoterIds)
+      ? r.upvoterIds
+      : Array.isArray(r.upvotes)
+      ? r.upvotes.map((u: any) => u.userId)
+      : [],
+    targetType: r.targetType || "ALL",
+    targetNames: parseStringList(r.targetNames),
+    targetGroupIds: parseStringList(r.targetGroupIds),
+    targetUserIds: parseStringList(r.targetUserIds),
+    replies: Array.isArray(r.replies)
+      ? r.replies
+          .map((rep: any) => ({
+            id: rep.id,
+            recommendationId: rep.recommendationId,
+            userId: rep.userId,
+            userName: rep.userName,
+            userImage: rep.userImage ?? null,
+            text: rep.text,
+            createdAt: toIsoString(rep.createdAt),
+          }))
+          .sort(
+            (a: AppRecommendationReply, b: AppRecommendationReply) =>
+              new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+          )
+      : [],
+    createdAt: toIsoString(r.createdAt),
+  };
+}
+
+function buildAdminUserProfile(params: {
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    image?: string | null;
+    role: string;
+    subscriptions: string[];
+    watchlistAlertsEnabled?: boolean | null;
+    createdAt: Date | string;
+  };
+  adminUserId: string;
+  acceptedFriendIds: string[];
+  mediaStatuses: AppMediaStatus[];
+  recommendations: AppRecommendation[];
+  customCollections: AppCustomCollection[];
+  friendGroups: AppFriendGroup[];
+  friends: Array<{
+    id: string;
+    name: string;
+    email: string;
+    image?: string | null;
+    role: string;
+  }>;
+}): AdminUserProfile {
+  const { user, adminUserId, acceptedFriendIds, mediaStatuses, recommendations, customCollections, friendGroups, friends } = params;
+  return {
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      image: user.image ?? null,
+      role: user.role,
+      subscriptions: user.subscriptions,
+      watchlistAlertsEnabled: user.watchlistAlertsEnabled ?? true,
+      createdAt: toIsoString(user.createdAt),
+      isFriendWithAdmin: user.id === adminUserId || acceptedFriendIds.includes(adminUserId),
+      ...computeUserActivityStats(user.createdAt, mediaStatuses, recommendations),
+    },
+    mediaStatuses,
+    recommendations,
+    customCollections,
+    friendGroups,
+    friends: friends.map((f) => ({
+      id: f.id,
+      name: f.name,
+      email: f.email,
+      image: f.image ?? null,
+      role: f.role,
+    })),
+  };
+}
+
 export async function getAllFriendsWithStats(
   currentUserId?: string,
   options?: { includeAllForAdmin?: boolean }
-) {
+): Promise<AppUserWithStats[]> {
   if (!currentUserId && !options?.includeAllForAdmin) {
     return [];
   }
@@ -1527,9 +1739,20 @@ export async function getAllFriendsWithStats(
   if (await isPostgresAvailable()) {
     const users = await prisma.user.findMany({
       where: friendIdSet ? { id: { in: Array.from(friendIdSet) } } : undefined,
-      include: {
-        mediaStatuses: true,
-        recommendations: true,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        subscriptions: true,
+        createdAt: true,
+        mediaStatuses: {
+          select: { status: true, mediaType: true, rating: true, updatedAt: true },
+        },
+        recommendations: {
+          select: { createdAt: true },
+        },
       },
       orderBy: { createdAt: "asc" },
     });
@@ -1537,13 +1760,10 @@ export async function getAllFriendsWithStats(
       id: u.id,
       name: u.name,
       email: u.email,
-      image: u.image,
+      image: u.image ?? null,
       role: u.role,
       subscriptions: parseSubscriptions(u.subscriptions),
-      watchedCount: u.mediaStatuses.filter((m) => m.status === "WATCHED").length,
-      watchingCount: u.mediaStatuses.filter((m) => m.status === "WATCHING" && m.mediaType === "tv").length,
-      watchlistCount: u.mediaStatuses.filter((m) => m.status === "WATCHLIST").length,
-      recommendationsCount: u.recommendations.length,
+      ...computeUserActivityStats(u.createdAt, u.mediaStatuses, u.recommendations),
       createdAt: u.createdAt.toISOString(),
     }));
   }
@@ -1553,19 +1773,152 @@ export async function getAllFriendsWithStats(
     ? db.users.filter((u) => friendIdSet.has(u.id))
     : db.users;
 
-  return filteredUsers.map((u) => ({
-    id: u.id,
-    name: u.name,
-    email: u.email,
-    image: u.image,
-    role: u.role,
-    subscriptions: u.subscriptions || ["netflix", "prime", "disney"],
-    watchedCount: db.mediaStatuses.filter((m) => m.userId === u.id && m.status === "WATCHED").length,
-    watchingCount: db.mediaStatuses.filter((m) => m.userId === u.id && m.status === "WATCHING" && m.mediaType === "tv").length,
-    watchlistCount: db.mediaStatuses.filter((m) => m.userId === u.id && m.status === "WATCHLIST").length,
-    recommendationsCount: db.recommendations.filter((r) => r.userId === u.id).length,
-    createdAt: u.createdAt,
-  }));
+  return filteredUsers.map((u) => {
+    const userStatuses = db.mediaStatuses.filter((m) => m.userId === u.id);
+    const userRecs = db.recommendations.filter((r) => r.userId === u.id);
+    return {
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      image: u.image ?? null,
+      role: u.role,
+      subscriptions: u.subscriptions || ["netflix", "prime", "disney"],
+      ...computeUserActivityStats(u.createdAt, userStatuses, userRecs),
+      createdAt: u.createdAt,
+    };
+  });
+}
+
+export async function getAdminUserProfile(
+  targetIdentifier: string,
+  adminUserId: string
+): Promise<AdminUserProfile | null> {
+  const cleanTarget = targetIdentifier.trim();
+  if (!cleanTarget) return null;
+  const targetLower = cleanTarget.toLowerCase();
+
+  if (await isPostgresAvailable()) {
+    await Promise.all([ensureMediaStatusColumns(), ensureWatchlistAlertSchema()]);
+
+    const dbUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { id: cleanTarget },
+          { email: { equals: cleanTarget, mode: "insensitive" } },
+          { name: { equals: cleanTarget, mode: "insensitive" } },
+        ],
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        role: true,
+        subscriptions: true,
+        watchlistAlertsEnabled: true,
+        createdAt: true,
+      },
+    });
+
+    if (!dbUser) return null;
+
+    const isSelf = dbUser.id === adminUserId;
+    const [statuses, recs, rawCollections, acceptedFriendIds, friendGroups] = await Promise.all([
+      prisma.mediaStatus.findMany({
+        where: { userId: dbUser.id },
+        orderBy: { updatedAt: "desc" },
+      }),
+      (prisma as any).recommendation
+        .findMany({
+          where: { userId: dbUser.id },
+          include: { upvotes: true, replies: true },
+          orderBy: { createdAt: "desc" },
+        })
+        .catch(() =>
+          prisma.recommendation.findMany({
+            where: { userId: dbUser.id },
+            include: { upvotes: true },
+            orderBy: { createdAt: "desc" },
+          })
+        ),
+      (prisma as any).customCollection
+        .findMany({
+          where: isSelf ? { ownerId: dbUser.id } : { ownerId: dbUser.id, visibility: { not: "PRIVATE" } },
+          orderBy: { updatedAt: "desc" },
+        })
+        .catch(() => []),
+      getAcceptedFriendIds(dbUser.id),
+      getUserFriendGroups(dbUser.id, dbUser.name).catch(() => []),
+    ]);
+
+    const friends =
+      acceptedFriendIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: acceptedFriendIds } },
+            select: { id: true, name: true, email: true, image: true, role: true },
+            orderBy: { name: "asc" },
+          })
+        : [];
+
+    const fallbackUser = { name: dbUser.name, image: dbUser.image };
+    return buildAdminUserProfile({
+      user: { ...dbUser, subscriptions: parseSubscriptions(dbUser.subscriptions) },
+      adminUserId,
+      acceptedFriendIds,
+      mediaStatuses: statuses.map((s: any) => mapRawMediaStatus(s, fallbackUser)),
+      recommendations: recs.map((r: any) => mapRawRecommendation(r, fallbackUser)),
+      customCollections: rawCollections.map((c: any) =>
+        mapRawCustomCollection({ ...c, owner: fallbackUser })
+      ),
+      friendGroups,
+      friends,
+    });
+  }
+
+  const db = readLocalDb();
+  const localUser = db.users.find(
+    (u) =>
+      u.id === cleanTarget ||
+      u.email.toLowerCase() === targetLower ||
+      u.name.toLowerCase() === targetLower
+  );
+  if (!localUser) return null;
+
+  const [acceptedFriendIds, friendGroups] = await Promise.all([
+    getAcceptedFriendIds(localUser.id),
+    getUserFriendGroups(localUser.id, localUser.name),
+  ]);
+
+  const allReplies = db.recommendationReplies || [];
+  const fallbackUser = { name: localUser.name, image: localUser.image ?? null };
+  const isSelf = localUser.id === adminUserId;
+
+  return buildAdminUserProfile({
+    user: {
+      ...localUser,
+      subscriptions: localUser.subscriptions || ["netflix", "prime", "disney"],
+    },
+    adminUserId,
+    acceptedFriendIds,
+    mediaStatuses: db.mediaStatuses
+      .filter((s) => s.userId === localUser.id)
+      .map((s) => mapRawMediaStatus(s, fallbackUser))
+      .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+    recommendations: db.recommendations
+      .filter((r) => r.userId === localUser.id)
+      .map((r) =>
+        mapRawRecommendation(
+          { ...r, replies: allReplies.filter((rep) => rep.recommendationId === r.id) },
+          fallbackUser
+        )
+      )
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+    customCollections: (db.customCollections || [])
+      .filter((c) => c.ownerId === localUser.id && (isSelf || c.visibility !== "PRIVATE"))
+      .map(mapRawCustomCollection),
+    friendGroups,
+    friends: db.users.filter((u) => acceptedFriendIds.includes(u.id)),
+  });
 }
 
 // --- Media Statuses & Recommendations ---
@@ -1729,76 +2082,14 @@ export async function getAllCommunityData(
       ]);
     }
 
-    const mappedRecs: AppRecommendation[] = recs.map((r: any) => ({
-      id: r.id,
-      userId: r.userId,
-      userName: r.user.name,
-      userImage: r.user.image,
-      tmdbId: r.tmdbId,
-      mediaType: r.mediaType as "movie" | "tv",
-      title: r.title,
-      posterPath: r.posterPath,
-      backdropPath: r.backdropPath,
-      releaseYear: r.releaseYear,
-      rating: r.rating,
-      comment: r.comment,
-      tags: r.tags ? r.tags.split(",").filter(Boolean) : [],
-      upvoterIds: r.upvotes ? r.upvotes.map((u: any) => u.userId) : [],
-      targetType: r.targetType || "ALL",
-      targetNames: parseStringList(r.targetNames),
-      targetGroupIds: parseStringList(r.targetGroupIds),
-      targetUserIds: parseStringList(r.targetUserIds),
-      replies: Array.isArray(r.replies)
-        ? r.replies
-            .map((rep: any) => ({
-              id: rep.id,
-              recommendationId: rep.recommendationId,
-              userId: rep.userId,
-              userName: rep.userName,
-              userImage: rep.userImage,
-              text: rep.text,
-              createdAt:
-                rep.createdAt instanceof Date ? rep.createdAt.toISOString() : String(rep.createdAt),
-            }))
-            .sort(
-              (a: any, b: any) =>
-                new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            )
-        : [],
-      createdAt: r.createdAt.toISOString(),
-    }));
+    const mappedRecs: AppRecommendation[] = recs.map((r: any) => mapRawRecommendation(r));
 
     const visibleRecs = mappedRecs.filter((r) =>
       isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
     );
 
     return {
-      mediaStatuses: statuses.map((s: any) => ({
-        id: s.id,
-        userId: s.userId,
-        userName: s.user.name,
-        userImage: s.user.image,
-        tmdbId: s.tmdbId,
-        mediaType: s.mediaType as "movie" | "tv",
-        title: s.title,
-        posterPath: s.posterPath,
-        releaseYear: s.releaseYear,
-        status: s.status as "WATCHED" | "WATCHLIST" | "WATCHING",
-        rating: s.rating,
-        watchedSeasons: s.watchedSeasons
-          ? typeof s.watchedSeasons === "string"
-            ? (() => {
-                try {
-                  return JSON.parse(s.watchedSeasons);
-                } catch {
-                  return null;
-                }
-              })()
-            : s.watchedSeasons
-          : null,
-        totalSeasons: s.totalSeasons ?? null,
-        updatedAt: s.updatedAt.toISOString(),
-      })),
+      mediaStatuses: statuses.map((s: any) => mapRawMediaStatus(s)),
       recommendations: visibleRecs,
     };
   }
@@ -1813,19 +2104,12 @@ export async function getAllCommunityData(
     : db.recommendations;
 
   const visibleRecs = rawRecs
-    .map((r) => ({
-      ...r,
-      targetType: r.targetType || "ALL",
-      targetNames: parseStringList(r.targetNames),
-      targetGroupIds: parseStringList(r.targetGroupIds),
-      targetUserIds: parseStringList(r.targetUserIds),
-      replies: allReplies
-        .filter((rep) => rep.recommendationId === r.id)
-        .sort(
-          (a, b) =>
-            new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        ),
-    }))
+    .map((r) =>
+      mapRawRecommendation({
+        ...r,
+        replies: allReplies.filter((rep) => rep.recommendationId === r.id),
+      })
+    )
     .filter((r) =>
       isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
     );
@@ -2402,8 +2686,8 @@ function mapRawCustomCollection(row: any): AppCustomCollection {
     targetUserIds: parseStringList(row.targetUserIds),
     upvoterIds: parseStringList(row.upvoterIds),
     comments: parseJsonSafe<AppCustomCollectionComment[]>(row.commentsJson || row.comments, []),
-    createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt || new Date().toISOString()),
-    updatedAt: row.updatedAt instanceof Date ? row.updatedAt.toISOString() : String(row.updatedAt || new Date().toISOString()),
+    createdAt: toIsoString(row.createdAt),
+    updatedAt: toIsoString(row.updatedAt),
   };
 }
 

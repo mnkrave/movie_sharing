@@ -7,6 +7,13 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
   }
 
-  const users = await getAllFriendsWithStats(undefined, { includeAllForAdmin: true });
-  return NextResponse.json(users);
+  try {
+    const users = await getAllFriendsWithStats(undefined, { includeAllForAdmin: true });
+    return NextResponse.json(users, {
+      headers: { "Cache-Control": "private, no-store" },
+    });
+  } catch (err) {
+    console.error("Admin users list error:", err);
+    return NextResponse.json({ error: "Serverfehler" }, { status: 500 });
+  }
 }
