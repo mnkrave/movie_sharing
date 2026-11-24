@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUserSession } from "@/lib/auth";
 import {
   normalizeProviderKey,
   resolveCollectionEntry,
@@ -324,8 +323,8 @@ async function lookupTmdbAndEnrich(
 
 export async function POST(req: Request) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
+    const auth = await requireUserSession();
+    if (!auth) {
       return NextResponse.json(
         { error: "Bitte logge dich ein, um den KI-Filmberater zu nutzen." },
         { status: 401 }
@@ -345,13 +344,11 @@ export async function POST(req: Request) {
     }
 
     const currentUserName: string = String(
-      session.user.name || body.currentUserName || "Kino-Fan"
+      auth.userName || body.currentUserName || "Kino-Fan"
     )
       .trim()
       .slice(0, 80);
-    const currentUserId: string = String(
-      (session.user as any)?.id || body.currentUserId || ""
-    ).trim();
+    const currentUserId: string = String(auth.userId || "").trim();
     const explicitParticipants: string[] = Array.isArray(body.explicitParticipants)
       ? body.explicitParticipants.slice(0, 20).map((p: any) => String(p).slice(0, 80))
       : [];

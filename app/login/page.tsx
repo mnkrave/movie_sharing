@@ -22,6 +22,16 @@ export default function LoginPage() {
     setIsStandalone(
       Boolean(nav.standalone) || window.matchMedia("(display-mode: standalone)").matches
     );
+    const errParam = new URLSearchParams(window.location.search).get("error");
+    if (errParam === "AccountBanned" || errParam === "ACCOUNT_BANNED") {
+      setError(
+        "Dein Account wurde vom Admin gesperrt. Bei Fragen wende dich bitte an den Administrator."
+      );
+    } else if (errParam === "AccessDenied") {
+      setError(
+        "Zugriff verweigert: Deine E-Mail ist noch nicht eingeladen oder die Einladung ist abgelaufen."
+      );
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -37,7 +47,11 @@ export default function LoginPage() {
         password,
       });
 
-      if (res?.error) {
+      if (res?.error === "ACCOUNT_BANNED") {
+        setError(
+          "Dein Account wurde vom Admin gesperrt. Bei Fragen wende dich bitte an den Administrator."
+        );
+      } else if (res?.error) {
         setError(
           "Anmeldung fehlgeschlagen. Bitte prüfe deine Zugangsdaten oder ob deine E-Mail freigeschaltet ist."
         );

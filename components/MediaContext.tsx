@@ -20,7 +20,7 @@ import type {
   AppCustomCollection,
   AppCustomCollectionMovie,
 } from "@/lib/store";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { parseMediaDeepLink } from "@/lib/share";
 import {
   clearOfflineWatchlist,
@@ -256,6 +256,14 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       }
     }
   }, []);
+
+  // Immediately sign out and clear cached data if the user's account was banned by an admin
+  useEffect(() => {
+    if (sessionStatus === "authenticated" && (session?.user as { isBanned?: boolean } | undefined)?.isBanned) {
+      clearOfflineWatchlist();
+      signOut({ callbackUrl: "/login?error=AccountBanned" });
+    }
+  }, [sessionStatus, session]);
 
   // Persist a read-only offline snapshot of the signed-in user's own list (cleared on confirmed logout)
   useEffect(() => {

@@ -4,6 +4,8 @@ import {
   getWhitelist,
   addEmailToWhitelist,
   removeEmailFromWhitelist,
+  isValidEmailAddress,
+  findUserByEmail,
 } from "@/lib/store";
 import { sendInviteEmail } from "@/lib/email";
 
@@ -23,13 +25,25 @@ export async function POST(req: Request) {
 
   try {
     const { email, resendOnly } = await req.json();
-    if (!email || typeof email !== "string" || !email.includes("@")) {
+    if (!email || typeof email !== "string" || !isValidEmailAddress(email)) {
       return NextResponse.json({ error: "Ungültige E-Mail-Adresse" }, { status: 400 });
     }
 
     const emailLower = email.toLowerCase().trim();
+    const existingUser = await findUserByEmail(emailLower);
+    if (existingUser?.isBanned) {
+      return NextResponse.json(
+        { error: "Dieser Nutzer ist aktuell gesperrt. Entsperre ihn zuerst in der Nutzer-Übersicht." },
+        { status: 400 }
+      );
+    }
+
     if (!resendOnly) {
-      await addEmailToWhitelist(emailLower);
+      await addEmailToWhitelist(emailLower, {
+        userId: admin.userId,
+        name: admin.userName,
+        email: admin.email,
+      });
     }
 
     const { sent: emailSent, inviteLink, error: emailError } = await sendInviteEmail({

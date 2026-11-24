@@ -26,18 +26,22 @@ import {
   ArrowDown,
   ArrowUpDown,
   Eye,
+  Ban,
+  CheckCircle2,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
-import type { AppUserWithStats } from "@/lib/store";
+import type {
+  AppInviteApprovalRequest,
+  AppUserWithStats,
+  AppWhitelistEntry,
+} from "@/lib/store";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import { updateUserBanStatus } from "@/lib/admin-client";
+import { BanUserModal, type BanTargetUser } from "@/components/BanUserModal";
+import { ApprovalStatusBadge, InviteStatusBadge } from "@/components/InviteStatusBadge";
 
 const USER_COLLATOR = new Intl.Collator("de", { numeric: true, sensitivity: "base" });
-
-interface WhitelistEntry {
-  id: string;
-  email: string;
-  createdAt: string;
-}
 
 type UserSortKey =
   | "name"
@@ -51,8 +55,12 @@ type UserSortKey =
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const { confirmDialog, customCollections, approveCustomCollection, showToast } = useMedia();
-  const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
+  const [whitelist, setWhitelist] = useState<AppWhitelistEntry[]>([]);
   const [users, setUsers] = useState<AppUserWithStats[]>([]);
+  const [inviteRequests, setInviteRequests] = useState<AppInviteApprovalRequest[]>([]);
+  const [reviewingRequestId, setReviewingRequestId] = useState<string | null>(null);
+  const [banModalTarget, setBanModalTarget] = useState<BanTargetUser | null>(null);
+  const [banBusyUserId, setBanBusyUserId] = useState<string | null>(null);
   const [userSearch, setUserSearch] = useState("");
   const [userSortKey, setUserSortKey] = useState<UserSortKey>("watchedCount");
   const [userSortDir, setUserSortDir] = useState<"ascending" | "descending">("descending");
@@ -74,20 +82,21 @@ export default function AdminPage() {
   const [alertRunning, setAlertRunning] = useState<string | null>(null);
   const [alertSummary, setAlertSummary] = useState<any>(null);
 
-  const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
-    (session?.user as any)?.role === "ADMIN";
+  const isSuperAdmin = session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL;
+  const isAdmin = isSuperAdmin || (session?.user as any)?.role === "ADMIN";
 
   const platformTotals = useMemo(() => {
     let watched = 0;
     let rated = 0;
     let tips = 0;
+    let banned = 0;
     for (const u of users) {
       watched += u.watchedCount || 0;
       rated += u.ratedCount || 0;
       tips += u.recommendationsCount || 0;
+      if (u.isBanned) banned++;
     }
-    return { watched, rated, tips };
+    return { watched, rated, tips, banned };
   }, [users]);
 
   const sortedFilteredUsers = useMemo(() => {
@@ -133,10 +142,11 @@ export default function AdminPage() {
 
   const fetchAdminData = async () => {
     try {
-      const [wlRes, usersRes, alertsRes] = await Promise.all([
+      const [wlRes, usersRes, alertsRes, reqsRes] = await Promise.all([
         fetch("/api/admin/whitelist"),
         fetch("/api/admin/users"),
         fetch("/api/admin/watchlist-alerts"),
+        fetch("/api/admin/invite-requests"),
       ]);
       if (wlRes.ok) {
         const wlData = await wlRes.json();
@@ -149,6 +159,10 @@ export default function AdminPage() {
       if (alertsRes.ok) {
         const aData = await alertsRes.json();
         setAlertStats(aData);
+      }
+      if (reqsRes.ok) {
+        const rData = await reqsRes.json();
+        setInviteRequests(Array.isArray(rData) ? rData : []);
       }
     } catch (err) {
       console.error("Admin fetch error:", err);
@@ -243,6 +257,84 @@ export default function AdminPage() {
       setAlertRunning(null);
     }
   };
+
+  const handleReviewInviteRequest = async (
+    reqItem: AppInviteApprovalRequest,
+    action: "APPROVE" | "REJECT"
+  ) => {
+    setReviewingRequestId(reqItem.id);
+    try {
+      const res = await fetch("/api/admin/invite-requests", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: reqItem.id, action }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || "Aktion fehlgeschlagen.", { type: "error" });
+        return;
+      }
+      if (Array.isArray(data.requests)) setInviteRequests(data.requests);
+      if (Array.isArray(data.whitelist)) setWhitelist(data.whitelist);
+      if (action === "APPROVE") {
+        if (data.inviteLink) {
+          setLastInviteLink(data.inviteLink);
+          setEmailSentNotice(Boolean(data.emailSent));
+        }
+        showToast(
+          data.emailSent
+            ? `„${reqItem.targetEmail}“ freigegeben & Einladungs-Mail verschickt!`
+            : `„${reqItem.targetEmail}“ freigegeben (Einladungslink generiert).`,
+          { type: "success" }
+        );
+      } else {
+        showToast(`Anfrage für „${reqItem.targetEmail}“ abgelehnt.`, { type: "info" });
+      }
+    } catch {
+      showToast("Netzwerkfehler beim Bearbeiten der Anfrage.", { type: "error" });
+    } finally {
+      setReviewingRequestId(null);
+    }
+  };
+
+  const handleBanChange = async (target: BanTargetUser, isBanned: boolean, reason?: string) => {
+    try {
+      const result = await updateUserBanStatus({
+        user: target,
+        isBanned,
+        reason,
+        confirmDialog,
+        showToast,
+        onStart: () => setBanBusyUserId(target.id),
+      });
+      if (!result.ok) return;
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.id === target.id
+            ? {
+                ...u,
+                isBanned,
+                bannedAt: result.bannedAt ?? null,
+                banReason: result.banReason ?? null,
+              }
+            : u
+        )
+      );
+      if (isBanned) setBanModalTarget(null);
+      fetchAdminData();
+    } finally {
+      setBanBusyUserId(null);
+    }
+  };
+
+  const handleConfirmBan = (reason: string) => {
+    if (!banModalTarget) return;
+    return handleBanChange(banModalTarget, true, reason);
+  };
+
+  const handleUnbanUser = (target: AppUserWithStats) =>
+    handleBanChange({ id: target.id, name: target.name, email: target.email }, false);
 
   const handleRemove = async (email: string) => {
     const confirmed = await confirmDialog({
@@ -343,12 +435,18 @@ export default function AdminPage() {
       <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-indigo-500/25 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 id="admin-users-heading" className="text-lg font-bold text-white flex items-center gap-2">
+            <h2 id="admin-users-heading" className="text-lg font-bold text-white flex flex-wrap items-center gap-2">
               <Users className="w-5 h-5 text-indigo-400" />
               <span>Alle Nutzer & Profile ({users.length})</span>
+              {platformTotals.banned > 0 && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/35 text-rose-300 text-[11px] font-bold">
+                  <Ban className="w-3 h-3" aria-hidden="true" />
+                  <span>{platformTotals.banned} gesperrt</span>
+                </span>
+              )}
             </h2>
             <p className="text-xs text-slate-400 mt-0.5">
-              Klicke auf einen Nutzer, um alle gesehenen Filme, Bewertungen, Merklisten, Tipps & Kollektionen einzusehen.
+              Klicke auf einen Nutzer für sein Profil oder sperre bzw. entsperre Konten direkt mit einem Klick.
             </p>
           </div>
 
@@ -423,7 +521,7 @@ export default function AdminPage() {
                   );
                 })}
                 <th scope="col" className="py-3 px-3.5 text-right font-bold text-slate-400">
-                  Profil
+                  Aktionen
                 </th>
               </tr>
             </thead>
@@ -438,8 +536,20 @@ export default function AdminPage() {
                 sortedFilteredUsers.map((u) => {
                   const profileHref = `/admin/users/${encodeURIComponent(u.id)}`;
                   const activityDate = u.lastActivityAt || u.createdAt;
+                  const isTargetSuperAdmin = u.email.toLowerCase() === SUPER_ADMIN_EMAIL;
+                  const isSelfRow = u.id === (session?.user as any)?.id;
+                  const canModerate =
+                    !isTargetSuperAdmin && !isSelfRow && (isSuperAdmin || u.role !== "ADMIN");
+                  const isBusy = banBusyUserId === u.id;
                   return (
-                    <tr key={u.id} className="hover:bg-slate-800/40 transition">
+                    <tr
+                      key={u.id}
+                      className={`transition ${
+                        u.isBanned
+                          ? "bg-rose-950/20 hover:bg-rose-950/30"
+                          : "hover:bg-slate-800/40"
+                      }`}
+                    >
                       <th scope="row" className="py-3 px-3.5 font-normal text-left">
                         <Link
                           href={profileHref}
@@ -455,19 +565,41 @@ export default function AdminPage() {
                             </div>
                           )}
                           <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
+                            <div className="flex flex-wrap items-center gap-1.5">
                               <span className="font-bold text-white group-hover:text-amber-300 transition truncate">
                                 {u.name}
                               </span>
-                              {u.role === "ADMIN" && (
-                                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold">
-                                  ADMIN
+                              {isTargetSuperAdmin ? (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-500/40 text-amber-300 text-[9px] font-bold">
+                                  SUPER-ADMIN
+                                </span>
+                              ) : (
+                                u.role === "ADMIN" && (
+                                  <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold">
+                                    ADMIN
+                                  </span>
+                                )
+                              )}
+                              {u.isBanned && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-rose-500/20 border border-rose-500/40 text-rose-300 text-[9px] font-bold">
+                                  <Ban className="w-2.5 h-2.5" aria-hidden="true" />
+                                  <span>GESPERRT</span>
                                 </span>
                               )}
                             </div>
                             <p className="text-[11px] text-slate-500 truncate max-w-[200px]">
                               {u.email}
                             </p>
+                            {u.invitedByName && (
+                              <p className="text-[10px] text-slate-400 truncate max-w-[200px]">
+                                Eingeladen von <span className="text-amber-300/90">@{u.invitedByName}</span>
+                              </p>
+                            )}
+                            {u.isBanned && u.banReason && (
+                              <p className="text-[10px] text-rose-300/90 truncate max-w-[210px]" title={u.banReason}>
+                                Grund: {u.banReason}
+                              </p>
+                            )}
                           </div>
                         </Link>
                       </th>
@@ -496,14 +628,40 @@ export default function AdminPage() {
                           {new Date(activityDate).toLocaleDateString("de-DE")}
                         </time>
                       </td>
-                      <td data-label="Profil" className="py-3 px-3.5 text-right whitespace-nowrap">
-                        <Link
-                          href={profileHref}
-                          className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-0 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-black border border-amber-500/35 font-bold text-[11px] transition"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Ansehen</span>
-                        </Link>
+                      <td data-label="Aktionen" className="py-3 px-3.5 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center justify-end gap-1.5">
+                          <Link
+                            href={profileHref}
+                            className="inline-flex items-center gap-1 min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-black border border-amber-500/35 font-bold text-[11px] transition"
+                          >
+                            <Eye className="w-3.5 h-3.5" aria-hidden="true" />
+                            <span>Ansehen</span>
+                          </Link>
+                          {canModerate &&
+                            (u.isBanned ? (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() => handleUnbanUser(u)}
+                                className="inline-flex items-center gap-1 min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-black border border-emerald-500/35 font-bold text-[11px] transition disabled:opacity-50 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" aria-hidden="true" />
+                                <span>{isBusy ? "..." : "Entsperren"}</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                disabled={isBusy}
+                                onClick={() =>
+                                  setBanModalTarget({ id: u.id, name: u.name, email: u.email })
+                                }
+                                className="inline-flex items-center gap-1 min-h-[38px] sm:min-h-0 px-2.5 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/35 font-bold text-[11px] transition disabled:opacity-50 cursor-pointer"
+                              >
+                                <Ban className="w-3.5 h-3.5" aria-hidden="true" />
+                                <span>Sperren</span>
+                              </button>
+                            ))}
+                        </div>
                       </td>
                     </tr>
                   );
@@ -513,6 +671,88 @@ export default function AdminPage() {
           </table>
         </div>
       </div>
+
+      {/* Blocked Invite Approval Queue */}
+      {inviteRequests.length > 0 && (
+        <div
+          id="invite-approvals"
+          className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-rose-500/30 space-y-4 scroll-mt-24"
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-amber-400" />
+                <span>
+                  Freigabe-Anfragen für blockierte Einladungen (
+                  {inviteRequests.filter((r) => r.status === "PENDING").length} offen)
+                </span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Einladungen, die von einem Sicherheits-Limit gestoppt wurden — du kannst sie hier trotzdem manuell freigeben.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {inviteRequests.map((reqItem) => {
+              const isBusy = reviewingRequestId === reqItem.id;
+              return (
+                <div
+                  key={reqItem.id}
+                  className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                >
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-black text-white break-all">
+                        {reqItem.targetEmail}
+                      </span>
+                      <span className="text-xs text-slate-400">
+                        angefragt von{" "}
+                        <Link
+                          href={`/admin/users/${encodeURIComponent(reqItem.requesterUserId)}`}
+                          className="text-amber-300 font-bold hover:underline"
+                        >
+                          @{reqItem.requesterName}
+                        </Link>
+                      </span>
+                      <ApprovalStatusBadge status={reqItem.status} variant="admin" />
+                    </div>
+                    <p className="text-xs text-rose-300/90 font-medium">
+                      Blockiert wegen: {reqItem.blockedReason}
+                    </p>
+                    <p className="text-[11px] text-slate-500">
+                      Angefragt am {new Date(reqItem.createdAt).toLocaleString("de-DE")}
+                    </p>
+                  </div>
+
+                  {reqItem.status === "PENDING" && (
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleReviewInviteRequest(reqItem, "APPROVE")}
+                        className="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>{isBusy ? "..." : "Trotzdem freigeben"}</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => handleReviewInviteRequest(reqItem, "REJECT")}
+                        className="px-3 py-1.5 rounded-xl bg-rose-950/60 hover:bg-rose-900 text-rose-300 font-bold text-xs border border-rose-500/30 flex items-center gap-1 disabled:opacity-50 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>Ablehnen</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Public Collections Approval Queue */}
       {customCollections.filter((c) => c.visibility === "PUBLIC").length > 0 && (
@@ -558,21 +798,7 @@ export default function AdminPage() {
                       <span className="text-xs text-slate-400">
                         von <strong className="text-slate-200">@{col.ownerName}</strong> ({col.movies.length} Titel)
                       </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                          col.approvalStatus === "APPROVED"
-                            ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-                            : col.approvalStatus === "REJECTED"
-                            ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                            : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                        }`}
-                      >
-                        {col.approvalStatus === "APPROVED"
-                          ? "✓ Freigegeben"
-                          : col.approvalStatus === "REJECTED"
-                          ? "Abgelehnt"
-                          : "⏳ Wartet auf Freigabe"}
-                      </span>
+                      <ApprovalStatusBadge status={col.approvalStatus} variant="admin" />
                     </div>
                     <p className="text-xs text-slate-400 line-clamp-2">{col.description}</p>
                     <p className="text-[11px] text-slate-500">
@@ -702,28 +928,51 @@ export default function AdminPage() {
           <table className="responsive-table w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/60 uppercase tracking-wider text-slate-500 border-b border-slate-800">
               <tr>
-                <th className="py-3 px-4">E-Mail</th>
-                <th className="py-3 px-4">Freigeschaltet am</th>
-                <th className="py-3 px-4 text-right">Aktionen</th>
+                <th scope="col" className="py-3 px-4">E-Mail</th>
+                <th scope="col" className="py-3 px-4">Eingeladen von</th>
+                <th scope="col" className="py-3 px-4">Status</th>
+                <th scope="col" className="py-3 px-4">Freigeschaltet am</th>
+                <th scope="col" className="py-3 px-4 text-right">Aktionen</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {whitelist.map((item) => {
                 const inviteUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/register?email=${encodeURIComponent(item.email)}`;
+                const isAdminInviter =
+                  !item.invitedByUserId ||
+                  item.invitedByEmail?.toLowerCase() === SUPER_ADMIN_EMAIL;
+
                 return (
                   <tr key={item.id} className="hover:bg-slate-800/40">
-                    <td data-label="E-Mail" className="py-3 px-4 font-medium text-white flex items-center gap-2">
-                      <span className="break-all">{item.email}</span>
-                      {item.email.toLowerCase() === "lukasreinle0@gmail.com" && (
-                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
-                          Admin
-                        </span>
+                    <td data-label="E-Mail" className="py-3 px-4 font-medium text-white">
+                      <div className="flex items-center gap-2">
+                        <span className="break-all">{item.email}</span>
+                        {item.email.toLowerCase() === SUPER_ADMIN_EMAIL && (
+                          <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
+                            Admin
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td data-label="Eingeladen von" className="py-3 px-4 text-slate-300">
+                      {!isAdminInviter && item.invitedByUserId ? (
+                        <Link
+                          href={`/admin/users/${encodeURIComponent(item.invitedByUserId)}`}
+                          className="text-amber-300 hover:underline font-semibold"
+                        >
+                          @{item.invitedByName || item.invitedByEmail || "Mitglied"}
+                        </Link>
+                      ) : (
+                        <span className="text-slate-500">Admin</span>
                       )}
                     </td>
-                    <td data-label="Freigeschaltet" className="py-3 px-4 text-slate-500">
+                    <td data-label="Status" className="py-3 px-4">
+                      <InviteStatusBadge item={item} />
+                    </td>
+                    <td data-label="Freigeschaltet" className="py-3 px-4 text-slate-500 whitespace-nowrap">
                       {new Date(item.createdAt).toLocaleDateString("de-DE")}
                     </td>
-                    <td data-label="Aktionen" className="py-3 px-4 text-right space-x-2">
+                    <td data-label="Aktionen" className="py-3 px-4 text-right space-x-2 whitespace-nowrap">
                       <button
                         type="button"
                         onClick={() => handleResendInvite(item.email)}
@@ -741,10 +990,11 @@ export default function AdminPage() {
                         {copiedLink === inviteUrl ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
                         <span>Link</span>
                       </button>
-                      {item.email.toLowerCase() !== "lukasreinle0@gmail.com" && (
+                      {item.email.toLowerCase() !== SUPER_ADMIN_EMAIL && (
                         <button
                           type="button"
                           onClick={() => handleRemove(item.email)}
+                          aria-label={`${item.email} von der Whitelist entfernen`}
                           className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 text-[11px]"
                         >
                           <Trash2 className="w-3 h-3" />
@@ -854,6 +1104,13 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+
+      <BanUserModal
+        target={banModalTarget}
+        submitting={Boolean(banModalTarget && banBusyUserId === banModalTarget.id)}
+        onClose={() => setBanModalTarget(null)}
+        onConfirm={handleConfirmBan}
+      />
     </div>
   );
 }

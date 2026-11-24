@@ -146,7 +146,7 @@ function RegisterForm() {
             />
           </div>
           <p className="text-[10px] text-slate-500 mt-1">
-            * Hinweis: Deine E-Mail muss von Lukas auf die Whitelist gesetzt worden sein.
+            * Hinweis: Deine E-Mail muss von einem Mitglied oder Admin eingeladen worden sein.
           </p>
         </div>
 

@@ -7,6 +7,7 @@ import {
   findUserById,
   createOrUpdateUser,
   isEmailWhitelisted,
+  SUPER_ADMIN_EMAIL,
 } from "./store";
 
 export const authOptions: NextAuthOptions = {
@@ -36,6 +37,10 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
+        if (user.isBanned && user.email.toLowerCase().trim() !== SUPER_ADMIN_EMAIL) {
+          throw new Error("ACCOUNT_BANNED");
+        }
+
         return {
           id: user.id,
           email: user.email,
@@ -53,6 +58,11 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account }) {
       if (!user.email) return false;
       const emailLower = user.email.toLowerCase().trim();
+
+      const existingUser = await findUserByEmail(emailLower);
+      if (existingUser?.isBanned && emailLower !== SUPER_ADMIN_EMAIL) {
+        return "/login?error=AccountBanned";
+      }
 
       const allowed = await isEmailWhitelisted(emailLower);
       if (!allowed) {
@@ -75,18 +85,26 @@ export const authOptions: NextAuthOptions = {
         // @ts-ignore
         token.role = user.role || "USER";
         token.picture = user.image || null;
+        // @ts-ignore
+        token.isBanned = false;
       } else if (token.email) {
         const dbUser = await findUserByEmail(token.email);
         if (dbUser) {
           token.sub = dbUser.id;
           token.role = dbUser.role;
           token.picture = dbUser.image || null;
+          // @ts-ignore
+          token.isBanned =
+            Boolean(dbUser.isBanned) && dbUser.email.toLowerCase().trim() !== SUPER_ADMIN_EMAIL;
         }
       } else if (token.sub) {
         const dbUser = await findUserById(token.sub);
         if (dbUser) {
           token.role = dbUser.role;
           token.picture = dbUser.image || null;
+          // @ts-ignore
+          token.isBanned =
+            Boolean(dbUser.isBanned) && dbUser.email.toLowerCase().trim() !== SUPER_ADMIN_EMAIL;
         }
       }
       return token;
@@ -97,6 +115,8 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
         // @ts-ignore
         session.user.role = token.role || "USER";
+        // @ts-ignore
+        session.user.isBanned = Boolean(token.isBanned);
         if (token.picture) {
           session.user.image = token.picture as string;
         }
@@ -111,7 +131,7 @@ export const authOptions: NextAuthOptions = {
 };
 
 /**
- * Verifies the server session and resolves the authenticated user from the database.
+ * Verifies the server session and resolves the active (non-banned) user from the database.
  */
 export async function requireUserSession() {
   const session = await getServerSession(authOptions);
@@ -119,15 +139,22 @@ export async function requireUserSession() {
   if (!email) return null;
 
   const dbUser = await findUserByEmail(email);
+  const isSuperAdmin = email === SUPER_ADMIN_EMAIL;
+  if (dbUser?.isBanned && !isSuperAdmin) return null;
+
   const userId = dbUser?.id || (session?.user as any)?.id || "";
   if (!userId) return null;
+
+  const isAdmin = isSuperAdmin || dbUser?.role === "ADMIN";
 
   return {
     session,
     email,
     dbUser,
     userId,
-    userName: dbUser?.name || session?.user?.name || "Lukas",
+    userName: dbUser?.name || session?.user?.name || "Freund",
+    userImage: dbUser?.image || session?.user?.image || null,
+    isAdmin,
   };
 }
 
@@ -136,10 +163,7 @@ export async function requireUserSession() {
  */
 export async function requireAdminSession() {
   const auth = await requireUserSession();
-  if (!auth) return null;
-
-  const isAdmin = auth.email === "lukasreinle0@gmail.com" || auth.dbUser?.role === "ADMIN";
-  if (!isAdmin) return null;
+  if (!auth || !auth.isAdmin) return null;
 
   return {
     session: auth.session,

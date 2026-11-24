@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Resend } from "resend";
 import type { DeStreamingProvider } from "./tmdb";
+import type { UserInviteQuota } from "./store";
 
 export interface WatchlistDigestEmailItem {
   tmdbId: number;
@@ -34,6 +35,10 @@ export function escapeHtml(value: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
+}
+
+function sanitizeHeaderText(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
 }
 
 function getSafePosterUrl(posterPath?: string | null): string | null {
@@ -128,12 +133,20 @@ async function sendResendHtmlEmail(params: {
 export async function sendInviteEmail(params: {
   to: string;
   invitedByName?: string;
+  expiresInDays?: number | null;
 }): Promise<{ sent: boolean; inviteLink: string; error?: string }> {
   const baseUrl = getBaseUrl();
   const emailLower = params.to.toLowerCase().trim();
   const inviteLink = `${baseUrl}/register?email=${encodeURIComponent(emailLower)}`;
   const loginLink = `${baseUrl}/login`;
-  const inviter = escapeHtml(params.invitedByName || "Lukas");
+  const rawInviterName = sanitizeHeaderText(params.invitedByName || "Lukas").slice(0, 80);
+  const inviter = escapeHtml(rawInviterName);
+  const expiryNotice =
+    typeof params.expiresInDays === "number" && params.expiresInDays > 0
+      ? `<p style="margin: 12px 0 0 0; font-size: 12px; color: #94a3b8;">
+           Hinweis: Diese Einladung ist <strong style="color:#f8fafc;">${params.expiresInDays} Tage</strong> gültig.
+         </p>`
+      : "";
 
   const html = wrapEmailLayout({
     eyebrow: "CineCircle Einladung",
@@ -152,6 +165,7 @@ export async function sendInviteEmail(params: {
           Direkt mit Google anmelden
         </a>
       </div>
+      ${expiryNotice}
       <p style="margin: 16px 0 0 0; font-size: 12px; color: #64748b;">
         Falls der Button nicht funktioniert, öffne diesen Link: <a href="${inviteLink}" style="color: #f59e0b;">${escapeHtml(inviteLink)}</a>
       </p>
@@ -160,11 +174,164 @@ export async function sendInviteEmail(params: {
 
   const res = await sendResendHtmlEmail({
     to: emailLower,
-    subject: `🎬 ${params.invitedByName || "Lukas"} hat dich zu CineCircle eingeladen!`,
+    subject: `🎬 ${rawInviterName} hat dich zu CineCircle eingeladen!`,
     html,
     context: "invite",
   });
   return { ...res, inviteLink };
+}
+
+async function sendAdminAlertEmail(params: {
+  to: string[];
+  excludeEmail: string;
+  eyebrow: string;
+  title: string;
+  introHtml: string;
+  rowsHtml: string;
+  outroHtml?: string;
+  adminHref: string;
+  adminCtaLabel: string;
+  profileHref: string;
+  profileCtaLabel: string;
+  subject: string;
+  context: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const excludedLower = params.excludeEmail.toLowerCase().trim();
+  const recipients = Array.from(
+    new Set(
+      params.to
+        .map((e) => e.toLowerCase().trim())
+        .filter((e) => Boolean(e) && e !== excludedLower)
+    )
+  );
+  if (recipients.length === 0) {
+    return { sent: false };
+  }
+
+  const baseUrl = getBaseUrl();
+  const adminUrl = `${baseUrl}${params.adminHref}`;
+  const profileUrl = `${baseUrl}${params.profileHref}`;
+
+  const html = wrapEmailLayout({
+    eyebrow: params.eyebrow,
+    title: params.title,
+    maxWidth: 560,
+    contentHtml: `
+      <p style="margin: 0 0 18px 0; font-size: 14px; line-height: 1.6; color: #cbd5e1;">
+        ${params.introHtml}
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background: #131c31; border: 1px solid #1e293b; border-radius: 14px; margin-bottom: 18px;">
+        <tr>
+          <td style="padding: 14px 16px; font-size: 13px; color: #cbd5e1; line-height: 1.7;">
+            ${params.rowsHtml}
+          </td>
+        </tr>
+      </table>
+      ${params.outroHtml ?? ""}
+      <div style="margin: 20px 0 6px 0;">
+        <a href="${adminUrl}" style="display: inline-block; padding: 12px 22px; background: #f59e0b; color: #090d16; font-weight: 800; font-size: 13px; text-decoration: none; border-radius: 12px; margin-right: 10px; margin-bottom: 10px;">
+          ${params.adminCtaLabel}
+        </a>
+        <a href="${profileUrl}" style="display: inline-block; padding: 11px 18px; background: #1e293b; color: #f8fafc; font-weight: 700; font-size: 13px; text-decoration: none; border-radius: 12px; border: 1px solid #334155;">
+          ${params.profileCtaLabel}
+        </a>
+      </div>
+    `,
+  });
+
+  const results = await Promise.all(
+    recipients.map((recipient) =>
+      sendResendHtmlEmail({
+        to: recipient,
+        subject: params.subject,
+        html,
+        context: params.context,
+      })
+    )
+  );
+  return {
+    sent: results.some((r) => r.sent),
+    error: results.find((r) => !r.sent)?.error,
+  };
+}
+
+export async function sendAdminInviteNotificationEmail(params: {
+  to: string[];
+  inviterId: string;
+  inviterName: string;
+  inviterEmail: string;
+  inviteeEmail: string;
+  expiresAt?: string | null;
+  quota: UserInviteQuota;
+}): Promise<{ sent: boolean; error?: string }> {
+  const inviterEmailLower = params.inviterEmail.toLowerCase().trim();
+  const safeInviterName = sanitizeHeaderText(params.inviterName || "Ein Nutzer").slice(0, 80);
+  const safeInvitee = sanitizeHeaderText(params.inviteeEmail.toLowerCase().trim());
+  const timestamp = new Date().toLocaleString("de-DE", {
+    timeZone: "Europe/Berlin",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+  const expiryText = params.expiresAt
+    ? new Date(params.expiresAt).toLocaleDateString("de-DE", { timeZone: "Europe/Berlin" })
+    : "Kein Ablaufdatum";
+
+  return sendAdminAlertEmail({
+    to: params.to,
+    excludeEmail: inviterEmailLower,
+    eyebrow: "CineCircle • Admin-Sicherheitshinweis",
+    title: "🔔 Neue Einladung durch einen Nutzer",
+    introHtml: `<strong style="color:#fff;">${escapeHtml(safeInviterName)}</strong> hat soeben eine neue E-Mail-Adresse zu CineCircle eingeladen und auf die Whitelist gesetzt.`,
+    rowsHtml: `
+      <div><strong style="color:#94a3b8;">Eingeladen von:</strong> <span style="color:#fff;">${escapeHtml(safeInviterName)}</span> (${escapeHtml(inviterEmailLower)})</div>
+      <div><strong style="color:#94a3b8;">Eingeladene E-Mail:</strong> <span style="color:#f59e0b; font-weight:700;">${escapeHtml(safeInvitee)}</span></div>
+      <div><strong style="color:#94a3b8;">Zeitpunkt:</strong> ${escapeHtml(timestamp)}</div>
+      <div><strong style="color:#94a3b8;">Gültig bis:</strong> ${escapeHtml(expiryText)}</div>
+      <div><strong style="color:#94a3b8;">Kontingent des Nutzers:</strong> ${params.quota.used24h}/${params.quota.limit24h} (24h) · ${params.quota.openPending}/${params.quota.maxOpenPending} offen · ${params.quota.used30d}/${params.quota.limit30d} (30 Tage)</div>
+    `,
+    outroHtml: `<p style="margin: 0 0 18px 0; font-size: 13px; line-height: 1.6; color: #94a3b8;">
+        Falls dir diese Einladung verdächtig vorkommt, kannst du die E-Mail im Admin-Dashboard sofort widerrufen oder den Nutzer sperren (dadurch werden auch alle offenen Einladungen dieses Nutzers automatisch widerrufen).
+      </p>`,
+    adminHref: "/admin",
+    adminCtaLabel: "Admin-Dashboard öffnen",
+    profileHref: `/admin/users/${encodeURIComponent(params.inviterId)}`,
+    profileCtaLabel: `Profil von ${escapeHtml(safeInviterName)} prüfen`,
+    subject: `🔔 CineCircle: ${safeInviterName} hat ${safeInvitee} eingeladen`,
+    context: "admin-invite-alert",
+  });
+}
+
+export async function sendAdminInviteApprovalRequestEmail(params: {
+  to: string[];
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  targetEmail: string;
+  blockedReason: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const requesterEmailLower = params.requesterEmail.toLowerCase().trim();
+  const safeName = sanitizeHeaderText(params.requesterName || "Ein Nutzer").slice(0, 80);
+  const safeTarget = sanitizeHeaderText(params.targetEmail.toLowerCase().trim());
+  const safeReason = sanitizeHeaderText(params.blockedReason).slice(0, 200);
+
+  return sendAdminAlertEmail({
+    to: params.to,
+    excludeEmail: requesterEmailLower,
+    eyebrow: "CineCircle • Einladungs-Freigabe angefragt",
+    title: "🛡️ Bitte um Ausnahme-Freigabe",
+    introHtml: `<strong style="color:#fff;">${escapeHtml(safeName)}</strong> wollte eine Einladung versenden, wurde aber von einem Sicherheits-Limit gestoppt und bittet dich um manuelle Freigabe.`,
+    rowsHtml: `
+      <div><strong style="color:#94a3b8;">Angefragt von:</strong> <span style="color:#fff;">${escapeHtml(safeName)}</span> (${escapeHtml(requesterEmailLower)})</div>
+      <div><strong style="color:#94a3b8;">Gewünschte E-Mail:</strong> <span style="color:#f59e0b; font-weight:700;">${escapeHtml(safeTarget)}</span></div>
+      <div><strong style="color:#94a3b8;">Blockiert wegen:</strong> <span style="color:#fb7185; font-weight:700;">${escapeHtml(safeReason)}</span></div>
+    `,
+    adminHref: "/admin#invite-approvals",
+    adminCtaLabel: "Im Admin-Dashboard freigeben / ablehnen",
+    profileHref: `/admin/users/${encodeURIComponent(params.requesterId)}`,
+    profileCtaLabel: "Profil prüfen",
+    subject: `🛡️ CineCircle: ${safeName} bittet um Einladungs-Freigabe für ${safeTarget}`,
+    context: "admin-invite-approval-request",
+  });
 }
 
 export async function sendWatchlistDigestEmail(params: {

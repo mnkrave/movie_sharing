@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUserSession } from "@/lib/auth";
 import {
   getAllCommunityData,
   getAllFriendsWithStats,
@@ -17,7 +16,6 @@ import {
   toggleRecommendationUpvote,
   updateUserSubscriptions,
   updateUserImage,
-  findUserByEmail,
   getUserFriendGroups,
   saveFriendGroup,
   deleteFriendGroup,
@@ -48,20 +46,9 @@ function sanitizeWatchedSeasons(raw: unknown): number[] | undefined {
 }
 
 export async function GET() {
-  const session = await getServerSession(authOptions);
-  let userId: string | undefined = undefined;
-  let isAdmin = false;
+  const auth = await requireUserSession();
 
-  if (session?.user?.email) {
-    const dbUser = await findUserByEmail(session.user.email);
-    userId = dbUser?.id || (session.user as any)?.id;
-    isAdmin =
-      session.user.email.toLowerCase() === "lukasreinle0@gmail.com" ||
-      dbUser?.role === "ADMIN" ||
-      (session.user as any)?.role === "ADMIN";
-  }
-
-  if (!session?.user?.email || !userId) {
+  if (!auth) {
     const publicCollections = await getVisibleCustomCollections(undefined, undefined, false);
     return NextResponse.json({
       mediaStatuses: [],
@@ -73,7 +60,7 @@ export async function GET() {
     });
   }
 
-  const currentUserName = session?.user?.name || undefined;
+  const { userId, userName: currentUserName, isAdmin } = auth;
 
   const [community, friends, friendRequests, friendGroups, customCollections] = await Promise.all([
     getAllCommunityData(userId, currentUserName),
@@ -93,28 +80,15 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const auth = await requireUserSession();
+  if (!auth) {
     return NextResponse.json(
       { error: "Bitte logge dich ein, um fortzufahren." },
       { status: 401 }
     );
   }
 
-  const dbUser = await findUserByEmail(session.user.email);
-  const userId = dbUser?.id || (session.user as any)?.id;
-  if (!userId) {
-    return NextResponse.json(
-      { error: "Benutzerkonto konnte nicht verifiziert werden." },
-      { status: 401 }
-    );
-  }
-  const userName = dbUser?.name || session.user.name || "Freund";
-  const userImage = dbUser?.image || session.user.image || null;
-  const isAdmin =
-    session.user.email.toLowerCase() === "lukasreinle0@gmail.com" ||
-    dbUser?.role === "ADMIN" ||
-    (session.user as any)?.role === "ADMIN";
+  const { userId, userName, userImage, isAdmin } = auth;
 
   try {
     const body = await req.json();
