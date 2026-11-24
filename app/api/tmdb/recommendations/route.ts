@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { findUserByEmail, getAllCommunityData } from "@/lib/store";
+import { requireUserSession } from "@/lib/auth";
+import { getAllCommunityData } from "@/lib/store";
 import {
   ALL_GENRES_MAP,
   mapGenreIdsForMediaType,
@@ -575,15 +574,10 @@ export async function POST(req: Request) {
 
     // 3. Social Collaborative Filtering via CineCircle Friends (safe session lookup)
     try {
-      const session = await getServerSession(authOptions);
-      if (session?.user?.email) {
-        const dbUser = await findUserByEmail(session.user.email);
-        const currentUserId = dbUser?.id || (session.user as any)?.id;
-        if (currentUserId) {
-          const community = await getAllCommunityData(
-            currentUserId,
-            dbUser?.name || session.user.name || undefined
-          );
+      const auth = await requireUserSession();
+      if (auth) {
+        const currentUserId = auth.userId;
+        const community = await getAllCommunityData(currentUserId, auth.userName);
 
           const myRatingMap = new Map<string, number>();
           for (const w of watchedItems) {
@@ -743,7 +737,6 @@ export async function POST(req: Request) {
               });
             })
           );
-        }
       }
     } catch (socialErr) {
       console.warn("Social collaborative filtering skipped:", socialErr);

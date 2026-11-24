@@ -3,6 +3,18 @@ import path from "path";
 import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { fetchDeStreamingProviders } from "./tmdb";
+import { SUPER_ADMIN_EMAIL, isValidEmailAddress } from "./constants";
+
+export { SUPER_ADMIN_EMAIL, isValidEmailAddress };
+
+export const INVITE_LIMITS = {
+  maxPer24h: 3,
+  maxPer30d: 10,
+  maxOpenPending: 5,
+  globalMaxPer24h: 20,
+  inviteTtlDays: 14,
+  targetCooldownHours: 24,
+} as const;
 
 export interface AppUser {
   id: string;
@@ -11,9 +23,50 @@ export interface AppUser {
   password?: string | null;
   image?: string | null;
   role: string;
+  isBanned?: boolean;
+  bannedAt?: string | null;
+  banReason?: string | null;
+  invitedByUserId?: string | null;
   subscriptions: string[];
   watchlistAlertsEnabled?: boolean;
   friendGroups?: { id: string; name: string; emoji: string; memberNames: string[] }[];
+  createdAt: string;
+}
+
+export interface AppWhitelistEntry {
+  id: string;
+  email: string;
+  invitedByUserId?: string | null;
+  invitedByName?: string | null;
+  invitedByEmail?: string | null;
+  expiresAt?: string | null;
+  acceptedAt?: string | null;
+  revokedAt?: string | null;
+  createdAt: string;
+  isRegistered?: boolean;
+}
+
+export interface UserInviteQuota {
+  used24h: number;
+  limit24h: number;
+  used30d: number;
+  limit30d: number;
+  openPending: number;
+  maxOpenPending: number;
+  inviteTtlDays: number;
+  isAdmin: boolean;
+}
+
+export interface AppInviteApprovalRequest {
+  id: string;
+  targetEmail: string;
+  requesterUserId: string;
+  requesterName: string;
+  requesterEmail: string;
+  blockedReason: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  reviewedByUserId?: string | null;
+  reviewedAt?: string | null;
   createdAt: string;
 }
 
@@ -162,7 +215,7 @@ export interface StreamingSnapshotEntry {
 
 interface LocalDbFile {
   users: AppUser[];
-  whitelist: { id: string; email: string; createdAt: string }[];
+  whitelist: AppWhitelistEntry[];
   mediaStatuses: AppMediaStatus[];
   recommendations: AppRecommendation[];
   friendships: AppFriendship[];
@@ -170,6 +223,7 @@ interface LocalDbFile {
   recommendationReplies?: AppRecommendationReply[];
   customCollections?: AppCustomCollection[];
   streamingSnapshots?: StreamingSnapshotEntry[];
+  inviteApprovalRequests?: AppInviteApprovalRequest[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -524,23 +578,78 @@ async function ensureWatchlistAlertSchema() {
   }
 }
 
+let inviteAndModerationSchemaEnsured = false;
+async function ensureInviteAndModerationSchema() {
+  if (inviteAndModerationSchemaEnsured) return;
+  try {
+    await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "isBanned" BOOLEAN NOT NULL DEFAULT false`;
+    await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedAt" TIMESTAMP(3)`;
+    await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "banReason" TEXT`;
+    await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "invitedByUserId" TEXT`;
+    await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "invitedByUserId" TEXT`;
+    await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "invitedByName" TEXT`;
+    await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "invitedByEmail" TEXT`;
+    await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "expiresAt" TIMESTAMP(3)`;
+    await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "acceptedAt" TIMESTAMP(3)`;
+    await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "revokedAt" TIMESTAMP(3)`;
+    await prisma.$executeRaw`
+      CREATE INDEX IF NOT EXISTS "WhitelistedEmail_invitedByUserId_createdAt_idx"
+      ON "WhitelistedEmail"("invitedByUserId", "createdAt")
+    `;
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "InviteApprovalRequest" (
+        "id" TEXT NOT NULL,
+        "targetEmail" TEXT NOT NULL,
+        "requesterUserId" TEXT NOT NULL,
+        "requesterName" TEXT NOT NULL,
+        "requesterEmail" TEXT NOT NULL,
+        "blockedReason" TEXT NOT NULL,
+        "status" TEXT NOT NULL DEFAULT 'PENDING',
+        "reviewedByUserId" TEXT,
+        "reviewedAt" TIMESTAMP(3),
+        "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "InviteApprovalRequest_pkey" PRIMARY KEY ("id")
+      )
+    `;
+    await prisma.$executeRaw`
+      CREATE INDEX IF NOT EXISTS "InviteApprovalRequest_status_createdAt_idx"
+      ON "InviteApprovalRequest"("status", "createdAt")
+    `;
+    await prisma.$executeRaw`
+      CREATE INDEX IF NOT EXISTS "InviteApprovalRequest_requesterUserId_createdAt_idx"
+      ON "InviteApprovalRequest"("requesterUserId", "createdAt")
+    `;
+    inviteAndModerationSchemaEnsured = true;
+  } catch {
+    // ignore if permissions or DB unavailable
+  }
+}
+
+function mapPrismaUser(u: any): AppUser {
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    password: u.password,
+    image: u.image,
+    role: u.role,
+    isBanned: Boolean(u.isBanned),
+    bannedAt: u.bannedAt ? toIsoString(u.bannedAt) : null,
+    banReason: u.banReason ?? null,
+    invitedByUserId: u.invitedByUserId ?? null,
+    subscriptions: parseSubscriptions(u.subscriptions),
+    watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
+    friendGroups: parseFriendGroups(u.friendGroups),
+    createdAt: toIsoString(u.createdAt),
+  };
+}
+
 export async function findUserByEmail(email: string): Promise<AppUser | null> {
   const emailLower = email.toLowerCase().trim();
   if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
     const u = await prisma.user.findUnique({ where: { email: emailLower } });
-    if (!u) return null;
-    return {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      password: u.password,
-      image: u.image,
-      role: u.role,
-      subscriptions: parseSubscriptions(u.subscriptions),
-      watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
-      friendGroups: parseFriendGroups(u.friendGroups),
-      createdAt: u.createdAt.toISOString(),
-    };
+    return u ? mapPrismaUser(u) : null;
   }
   const db = readLocalDb();
   return db.users.find((u) => u.email.toLowerCase() === emailLower) || null;
@@ -548,23 +657,88 @@ export async function findUserByEmail(email: string): Promise<AppUser | null> {
 
 export async function findUserById(id: string): Promise<AppUser | null> {
   if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
     const u = await prisma.user.findUnique({ where: { id } });
-    if (!u) return null;
-    return {
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      password: u.password,
-      image: u.image,
-      role: u.role,
-      subscriptions: parseSubscriptions(u.subscriptions),
-      watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
-      friendGroups: parseFriendGroups(u.friendGroups),
-      createdAt: u.createdAt.toISOString(),
-    };
+    return u ? mapPrismaUser(u) : null;
   }
   const db = readLocalDb();
   return db.users.find((u) => u.id === id) || null;
+}
+
+/**
+ * Marks a whitelist invite as accepted (clearing any expiry) and sends a pending
+ * friend request from the inviter to the newly registered user if eligible.
+ */
+async function markInviteAcceptedAndConnect(emailLower: string, userId: string): Promise<string | null> {
+  const now = new Date();
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const wl = await prisma.whitelistedEmail.findUnique({ where: { email: emailLower } });
+    if (!wl || wl.revokedAt) return null;
+
+    if (!wl.acceptedAt || wl.expiresAt) {
+      await prisma.whitelistedEmail.update({
+        where: { id: wl.id },
+        data: { acceptedAt: wl.acceptedAt ?? now, expiresAt: null },
+      });
+    }
+
+    const inviterId = wl.invitedByUserId;
+    if (inviterId && inviterId !== userId) {
+      const inviter = await prisma.user.findUnique({
+        where: { id: inviterId },
+        select: { id: true, isBanned: true },
+      });
+      if (inviter && !inviter.isBanned) {
+        const existingFs = await prisma.friendship.findFirst({
+          where: {
+            OR: [
+              { userId: inviterId, friendId: userId },
+              { userId, friendId: inviterId },
+            ],
+          },
+        });
+        if (!existingFs) {
+          await prisma.friendship
+            .create({ data: { userId: inviterId, friendId: userId, status: "PENDING" } })
+            .catch(() => {});
+        }
+      }
+      return inviterId;
+    }
+    return null;
+  }
+
+  const db = readLocalDb();
+  const wl = db.whitelist.find((w) => w.email.toLowerCase() === emailLower && !w.revokedAt);
+  if (!wl) return null;
+  wl.acceptedAt = wl.acceptedAt || now.toISOString();
+  wl.expiresAt = null;
+  const inviterId = wl.invitedByUserId || null;
+  if (inviterId && inviterId !== userId) {
+    const inviter = db.users.find((u) => u.id === inviterId && !u.isBanned);
+    if (inviter) {
+      if (!db.friendships) db.friendships = [];
+      const exists = db.friendships.some(
+        (f) =>
+          (f.userId === inviterId && f.friendId === userId) ||
+          (f.userId === userId && f.friendId === inviterId)
+      );
+      if (!exists) {
+        const iso = now.toISOString();
+        db.friendships.unshift({
+          id: `fs_${Date.now()}`,
+          userId: inviterId,
+          friendId: userId,
+          status: "PENDING",
+          createdAt: iso,
+          updatedAt: iso,
+        });
+      }
+    }
+  }
+  writeLocalDb(db);
+  return inviterId;
 }
 
 export async function createOrUpdateUser(data: {
@@ -575,10 +749,11 @@ export async function createOrUpdateUser(data: {
   role?: string;
 }): Promise<AppUser> {
   const emailLower = data.email.toLowerCase().trim();
-  const isAdmin = emailLower === "lukasreinle0@gmail.com";
+  const isAdmin = emailLower === SUPER_ADMIN_EMAIL;
   const role = isAdmin ? "ADMIN" : data.role || "USER";
 
   if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
     const existing = await prisma.user.findUnique({ where: { email: emailLower } });
     if (existing) {
       const updated = await prisma.user.update({
@@ -590,18 +765,11 @@ export async function createOrUpdateUser(data: {
           role: isAdmin ? "ADMIN" : existing.role,
         },
       });
-      return {
-        id: updated.id,
-        name: updated.name,
-        email: updated.email,
-        password: updated.password,
-        image: updated.image,
-        role: updated.role,
-        subscriptions: parseSubscriptions(updated.subscriptions),
-        friendGroups: parseFriendGroups(updated.friendGroups),
-        createdAt: updated.createdAt.toISOString(),
-      };
+      await markInviteAcceptedAndConnect(emailLower, updated.id);
+      return mapPrismaUser(updated);
     }
+
+    const wl = await prisma.whitelistedEmail.findUnique({ where: { email: emailLower } });
     const created = await prisma.user.create({
       data: {
         email: emailLower,
@@ -609,33 +777,27 @@ export async function createOrUpdateUser(data: {
         password: data.password,
         image: data.image,
         role,
+        invitedByUserId: wl && !wl.revokedAt ? wl.invitedByUserId : null,
         subscriptions: JSON.stringify(["netflix", "prime", "disney"]),
       },
     });
-    return {
-      id: created.id,
-      name: created.name,
-      email: created.email,
-      password: created.password,
-      image: created.image,
-      role: created.role,
-      subscriptions: parseSubscriptions(created.subscriptions),
-      friendGroups: parseFriendGroups(created.friendGroups),
-      createdAt: created.createdAt.toISOString(),
-    };
+    await markInviteAcceptedAndConnect(emailLower, created.id);
+    return mapPrismaUser(created);
   }
 
   const db = readLocalDb();
-  let existing = db.users.find((u) => u.email.toLowerCase() === emailLower);
+  const existing = db.users.find((u) => u.email.toLowerCase() === emailLower);
   if (existing) {
     existing.name = data.name || existing.name;
     if (data.password) existing.password = data.password;
     if (data.image !== undefined) existing.image = data.image;
     if (isAdmin) existing.role = "ADMIN";
     writeLocalDb(db);
+    await markInviteAcceptedAndConnect(emailLower, existing.id);
     return existing;
   }
 
+  const wl = db.whitelist.find((w) => w.email.toLowerCase() === emailLower && !w.revokedAt);
   const newUser: AppUser = {
     id: `user_${Date.now()}`,
     email: emailLower,
@@ -643,11 +805,14 @@ export async function createOrUpdateUser(data: {
     password: data.password || null,
     image: data.image || null,
     role,
+    isBanned: false,
+    invitedByUserId: wl?.invitedByUserId ?? null,
     subscriptions: ["netflix", "prime", "disney"],
     createdAt: new Date().toISOString(),
   };
   db.users.push(newUser);
   writeLocalDb(db);
+  await markInviteAcceptedAndConnect(emailLower, newUser.id);
   return newUser;
 }
 
@@ -1012,11 +1177,41 @@ export async function updateUserImage(userId: string, image: string | null): Pro
   return safeImage;
 }
 
+function isWhitelistEntryActive(
+  entry: { revokedAt?: Date | string | null; acceptedAt?: Date | string | null; expiresAt?: Date | string | null },
+  nowMs = Date.now()
+): boolean {
+  if (entry.revokedAt) return false;
+  if (entry.acceptedAt) return true;
+  if (!entry.expiresAt) return true;
+  return new Date(entry.expiresAt).getTime() > nowMs;
+}
+
+function mapWhitelistEntry(w: any, registeredEmails: Set<string>): AppWhitelistEntry {
+  const emailLower = w.email.toLowerCase();
+  return {
+    id: w.id,
+    email: w.email,
+    invitedByUserId: w.invitedByUserId ?? null,
+    invitedByName: w.invitedByName ?? null,
+    invitedByEmail: w.invitedByEmail ?? null,
+    expiresAt: w.expiresAt ? toIsoString(w.expiresAt) : null,
+    acceptedAt: w.acceptedAt ? toIsoString(w.acceptedAt) : null,
+    revokedAt: w.revokedAt ? toIsoString(w.revokedAt) : null,
+    createdAt: toIsoString(w.createdAt),
+    isRegistered: Boolean(w.acceptedAt) || registeredEmails.has(emailLower),
+  };
+}
+
 export async function isEmailWhitelisted(email: string): Promise<boolean> {
   const emailLower = email.toLowerCase().trim();
-  if (emailLower === "lukasreinle0@gmail.com") {
+  if (emailLower === SUPER_ADMIN_EMAIL) {
     await addEmailToWhitelist(emailLower);
     return true;
+  }
+  const existingUser = await findUserByEmail(emailLower);
+  if (existingUser?.isBanned) {
+    return false;
   }
   const envList = (process.env.WHITELISTED_EMAILS || "")
     .split(",")
@@ -1028,53 +1223,883 @@ export async function isEmailWhitelisted(email: string): Promise<boolean> {
   }
 
   if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
     const found = await prisma.whitelistedEmail.findUnique({ where: { email: emailLower } });
-    return !!found;
+    return Boolean(found) && isWhitelistEntryActive(found!);
   }
 
   const db = readLocalDb();
-  return db.whitelist.some((w) => w.email.toLowerCase() === emailLower);
+  const found = db.whitelist.find((w) => w.email.toLowerCase() === emailLower);
+  return Boolean(found) && isWhitelistEntryActive(found!);
 }
 
-export async function getWhitelist() {
+export async function getWhitelist(): Promise<AppWhitelistEntry[]> {
   if (await isPostgresAvailable()) {
-    const list = await prisma.whitelistedEmail.findMany({ orderBy: { createdAt: "desc" } });
-    return list.map((w) => ({ id: w.id, email: w.email, createdAt: w.createdAt.toISOString() }));
+    await ensureInviteAndModerationSchema();
+    const [list, users] = await Promise.all([
+      prisma.whitelistedEmail.findMany({
+        where: { revokedAt: null },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.findMany({ select: { email: true } }),
+    ]);
+    const registeredEmails = new Set(users.map((u) => u.email.toLowerCase()));
+    return list.map((w) => mapWhitelistEntry(w, registeredEmails));
   }
   const db = readLocalDb();
-  return db.whitelist;
+  const registeredEmails = new Set(db.users.map((u) => u.email.toLowerCase()));
+  return db.whitelist
+    .filter((w) => !w.revokedAt)
+    .map((w) => mapWhitelistEntry(w, registeredEmails));
 }
 
-export async function addEmailToWhitelist(email: string) {
+export async function addEmailToWhitelist(
+  email: string,
+  inviter?: { userId?: string | null; name?: string | null; email?: string | null }
+) {
   const emailLower = email.toLowerCase().trim();
   if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
     const exists = await prisma.whitelistedEmail.findUnique({ where: { email: emailLower } });
     if (!exists) {
-      await prisma.whitelistedEmail.create({ data: { email: emailLower } });
+      await prisma.whitelistedEmail.create({
+        data: {
+          email: emailLower,
+          invitedByUserId: inviter?.userId ?? null,
+          invitedByName: inviter?.name ?? null,
+          invitedByEmail: inviter?.email ?? null,
+        },
+      });
+    } else if (exists.revokedAt || exists.expiresAt) {
+      await prisma.whitelistedEmail.update({
+        where: { email: emailLower },
+        data: {
+          revokedAt: null,
+          expiresAt: null,
+          invitedByUserId: inviter?.userId ?? exists.invitedByUserId,
+          invitedByName: inviter?.name ?? exists.invitedByName,
+          invitedByEmail: inviter?.email ?? exists.invitedByEmail,
+        },
+      });
     }
     return;
   }
   const db = readLocalDb();
-  if (!db.whitelist.some((w) => w.email.toLowerCase() === emailLower)) {
+  const existing = db.whitelist.find((w) => w.email.toLowerCase() === emailLower);
+  if (!existing) {
     db.whitelist.unshift({
       id: `wl_${Date.now()}`,
       email: emailLower,
+      invitedByUserId: inviter?.userId ?? null,
+      invitedByName: inviter?.name ?? null,
+      invitedByEmail: inviter?.email ?? null,
+      expiresAt: null,
+      acceptedAt: null,
+      revokedAt: null,
       createdAt: new Date().toISOString(),
     });
+    writeLocalDb(db);
+  } else if (existing.revokedAt || existing.expiresAt) {
+    existing.revokedAt = null;
+    existing.expiresAt = null;
+    if (inviter?.userId) existing.invitedByUserId = inviter.userId;
+    if (inviter?.name) existing.invitedByName = inviter.name;
+    if (inviter?.email) existing.invitedByEmail = inviter.email;
     writeLocalDb(db);
   }
 }
 
 export async function removeEmailFromWhitelist(email: string) {
   const emailLower = email.toLowerCase().trim();
-  if (emailLower === "lukasreinle0@gmail.com") return;
+  if (emailLower === SUPER_ADMIN_EMAIL) return;
+  const now = new Date();
   if (await isPostgresAvailable()) {
-    await prisma.whitelistedEmail.deleteMany({ where: { email: emailLower } });
+    await ensureInviteAndModerationSchema();
+    await prisma.whitelistedEmail.updateMany({
+      where: { email: emailLower, revokedAt: null },
+      data: { revokedAt: now },
+    });
     return;
   }
   const db = readLocalDb();
-  db.whitelist = db.whitelist.filter((w) => w.email.toLowerCase() !== emailLower);
+  const item = db.whitelist.find((w) => w.email.toLowerCase() === emailLower);
+  if (item) {
+    item.revokedAt = now.toISOString();
+    writeLocalDb(db);
+  }
+}
+
+function tallyInviteQuota(params: {
+  entries: Array<{
+    email: string;
+    invitedByUserId?: string | null;
+    createdAt: Date | string;
+    expiresAt?: Date | string | null;
+    acceptedAt?: Date | string | null;
+    revokedAt?: Date | string | null;
+  }>;
+  users: Array<{ id: string; email: string; role: string }>;
+  userId: string;
+  isAdmin: boolean;
+  nowMs: number;
+}): { quota: UserInviteQuota; globalUsed24h: number; registeredSet: Set<string> } {
+  const { entries, users, userId, isAdmin, nowMs } = params;
+  const since24hMs = nowMs - 24 * 60 * 60 * 1000;
+  const since30dMs = nowMs - 30 * 24 * 60 * 60 * 1000;
+  const registeredSet = new Set(users.map((u) => u.email.toLowerCase()));
+  const adminIds = new Set(
+    users
+      .filter((u) => u.role === "ADMIN" || u.email.toLowerCase() === SUPER_ADMIN_EMAIL)
+      .map((u) => u.id)
+  );
+
+  let used24h = 0;
+  let used30d = 0;
+  let openPending = 0;
+  let globalUsed24h = 0;
+
+  for (const e of entries) {
+    const createdTs = new Date(e.createdAt).getTime();
+    if (e.invitedByUserId && !adminIds.has(e.invitedByUserId) && createdTs >= since24hMs) {
+      globalUsed24h++;
+    }
+    if (e.invitedByUserId !== userId) continue;
+    if (createdTs >= since24hMs) used24h++;
+    if (createdTs >= since30dMs) used30d++;
+    if (
+      !e.revokedAt &&
+      !e.acceptedAt &&
+      !registeredSet.has(e.email.toLowerCase()) &&
+      (!e.expiresAt || new Date(e.expiresAt).getTime() > nowMs)
+    ) {
+      openPending++;
+    }
+  }
+
+  return {
+    quota: {
+      used24h,
+      limit24h: INVITE_LIMITS.maxPer24h,
+      used30d,
+      limit30d: INVITE_LIMITS.maxPer30d,
+      openPending,
+      maxOpenPending: INVITE_LIMITS.maxOpenPending,
+      inviteTtlDays: INVITE_LIMITS.inviteTtlDays,
+      isAdmin,
+    },
+    globalUsed24h,
+    registeredSet,
+  };
+}
+
+async function loadInviteQuotaContext(userId: string, isAdmin: boolean) {
+  const nowMs = Date.now();
+  const since24h = new Date(nowMs - 24 * 60 * 60 * 1000);
+
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const [entries, users] = await Promise.all([
+      prisma.whitelistedEmail.findMany({
+        where: {
+          OR: [{ invitedByUserId: userId }, { createdAt: { gte: since24h }, invitedByUserId: { not: null } }],
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.user.findMany({ select: { id: true, email: true, role: true } }),
+    ]);
+    return {
+      entries,
+      ...tallyInviteQuota({ entries, users, userId, isAdmin, nowMs }),
+    };
+  }
+
+  const db = readLocalDb();
+  return {
+    entries: db.whitelist,
+    ...tallyInviteQuota({ entries: db.whitelist, users: db.users, userId, isAdmin, nowMs }),
+  };
+}
+
+export async function getUserInvitesAndQuota(
+  userId: string,
+  isAdmin: boolean
+): Promise<{ invites: AppWhitelistEntry[]; quota: UserInviteQuota }> {
+  const { entries, quota, registeredSet } = await loadInviteQuotaContext(userId, isAdmin);
+  const invites = entries
+    .filter((w) => w.invitedByUserId === userId && !w.revokedAt)
+    .slice(0, 50)
+    .map((w) => mapWhitelistEntry(w, registeredSet));
+
+  return { invites, quota };
+}
+
+function checkExistingWhitelistConflict(
+  existingWl: { createdAt: Date | string; revokedAt?: Date | string | null; acceptedAt?: Date | string | null; expiresAt?: Date | string | null },
+  inviterIsAdmin: boolean,
+  nowMs: number
+): { status: number; error: string; canRequestAdminApproval?: boolean; blockedReason?: string } | null {
+  if (isWhitelistEntryActive(existingWl, nowMs)) {
+    return { status: 409, error: "Diese E-Mail-Adresse wurde bereits eingeladen und ist aktiv." };
+  }
+  const targetCooldownMs = INVITE_LIMITS.targetCooldownHours * 60 * 60 * 1000;
+  if (!inviterIsAdmin && nowMs - new Date(existingWl.createdAt).getTime() < targetCooldownMs) {
+    return {
+      status: 429,
+      error: "An diese E-Mail-Adresse wurde in den letzten 24 Stunden bereits eine Einladung gesendet.",
+      canRequestAdminApproval: true,
+      blockedReason: "24h-Cooldown für diese Ziel-E-Mail",
+    };
+  }
+  return null;
+}
+
+async function evaluateUserInviteEligibility(params: {
+  inviterId: string;
+  inviterEmail: string;
+  inviterIsAdmin: boolean;
+  emailLower: string;
+  nowMs: number;
+}): Promise<
+  | { ok: true; quota: UserInviteQuota }
+  | { ok: false; status: number; error: string; canRequestAdminApproval?: boolean; blockedReason?: string }
+> {
+  const { emailLower, nowMs } = params;
+  if (!isValidEmailAddress(emailLower)) {
+    return { ok: false, status: 400, error: "Bitte gib eine gültige E-Mail-Adresse ein." };
+  }
+  if (emailLower === params.inviterEmail.toLowerCase().trim()) {
+    return { ok: false, status: 400, error: "Du kannst dich nicht selbst einladen." };
+  }
+
+  const existingUser = await findUserByEmail(emailLower);
+  if (existingUser?.isBanned) {
+    return {
+      ok: false,
+      status: 403,
+      error: "Diese E-Mail-Adresse kann derzeit nicht eingeladen werden.",
+    };
+  }
+  if (existingUser) {
+    return {
+      ok: false,
+      status: 409,
+      error: "Diese Person ist bereits bei CineCircle registriert. Suche sie oben unter „Freund hinzufügen“.",
+    };
+  }
+
+  // Check active/cooldown whitelist conflict first (so already-active emails never offer override)
+  const existingWl = (await isPostgresAvailable())
+    ? (await ensureInviteAndModerationSchema(),
+      await prisma.whitelistedEmail.findUnique({ where: { email: emailLower } }))
+    : readLocalDb().whitelist.find((w) => w.email.toLowerCase() === emailLower);
+
+  if (existingWl) {
+    const conflict = checkExistingWhitelistConflict(existingWl, params.inviterIsAdmin, nowMs);
+    if (conflict) return { ok: false, ...conflict };
+  }
+
+  const { quota, globalUsed24h } = await loadInviteQuotaContext(
+    params.inviterId,
+    params.inviterIsAdmin
+  );
+
+  if (!params.inviterIsAdmin) {
+    if (globalUsed24h >= INVITE_LIMITS.globalMaxPer24h) {
+      return {
+        ok: false,
+        status: 429,
+        error: "Das tägliche Sicherheits-Limit für Einladungen wurde erreicht. Du kannst den Admin um eine manuelle Freigabe bitten.",
+        canRequestAdminApproval: true,
+        blockedReason: `Plattform-Limit (${INVITE_LIMITS.globalMaxPer24h}/24h) erreicht`,
+      };
+    }
+    if (quota.used24h >= INVITE_LIMITS.maxPer24h) {
+      return {
+        ok: false,
+        status: 429,
+        error: `Du hast das Tageslimit von ${INVITE_LIMITS.maxPer24h} Einladungen in 24 Stunden erreicht.`,
+        canRequestAdminApproval: true,
+        blockedReason: `Tageslimit (${INVITE_LIMITS.maxPer24h}/24h) erreicht`,
+      };
+    }
+    if (quota.used30d >= INVITE_LIMITS.maxPer30d) {
+      return {
+        ok: false,
+        status: 429,
+        error: `Du hast dein Kontingent von ${INVITE_LIMITS.maxPer30d} Einladungen in 30 Tagen ausgeschöpft.`,
+        canRequestAdminApproval: true,
+        blockedReason: `30-Tage-Kontingent (${INVITE_LIMITS.maxPer30d}/30d) erreicht`,
+      };
+    }
+    if (quota.openPending >= INVITE_LIMITS.maxOpenPending) {
+      return {
+        ok: false,
+        status: 429,
+        error: `Maximal ${INVITE_LIMITS.maxOpenPending} offene Einladungen gleichzeitig. Warte auf eine Registrierung, ziehe eine offene Einladung zurück oder bitte den Admin um Freigabe.`,
+        canRequestAdminApproval: true,
+        blockedReason: `Max. ${INVITE_LIMITS.maxOpenPending} offene Einladungen erreicht`,
+      };
+    }
+  }
+
+  return { ok: true, quota };
+}
+
+async function upsertWhitelistInviteRecord(params: {
+  emailLower: string;
+  inviterId: string;
+  inviterName: string;
+  inviterEmailLower: string;
+  expiresAt: Date | null;
+  now: Date;
+}): Promise<{ ok: true; entry: AppWhitelistEntry } | { ok: false; status: number; error: string }> {
+  const { emailLower, inviterId, inviterName, inviterEmailLower, expiresAt, now } = params;
+
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const existingWl = await prisma.whitelistedEmail.findUnique({ where: { email: emailLower } });
+    if (existingWl) {
+      const updated = await prisma.whitelistedEmail.update({
+        where: { email: emailLower },
+        data: {
+          invitedByUserId: inviterId,
+          invitedByName: inviterName,
+          invitedByEmail: inviterEmailLower,
+          expiresAt,
+          acceptedAt: null,
+          revokedAt: null,
+          createdAt: now,
+        },
+      });
+      return { ok: true, entry: mapWhitelistEntry(updated, new Set()) };
+    }
+
+    try {
+      const created = await prisma.whitelistedEmail.create({
+        data: {
+          email: emailLower,
+          invitedByUserId: inviterId,
+          invitedByName: inviterName,
+          invitedByEmail: inviterEmailLower,
+          expiresAt,
+        },
+      });
+      return { ok: true, entry: mapWhitelistEntry(created, new Set()) };
+    } catch (err: any) {
+      if (err?.code === "P2002") {
+        return {
+          ok: false,
+          status: 409,
+          error: "Diese E-Mail-Adresse wurde bereits eingeladen und ist aktiv.",
+        };
+      }
+      throw err;
+    }
+  }
+
+  const db = readLocalDb();
+  const existingWl = db.whitelist.find((w) => w.email.toLowerCase() === emailLower);
+  if (existingWl) {
+    existingWl.invitedByUserId = inviterId;
+    existingWl.invitedByName = inviterName;
+    existingWl.invitedByEmail = inviterEmailLower;
+    existingWl.expiresAt = expiresAt ? expiresAt.toISOString() : null;
+    existingWl.acceptedAt = null;
+    existingWl.revokedAt = null;
+    existingWl.createdAt = now.toISOString();
+    writeLocalDb(db);
+    return { ok: true, entry: mapWhitelistEntry(existingWl, new Set()) };
+  }
+
+  const entry: AppWhitelistEntry = {
+    id: `wl_${Date.now()}`,
+    email: emailLower,
+    invitedByUserId: inviterId,
+    invitedByName: inviterName,
+    invitedByEmail: inviterEmailLower,
+    expiresAt: expiresAt ? expiresAt.toISOString() : null,
+    acceptedAt: null,
+    revokedAt: null,
+    createdAt: now.toISOString(),
+    isRegistered: false,
+  };
+  db.whitelist.unshift(entry);
   writeLocalDb(db);
+  return { ok: true, entry };
+}
+
+export async function createUserInvite(params: {
+  inviterId: string;
+  inviterName: string;
+  inviterEmail: string;
+  inviterIsAdmin: boolean;
+  targetEmail: string;
+}): Promise<
+  | { success: true; entry: AppWhitelistEntry; quota: UserInviteQuota }
+  | { success: false; status: number; error: string; canRequestAdminApproval?: boolean }
+> {
+  const emailLower = params.targetEmail.toLowerCase().trim();
+  const now = new Date();
+  const nowMs = now.getTime();
+
+  const eligibility = await evaluateUserInviteEligibility({
+    inviterId: params.inviterId,
+    inviterEmail: params.inviterEmail,
+    inviterIsAdmin: params.inviterIsAdmin,
+    emailLower,
+    nowMs,
+  });
+
+  if (!eligibility.ok) {
+    return {
+      success: false,
+      status: eligibility.status,
+      error: eligibility.error,
+      canRequestAdminApproval: eligibility.canRequestAdminApproval,
+    };
+  }
+
+  const expiresAt = params.inviterIsAdmin
+    ? null
+    : new Date(nowMs + INVITE_LIMITS.inviteTtlDays * 24 * 60 * 60 * 1000);
+
+  const saved = await upsertWhitelistInviteRecord({
+    emailLower,
+    inviterId: params.inviterId,
+    inviterName: params.inviterName,
+    inviterEmailLower: params.inviterEmail.toLowerCase().trim(),
+    expiresAt,
+    now,
+  });
+
+  if (!saved.ok) {
+    return { success: false, status: saved.status, error: saved.error };
+  }
+
+  return {
+    success: true,
+    entry: saved.entry,
+    quota: {
+      ...eligibility.quota,
+      used24h: eligibility.quota.used24h + 1,
+      used30d: eligibility.quota.used30d + 1,
+      openPending: eligibility.quota.openPending + 1,
+    },
+  };
+}
+
+function mapInviteApprovalRequest(r: any): AppInviteApprovalRequest {
+  return {
+    id: r.id,
+    targetEmail: r.targetEmail,
+    requesterUserId: r.requesterUserId,
+    requesterName: r.requesterName,
+    requesterEmail: r.requesterEmail,
+    blockedReason: r.blockedReason,
+    status: r.status as "PENDING" | "APPROVED" | "REJECTED",
+    reviewedByUserId: r.reviewedByUserId ?? null,
+    reviewedAt: r.reviewedAt ? toIsoString(r.reviewedAt) : null,
+    createdAt: toIsoString(r.createdAt),
+  };
+}
+
+export async function getInviteApprovalRequests(options?: {
+  requesterUserId?: string;
+}): Promise<AppInviteApprovalRequest[]> {
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const rows = await prisma.inviteApprovalRequest.findMany({
+      where: options?.requesterUserId ? { requesterUserId: options.requesterUserId } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+    return rows.map(mapInviteApprovalRequest);
+  }
+
+  const db = readLocalDb();
+  const list = db.inviteApprovalRequests || [];
+  return (options?.requesterUserId
+    ? list.filter((r) => r.requesterUserId === options.requesterUserId)
+    : list
+  ).slice(0, 50);
+}
+
+export async function createInviteApprovalRequest(params: {
+  requesterId: string;
+  requesterName: string;
+  requesterEmail: string;
+  requesterIsAdmin: boolean;
+  targetEmail: string;
+}): Promise<
+  | { success: true; request: AppInviteApprovalRequest }
+  | { success: false; status: number; error: string }
+> {
+  const emailLower = params.targetEmail.toLowerCase().trim();
+  const now = new Date();
+  const nowMs = now.getTime();
+  const since24h = new Date(nowMs - 24 * 60 * 60 * 1000);
+
+  // Re-evaluate server-side so blocked reason cannot be spoofed and banned/active emails are rejected
+  const eligibility = await evaluateUserInviteEligibility({
+    inviterId: params.requesterId,
+    inviterEmail: params.requesterEmail,
+    inviterIsAdmin: params.requesterIsAdmin,
+    emailLower,
+    nowMs,
+  });
+
+  if (eligibility.ok) {
+    return {
+      success: false,
+      status: 400,
+      error: "Du kannst diese E-Mail direkt einladen — eine Admin-Freigabe ist nicht nötig.",
+    };
+  }
+  if (!eligibility.canRequestAdminApproval) {
+    return { success: false, status: eligibility.status, error: eligibility.error };
+  }
+
+  const blockedReason = eligibility.blockedReason || eligibility.error.slice(0, 160);
+
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const [existingForEmail, recentCount, pendingCount] = await Promise.all([
+      prisma.inviteApprovalRequest.findFirst({
+        where: { targetEmail: emailLower, status: "PENDING" },
+        select: { id: true },
+      }),
+      prisma.inviteApprovalRequest.count({
+        where: { requesterUserId: params.requesterId, createdAt: { gte: since24h } },
+      }),
+      prisma.inviteApprovalRequest.count({
+        where: { requesterUserId: params.requesterId, status: "PENDING" },
+      }),
+    ]);
+
+    if (existingForEmail) {
+      return {
+        success: false,
+        status: 409,
+        error: "Für diese E-Mail liegt bereits eine offene Freigabe-Anfrage beim Admin vor.",
+      };
+    }
+    if (recentCount >= 3 || pendingCount >= 5) {
+      return {
+        success: false,
+        status: 429,
+        error: "Du hast das Limit für Admin-Freigabe-Anfragen erreicht. Bitte warte auf die Rückmeldung des Admins.",
+      };
+    }
+
+    const created = await prisma.inviteApprovalRequest.create({
+      data: {
+        targetEmail: emailLower,
+        requesterUserId: params.requesterId,
+        requesterName: params.requesterName,
+        requesterEmail: params.requesterEmail.toLowerCase().trim(),
+        blockedReason,
+        status: "PENDING",
+      },
+    });
+    return { success: true, request: mapInviteApprovalRequest(created) };
+  }
+
+  const db = readLocalDb();
+  if (!db.inviteApprovalRequests) db.inviteApprovalRequests = [];
+  if (db.inviteApprovalRequests.some((r) => r.targetEmail === emailLower && r.status === "PENDING")) {
+    return {
+      success: false,
+      status: 409,
+      error: "Für diese E-Mail liegt bereits eine offene Freigabe-Anfrage beim Admin vor.",
+    };
+  }
+  const recentCount = db.inviteApprovalRequests.filter(
+    (r) => r.requesterUserId === params.requesterId && new Date(r.createdAt).getTime() >= since24h.getTime()
+  ).length;
+  const pendingCount = db.inviteApprovalRequests.filter(
+    (r) => r.requesterUserId === params.requesterId && r.status === "PENDING"
+  ).length;
+  if (recentCount >= 3 || pendingCount >= 5) {
+    return {
+      success: false,
+      status: 429,
+      error: "Du hast das Limit für Admin-Freigabe-Anfragen erreicht. Bitte warte auf die Rückmeldung des Admins.",
+    };
+  }
+
+  const created: AppInviteApprovalRequest = {
+    id: `iar_${Date.now()}`,
+    targetEmail: emailLower,
+    requesterUserId: params.requesterId,
+    requesterName: params.requesterName,
+    requesterEmail: params.requesterEmail.toLowerCase().trim(),
+    blockedReason,
+    status: "PENDING",
+    reviewedByUserId: null,
+    reviewedAt: null,
+    createdAt: now.toISOString(),
+  };
+  db.inviteApprovalRequests.unshift(created);
+  writeLocalDb(db);
+  return { success: true, request: created };
+}
+
+export async function reviewInviteApprovalRequest(params: {
+  requestId: string;
+  adminUserId: string;
+  action: "APPROVE" | "REJECT";
+}): Promise<
+  | { success: true; request: AppInviteApprovalRequest; entry?: AppWhitelistEntry }
+  | { success: false; status: number; error: string }
+> {
+  const cleanId = params.requestId.trim();
+  if (!cleanId) return { success: false, status: 400, error: "Anfrage-ID fehlt." };
+  const now = new Date();
+
+  let reqRecord: AppInviteApprovalRequest | null = null;
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const raw = await prisma.inviteApprovalRequest.findUnique({ where: { id: cleanId } });
+    reqRecord = raw ? mapInviteApprovalRequest(raw) : null;
+  } else {
+    const db = readLocalDb();
+    reqRecord = (db.inviteApprovalRequests || []).find((r) => r.id === cleanId) || null;
+  }
+
+  if (!reqRecord) {
+    return { success: false, status: 404, error: "Freigabe-Anfrage nicht gefunden." };
+  }
+  if (reqRecord.status !== "PENDING") {
+    return { success: false, status: 400, error: "Diese Anfrage wurde bereits bearbeitet." };
+  }
+
+  let approvedEntry: AppWhitelistEntry | undefined;
+  if (params.action === "APPROVE") {
+    const existingUser = await findUserByEmail(reqRecord.targetEmail);
+    if (existingUser?.isBanned) {
+      return {
+        success: false,
+        status: 400,
+        error: "Diese E-Mail gehört zu einem gesperrten Nutzer. Entsperre ihn zuerst in der Nutzer-Übersicht.",
+      };
+    }
+    if (existingUser) {
+      return { success: false, status: 409, error: "Diese Person ist bereits registriert." };
+    }
+
+    const saved = await upsertWhitelistInviteRecord({
+      emailLower: reqRecord.targetEmail.toLowerCase().trim(),
+      inviterId: reqRecord.requesterUserId,
+      inviterName: reqRecord.requesterName,
+      inviterEmailLower: reqRecord.requesterEmail.toLowerCase().trim(),
+      expiresAt: null, // Admin explicitly approved this invite
+      now,
+    });
+    if (!saved.ok) {
+      return { success: false, status: saved.status, error: saved.error };
+    }
+    approvedEntry = saved.entry;
+  }
+
+  const nextStatus = params.action === "APPROVE" ? "APPROVED" : "REJECTED";
+  if (await isPostgresAvailable()) {
+    const updated = await prisma.inviteApprovalRequest.update({
+      where: { id: cleanId },
+      data: {
+        status: nextStatus,
+        reviewedByUserId: params.adminUserId,
+        reviewedAt: now,
+      },
+    });
+    return { success: true, request: mapInviteApprovalRequest(updated), entry: approvedEntry };
+  }
+
+  const db = readLocalDb();
+  const item = (db.inviteApprovalRequests || []).find((r) => r.id === cleanId);
+  if (item) {
+    item.status = nextStatus;
+    item.reviewedByUserId = params.adminUserId;
+    item.reviewedAt = now.toISOString();
+    writeLocalDb(db);
+    return { success: true, request: item, entry: approvedEntry };
+  }
+  return { success: false, status: 404, error: "Freigabe-Anfrage nicht gefunden." };
+}
+
+export async function revokeUserInvite(
+  userId: string,
+  inviteId: string
+): Promise<{ success: boolean; status?: number; error?: string }> {
+  const cleanId = inviteId.trim();
+  if (!cleanId) return { success: false, status: 400, error: "Einladungs-ID fehlt." };
+  const now = new Date();
+
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const entry = await prisma.whitelistedEmail.findUnique({ where: { id: cleanId } });
+    if (!entry || entry.invitedByUserId !== userId || entry.revokedAt) {
+      return { success: false, status: 404, error: "Einladung nicht gefunden." };
+    }
+    const registered = await prisma.user.findUnique({
+      where: { email: entry.email.toLowerCase() },
+      select: { id: true },
+    });
+    if (entry.acceptedAt || registered) {
+      return {
+        success: false,
+        status: 400,
+        error: "Diese Person hat sich bereits registriert. Die Einladung kann nicht mehr zurückgezogen werden.",
+      };
+    }
+    await prisma.whitelistedEmail.update({
+      where: { id: cleanId },
+      data: { revokedAt: now },
+    });
+    return { success: true };
+  }
+
+  const db = readLocalDb();
+  const entry = db.whitelist.find((w) => w.id === cleanId && w.invitedByUserId === userId && !w.revokedAt);
+  if (!entry) return { success: false, status: 404, error: "Einladung nicht gefunden." };
+  const registered = db.users.some((u) => u.email.toLowerCase() === entry.email.toLowerCase());
+  if (entry.acceptedAt || registered) {
+    return {
+      success: false,
+      status: 400,
+      error: "Diese Person hat sich bereits registriert. Die Einladung kann nicht mehr zurückgezogen werden.",
+    };
+  }
+  entry.revokedAt = now.toISOString();
+  writeLocalDb(db);
+  return { success: true };
+}
+
+export async function getAdminNotificationEmails(): Promise<string[]> {
+  const emails = new Set<string>([SUPER_ADMIN_EMAIL]);
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const admins = await prisma.user.findMany({
+      where: { role: "ADMIN", isBanned: false },
+      select: { email: true },
+    });
+    for (const a of admins) {
+      if (a.email) emails.add(a.email.toLowerCase().trim());
+    }
+    return Array.from(emails);
+  }
+  const db = readLocalDb();
+  for (const u of db.users) {
+    if (u.role === "ADMIN" && !u.isBanned && u.email) {
+      emails.add(u.email.toLowerCase().trim());
+    }
+  }
+  return Array.from(emails);
+}
+
+export async function setUserBanStatus(params: {
+  targetUserId: string;
+  adminUserId: string;
+  adminEmail: string;
+  isBanned: boolean;
+  reason?: string | null;
+}): Promise<
+  | { success: true; user: AppUser; revokedInvitesCount: number }
+  | { success: false; status: number; error: string }
+> {
+  const target = await findUserById(params.targetUserId);
+  if (!target) {
+    return { success: false, status: 404, error: "Benutzer nicht gefunden." };
+  }
+  const targetEmailLower = target.email.toLowerCase().trim();
+  const actingIsSuperAdmin = params.adminEmail.toLowerCase().trim() === SUPER_ADMIN_EMAIL;
+
+  if (targetEmailLower === SUPER_ADMIN_EMAIL) {
+    return {
+      success: false,
+      status: 403,
+      error: "Der Super-Admin (lukasreinle0@gmail.com) kann niemals gesperrt werden.",
+    };
+  }
+  if (target.id === params.adminUserId) {
+    return { success: false, status: 400, error: "Du kannst dich nicht selbst sperren." };
+  }
+  if (target.role === "ADMIN" && !actingIsSuperAdmin) {
+    return {
+      success: false,
+      status: 403,
+      error: "Nur der Super-Admin (lukasreinle0@gmail.com) kann andere Admins sperren.",
+    };
+  }
+
+  const cleanReason = params.isBanned && params.reason ? String(params.reason).trim().slice(0, 300) || null : null;
+  const now = new Date();
+  let revokedInvitesCount = 0;
+
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const updated = await prisma.user.update({
+      where: { id: target.id },
+      data: {
+        isBanned: params.isBanned,
+        bannedAt: params.isBanned ? now : null,
+        banReason: cleanReason,
+      },
+    });
+
+    if (params.isBanned) {
+      const [revoked] = await Promise.all([
+        prisma.whitelistedEmail.updateMany({
+          where: {
+            invitedByUserId: target.id,
+            acceptedAt: null,
+            revokedAt: null,
+          },
+          data: { revokedAt: now },
+        }),
+        prisma.inviteApprovalRequest.updateMany({
+          where: { requesterUserId: target.id, status: "PENDING" },
+          data: {
+            status: "REJECTED",
+            reviewedByUserId: params.adminUserId,
+            reviewedAt: now,
+          },
+        }),
+      ]);
+      revokedInvitesCount = revoked.count;
+    } else {
+      await addEmailToWhitelist(target.email);
+    }
+
+    return { success: true, user: mapPrismaUser(updated), revokedInvitesCount };
+  }
+
+  const db = readLocalDb();
+  const localUser = db.users.find((u) => u.id === target.id);
+  if (!localUser) return { success: false, status: 404, error: "Benutzer nicht gefunden." };
+  localUser.isBanned = params.isBanned;
+  localUser.bannedAt = params.isBanned ? now.toISOString() : null;
+  localUser.banReason = cleanReason;
+
+  if (params.isBanned) {
+    for (const w of db.whitelist) {
+      if (w.invitedByUserId === target.id && !w.acceptedAt && !w.revokedAt) {
+        w.revokedAt = now.toISOString();
+        revokedInvitesCount++;
+      }
+    }
+    for (const r of db.inviteApprovalRequests || []) {
+      if (r.requesterUserId === target.id && r.status === "PENDING") {
+        r.status = "REJECTED";
+        r.reviewedByUserId = params.adminUserId;
+        r.reviewedAt = now.toISOString();
+      }
+    }
+  }
+  writeLocalDb(db);
+  if (!params.isBanned) {
+    await addEmailToWhitelist(target.email);
+  }
+  return { success: true, user: localUser, revokedInvitesCount };
 }
 
 // --- Friendships & Access Control ---
@@ -1127,26 +2152,30 @@ export async function getUserFriendRequests(userId: string) {
       ]);
 
       return {
-        pendingReceived: received.map((r) => ({
-          requestId: r.id,
-          user: {
-            id: r.user.id,
-            name: r.user.name,
-            email: r.user.email,
-            image: r.user.image,
-          },
-          createdAt: r.createdAt.toISOString(),
-        })),
-        pendingSent: sent.map((s) => ({
-          requestId: s.id,
-          user: {
-            id: s.friend.id,
-            name: s.friend.name,
-            email: s.friend.email,
-            image: s.friend.image,
-          },
-          createdAt: s.createdAt.toISOString(),
-        })),
+        pendingReceived: received
+          .filter((r) => !r.user.isBanned)
+          .map((r) => ({
+            requestId: r.id,
+            user: {
+              id: r.user.id,
+              name: r.user.name,
+              email: r.user.email,
+              image: r.user.image,
+            },
+            createdAt: r.createdAt.toISOString(),
+          })),
+        pendingSent: sent
+          .filter((s) => !s.friend.isBanned)
+          .map((s) => ({
+            requestId: s.id,
+            user: {
+              id: s.friend.id,
+              name: s.friend.name,
+              email: s.friend.email,
+              image: s.friend.image,
+            },
+            createdAt: s.createdAt.toISOString(),
+          })),
       };
     } catch {
       // fallback
@@ -1158,28 +2187,34 @@ export async function getUserFriendRequests(userId: string) {
 
   const pendingReceived = friendships
     .filter((f) => f.friendId === userId && f.status === "PENDING")
-    .map((f) => {
+    .flatMap((f) => {
       const u = db.users.find((user) => user.id === f.userId);
-      return {
-        requestId: f.id,
-        user: u
-          ? { id: u.id, name: u.name, email: u.email, image: u.image }
-          : { id: f.userId, name: "Unbekannt", email: "", image: null },
-        createdAt: f.createdAt,
-      };
+      if (u?.isBanned) return [];
+      return [
+        {
+          requestId: f.id,
+          user: u
+            ? { id: u.id, name: u.name, email: u.email, image: u.image }
+            : { id: f.userId, name: "Unbekannt", email: "", image: null },
+          createdAt: f.createdAt,
+        },
+      ];
     });
 
   const pendingSent = friendships
     .filter((f) => f.userId === userId && f.status === "PENDING")
-    .map((f) => {
+    .flatMap((f) => {
       const u = db.users.find((user) => user.id === f.friendId);
-      return {
-        requestId: f.id,
-        user: u
-          ? { id: u.id, name: u.name, email: u.email, image: u.image }
-          : { id: f.friendId, name: "Unbekannt", email: "", image: null },
-        createdAt: f.createdAt,
-      };
+      if (u?.isBanned) return [];
+      return [
+        {
+          requestId: f.id,
+          user: u
+            ? { id: u.id, name: u.name, email: u.email, image: u.image }
+            : { id: f.friendId, name: "Unbekannt", email: "", image: null },
+          createdAt: f.createdAt,
+        },
+      ];
     });
 
   return { pendingReceived, pendingSent };
@@ -1197,8 +2232,10 @@ export async function sendFriendRequest(requesterId: string, targetIdentifier: s
 
   if (await isPostgresAvailable()) {
     try {
+      await ensureInviteAndModerationSchema();
       const targetUser = await prisma.user.findFirst({
         where: {
+          isBanned: false,
           OR: [
             { email: { equals: cleanTarget, mode: "insensitive" } },
             { name: { equals: cleanTarget, mode: "insensitive" } },
@@ -1261,7 +2298,7 @@ export async function sendFriendRequest(requesterId: string, targetIdentifier: s
 
   const db = readLocalDb();
   const targetUser = db.users.find(
-    (u) => u.email.toLowerCase() === cleanTarget || u.name.toLowerCase() === cleanTarget
+    (u) => !u.isBanned && (u.email.toLowerCase() === cleanTarget || u.name.toLowerCase() === cleanTarget)
   );
 
   if (!targetUser) {
@@ -1409,9 +2446,11 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
 
   if (await isPostgresAvailable()) {
     try {
+      await ensureInviteAndModerationSchema();
       const users = await prisma.user.findMany({
         where: {
           id: { not: currentUserId },
+          isBanned: false,
           OR: [
             { name: { contains: cleanQ, mode: "insensitive" } },
             { email: { contains: cleanQ, mode: "insensitive" } },
@@ -1471,6 +2510,7 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
     .filter(
       (u) =>
         u.id !== currentUserId &&
+        !u.isBanned &&
         (u.name.toLowerCase().includes(cleanQ) || u.email.toLowerCase().includes(cleanQ))
     )
     .slice(0, 10);
@@ -1517,6 +2557,11 @@ export interface AppUserWithStats {
   email: string;
   image: string | null;
   role: string;
+  isBanned?: boolean;
+  bannedAt?: string | null;
+  banReason?: string | null;
+  invitedByUserId?: string | null;
+  invitedByName?: string | null;
   subscriptions: string[];
   watchedCount: number;
   watchingCount: number;
@@ -1543,6 +2588,13 @@ export interface AdminUserProfile {
     email: string;
     image: string | null;
     role: string;
+  }>;
+  invitedUsers?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    isBanned: boolean;
+    createdAt: string;
   }>;
 }
 
@@ -1677,6 +2729,11 @@ function buildAdminUserProfile(params: {
     email: string;
     image?: string | null;
     role: string;
+    isBanned?: boolean;
+    bannedAt?: Date | string | null;
+    banReason?: string | null;
+    invitedByUserId?: string | null;
+    invitedByName?: string | null;
     subscriptions: string[];
     watchlistAlertsEnabled?: boolean | null;
     createdAt: Date | string;
@@ -1694,8 +2751,25 @@ function buildAdminUserProfile(params: {
     image?: string | null;
     role: string;
   }>;
+  invitedUsers?: Array<{
+    id: string;
+    name: string;
+    email: string;
+    isBanned?: boolean;
+    createdAt: Date | string;
+  }>;
 }): AdminUserProfile {
-  const { user, adminUserId, acceptedFriendIds, mediaStatuses, recommendations, customCollections, friendGroups, friends } = params;
+  const {
+    user,
+    adminUserId,
+    acceptedFriendIds,
+    mediaStatuses,
+    recommendations,
+    customCollections,
+    friendGroups,
+    friends,
+    invitedUsers = [],
+  } = params;
   return {
     user: {
       id: user.id,
@@ -1703,6 +2777,11 @@ function buildAdminUserProfile(params: {
       email: user.email,
       image: user.image ?? null,
       role: user.role,
+      isBanned: Boolean(user.isBanned),
+      bannedAt: user.bannedAt ? toIsoString(user.bannedAt) : null,
+      banReason: user.banReason ?? null,
+      invitedByUserId: user.invitedByUserId ?? null,
+      invitedByName: user.invitedByName ?? null,
       subscriptions: user.subscriptions,
       watchlistAlertsEnabled: user.watchlistAlertsEnabled ?? true,
       createdAt: toIsoString(user.createdAt),
@@ -1720,6 +2799,13 @@ function buildAdminUserProfile(params: {
       image: f.image ?? null,
       role: f.role,
     })),
+    invitedUsers: invitedUsers.map((iu) => ({
+      id: iu.id,
+      name: iu.name,
+      email: iu.email,
+      isBanned: Boolean(iu.isBanned),
+      createdAt: toIsoString(iu.createdAt),
+    })),
   };
 }
 
@@ -1730,6 +2816,7 @@ export async function getAllFriendsWithStats(
   if (!currentUserId && !options?.includeAllForAdmin) {
     return [];
   }
+  const forAdmin = Boolean(options?.includeAllForAdmin);
   let friendIdSet: Set<string> | null = null;
   if (currentUserId) {
     const ids = await getAcceptedFriendIds(currentUserId);
@@ -1737,14 +2824,22 @@ export async function getAllFriendsWithStats(
   }
 
   if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
     const users = await prisma.user.findMany({
-      where: friendIdSet ? { id: { in: Array.from(friendIdSet) } } : undefined,
+      where: {
+        ...(friendIdSet ? { id: { in: Array.from(friendIdSet) } } : {}),
+        ...(forAdmin ? {} : { isBanned: false }),
+      },
       select: {
         id: true,
         name: true,
         email: true,
         image: true,
         role: true,
+        isBanned: true,
+        bannedAt: true,
+        banReason: true,
+        invitedByUserId: true,
         subscriptions: true,
         createdAt: true,
         mediaStatuses: {
@@ -1756,12 +2851,22 @@ export async function getAllFriendsWithStats(
       },
       orderBy: { createdAt: "asc" },
     });
+    const nameById = new Map(users.map((u) => [u.id, u.name]));
     return users.map((u) => ({
       id: u.id,
       name: u.name,
       email: u.email,
       image: u.image ?? null,
       role: u.role,
+      ...(forAdmin
+        ? {
+            isBanned: Boolean(u.isBanned),
+            bannedAt: u.bannedAt ? u.bannedAt.toISOString() : null,
+            banReason: u.banReason ?? null,
+            invitedByUserId: u.invitedByUserId ?? null,
+            invitedByName: u.invitedByUserId ? nameById.get(u.invitedByUserId) ?? null : null,
+          }
+        : {}),
       subscriptions: parseSubscriptions(u.subscriptions),
       ...computeUserActivityStats(u.createdAt, u.mediaStatuses, u.recommendations),
       createdAt: u.createdAt.toISOString(),
@@ -1769,9 +2874,12 @@ export async function getAllFriendsWithStats(
   }
 
   const db = readLocalDb();
-  const filteredUsers = friendIdSet
-    ? db.users.filter((u) => friendIdSet.has(u.id))
-    : db.users;
+  const nameById = new Map(db.users.map((u) => [u.id, u.name]));
+  const filteredUsers = db.users.filter((u) => {
+    if (friendIdSet && !friendIdSet.has(u.id)) return false;
+    if (!forAdmin && u.isBanned) return false;
+    return true;
+  });
 
   return filteredUsers.map((u) => {
     const userStatuses = db.mediaStatuses.filter((m) => m.userId === u.id);
@@ -1782,6 +2890,15 @@ export async function getAllFriendsWithStats(
       email: u.email,
       image: u.image ?? null,
       role: u.role,
+      ...(forAdmin
+        ? {
+            isBanned: Boolean(u.isBanned),
+            bannedAt: u.bannedAt ?? null,
+            banReason: u.banReason ?? null,
+            invitedByUserId: u.invitedByUserId ?? null,
+            invitedByName: u.invitedByUserId ? nameById.get(u.invitedByUserId) ?? null : null,
+          }
+        : {}),
       subscriptions: u.subscriptions || ["netflix", "prime", "disney"],
       ...computeUserActivityStats(u.createdAt, userStatuses, userRecs),
       createdAt: u.createdAt,
@@ -1798,7 +2915,11 @@ export async function getAdminUserProfile(
   const targetLower = cleanTarget.toLowerCase();
 
   if (await isPostgresAvailable()) {
-    await Promise.all([ensureMediaStatusColumns(), ensureWatchlistAlertSchema()]);
+    await Promise.all([
+      ensureMediaStatusColumns(),
+      ensureWatchlistAlertSchema(),
+      ensureInviteAndModerationSchema(),
+    ]);
 
     const dbUser = await prisma.user.findFirst({
       where: {
@@ -1814,6 +2935,10 @@ export async function getAdminUserProfile(
         email: true,
         image: true,
         role: true,
+        isBanned: true,
+        bannedAt: true,
+        banReason: true,
+        invitedByUserId: true,
         subscriptions: true,
         watchlistAlertsEnabled: true,
         createdAt: true,
@@ -1823,33 +2948,45 @@ export async function getAdminUserProfile(
     if (!dbUser) return null;
 
     const isSelf = dbUser.id === adminUserId;
-    const [statuses, recs, rawCollections, acceptedFriendIds, friendGroups] = await Promise.all([
-      prisma.mediaStatus.findMany({
-        where: { userId: dbUser.id },
-        orderBy: { updatedAt: "desc" },
-      }),
-      (prisma as any).recommendation
-        .findMany({
+    const [statuses, recs, rawCollections, acceptedFriendIds, friendGroups, inviter, invitedUsers] =
+      await Promise.all([
+        prisma.mediaStatus.findMany({
           where: { userId: dbUser.id },
-          include: { upvotes: true, replies: true },
-          orderBy: { createdAt: "desc" },
-        })
-        .catch(() =>
-          prisma.recommendation.findMany({
+          orderBy: { updatedAt: "desc" },
+        }),
+        (prisma as any).recommendation
+          .findMany({
             where: { userId: dbUser.id },
-            include: { upvotes: true },
+            include: { upvotes: true, replies: true },
             orderBy: { createdAt: "desc" },
           })
-        ),
-      (prisma as any).customCollection
-        .findMany({
-          where: isSelf ? { ownerId: dbUser.id } : { ownerId: dbUser.id, visibility: { not: "PRIVATE" } },
-          orderBy: { updatedAt: "desc" },
-        })
-        .catch(() => []),
-      getAcceptedFriendIds(dbUser.id),
-      getUserFriendGroups(dbUser.id, dbUser.name).catch(() => []),
-    ]);
+          .catch(() =>
+            prisma.recommendation.findMany({
+              where: { userId: dbUser.id },
+              include: { upvotes: true },
+              orderBy: { createdAt: "desc" },
+            })
+          ),
+        (prisma as any).customCollection
+          .findMany({
+            where: isSelf ? { ownerId: dbUser.id } : { ownerId: dbUser.id, visibility: { not: "PRIVATE" } },
+            orderBy: { updatedAt: "desc" },
+          })
+          .catch(() => []),
+        getAcceptedFriendIds(dbUser.id),
+        getUserFriendGroups(dbUser.id, dbUser.name).catch(() => []),
+        dbUser.invitedByUserId
+          ? prisma.user.findUnique({
+              where: { id: dbUser.invitedByUserId },
+              select: { name: true },
+            })
+          : Promise.resolve(null),
+        prisma.user.findMany({
+          where: { invitedByUserId: dbUser.id },
+          select: { id: true, name: true, email: true, isBanned: true, createdAt: true },
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
 
     const friends =
       acceptedFriendIds.length > 0
@@ -1862,7 +2999,11 @@ export async function getAdminUserProfile(
 
     const fallbackUser = { name: dbUser.name, image: dbUser.image };
     return buildAdminUserProfile({
-      user: { ...dbUser, subscriptions: parseSubscriptions(dbUser.subscriptions) },
+      user: {
+        ...dbUser,
+        invitedByName: inviter?.name ?? null,
+        subscriptions: parseSubscriptions(dbUser.subscriptions),
+      },
       adminUserId,
       acceptedFriendIds,
       mediaStatuses: statuses.map((s: any) => mapRawMediaStatus(s, fallbackUser)),
@@ -1872,6 +3013,7 @@ export async function getAdminUserProfile(
       ),
       friendGroups,
       friends,
+      invitedUsers,
     });
   }
 
@@ -1889,6 +3031,19 @@ export async function getAdminUserProfile(
     getUserFriendGroups(localUser.id, localUser.name),
   ]);
 
+  const inviter = localUser.invitedByUserId
+    ? db.users.find((u) => u.id === localUser.invitedByUserId)
+    : null;
+  const invitedUsers = db.users
+    .filter((u) => u.invitedByUserId === localUser.id)
+    .map((u) => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      isBanned: Boolean(u.isBanned),
+      createdAt: u.createdAt,
+    }));
+
   const allReplies = db.recommendationReplies || [];
   const fallbackUser = { name: localUser.name, image: localUser.image ?? null };
   const isSelf = localUser.id === adminUserId;
@@ -1896,6 +3051,7 @@ export async function getAdminUserProfile(
   return buildAdminUserProfile({
     user: {
       ...localUser,
+      invitedByName: inviter?.name ?? null,
       subscriptions: localUser.subscriptions || ["netflix", "prime", "disney"],
     },
     adminUserId,
@@ -1918,6 +3074,7 @@ export async function getAdminUserProfile(
       .map(mapRawCustomCollection),
     friendGroups,
     friends: db.users.filter((u) => acceptedFriendIds.includes(u.id)),
+    invitedUsers,
   });
 }
 
@@ -2082,26 +3239,36 @@ export async function getAllCommunityData(
       ]);
     }
 
-    const mappedRecs: AppRecommendation[] = recs.map((r: any) => mapRawRecommendation(r));
+    const activeStatuses = statuses.filter(
+      (s: any) => !s.user?.isBanned || s.userId === currentUserId
+    );
+    const mappedRecs: AppRecommendation[] = recs
+      .filter((r: any) => !r.user?.isBanned || r.userId === currentUserId)
+      .map((r: any) => mapRawRecommendation(r));
 
     const visibleRecs = mappedRecs.filter((r) =>
       isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
     );
 
     return {
-      mediaStatuses: statuses.map((s: any) => mapRawMediaStatus(s)),
+      mediaStatuses: activeStatuses.map((s: any) => mapRawMediaStatus(s)),
       recommendations: visibleRecs,
     };
   }
 
   const db = readLocalDb();
+  const bannedUserIds = new Set(db.users.filter((u) => u.isBanned).map((u) => u.id));
   const allReplies = db.recommendationReplies || [];
-  const statuses = allowedUserIds
-    ? db.mediaStatuses.filter((s) => allowedUserIds.has(s.userId))
-    : db.mediaStatuses;
-  const rawRecs = allowedUserIds
-    ? db.recommendations.filter((r) => allowedUserIds.has(r.userId))
-    : db.recommendations;
+  const statuses = db.mediaStatuses.filter(
+    (s) =>
+      (!allowedUserIds || allowedUserIds.has(s.userId)) &&
+      (!bannedUserIds.has(s.userId) || s.userId === currentUserId)
+  );
+  const rawRecs = db.recommendations.filter(
+    (r) =>
+      (!allowedUserIds || allowedUserIds.has(r.userId)) &&
+      (!bannedUserIds.has(r.userId) || r.userId === currentUserId)
+  );
 
   const visibleRecs = rawRecs
     .map((r) =>
@@ -3250,16 +4417,17 @@ export async function getWatchlistAlertContext(): Promise<{
   const snapshots = new Map<string, string[]>();
 
   if (await isPostgresAvailable()) {
-    await ensureWatchlistAlertSchema();
+    await Promise.all([ensureWatchlistAlertSchema(), ensureInviteAndModerationSchema()]);
     const [rows, snapshotRows] = await Promise.all([
       prisma.mediaStatus.findMany({
-        where: { status: "WATCHLIST" },
+        where: { status: "WATCHLIST", user: { isBanned: false } },
         include: {
           user: {
             select: {
               id: true,
               name: true,
               email: true,
+              isBanned: true,
               subscriptions: true,
               watchlistAlertsEnabled: true,
             },
@@ -3274,7 +4442,7 @@ export async function getWatchlistAlertContext(): Promise<{
     }
 
     const candidates: WatchlistAlertCandidate[] = rows
-      .filter((r) => Boolean(r.user?.email))
+      .filter((r) => Boolean(r.user?.email) && !r.user?.isBanned)
       .map((r) => ({
         mediaStatusId: r.id,
         userId: r.user.id,
@@ -3302,7 +4470,7 @@ export async function getWatchlistAlertContext(): Promise<{
   for (const m of db.mediaStatuses) {
     if (m.status !== "WATCHLIST") continue;
     const u = usersById.get(m.userId);
-    if (!u?.email) continue;
+    if (!u?.email || u.isBanned) continue;
     candidates.push({
       mediaStatusId: m.id,
       userId: u.id,

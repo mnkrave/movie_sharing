@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { requireUserSession } from "@/lib/auth";
 import { searchMultiMedia, MediaItem } from "@/lib/tmdb";
 
 interface RawImportQuery {
@@ -21,8 +20,8 @@ export interface MatchedImportItem {
 }
 
 export async function POST(req: Request) {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
+  const auth = await requireUserSession();
+  if (!auth) {
     return NextResponse.json({ error: "Bitte zuerst einloggen." }, { status: 401 });
   }
 

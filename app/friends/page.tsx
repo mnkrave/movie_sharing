@@ -23,7 +23,7 @@ import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import { useMedia, FriendGroup } from "@/components/MediaContext";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { BottomSheetDialog } from "@/components/BottomSheetDialog";
-import { shareOrCopy } from "@/lib/share";
+import { FriendInviteSection } from "@/components/FriendInviteSection";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -330,38 +330,28 @@ export default function FriendsPage() {
         </div>
 
         <div className="flex flex-wrap sm:flex-col gap-2">
-          {isAdmin ? (
+          <button
+            type="button"
+            onClick={() => {
+              const section = document.getElementById("invite-friends");
+              section?.scrollIntoView({ behavior: "smooth", block: "start" });
+              setTimeout(() => {
+                document.getElementById("friend-invite-email")?.focus();
+              }, 350);
+            }}
+            className="flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Freunde einladen</span>
+          </button>
+          {isAdmin && (
             <Link
               href="/admin"
-              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20"
+              className="flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 px-5 py-2 rounded-2xl bg-slate-800 hover:bg-slate-700 text-amber-300 font-bold text-xs border border-amber-500/30 transition"
             >
-              <UserPlus className="w-4 h-4" />
-              <span>Freunde einladen (Admin)</span>
+              <Shield className="w-4 h-4" />
+              <span>Admin-Panel</span>
             </Link>
-          ) : (
-            <button
-              type="button"
-              onClick={async () => {
-                const outcome = await shareOrCopy({
-                  title: "CineCircle Einladung",
-                  text: "Komm in meinen CineCircle zum Filme & Serien teilen:",
-                  url: window.location.origin + "/register",
-                });
-                if (outcome === "copied") {
-                  showToast("Einladungslink in die Zwischenablage kopiert!", {
-                    type: "success",
-                  });
-                } else if (outcome === "error") {
-                  showToast("Link konnte nicht automatisch geteilt werden.", {
-                    type: "error",
-                  });
-                }
-              }}
-              className="flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition cursor-pointer"
-            >
-              <UserPlus className="w-4 h-4" />
-              <span>Einladungslink teilen</span>
-            </button>
           )}
         </div>
       </div>
@@ -585,6 +575,9 @@ export default function FriendsPage() {
           </div>
         )}
       </div>
+
+      {/* Invite New Friends to CineCircle */}
+      <FriendInviteSection />
 
       {/* CineCrews / Friend Groups for AI Group Match */}
       <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-5">

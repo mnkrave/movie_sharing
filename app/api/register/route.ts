@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import {
   isEmailWhitelisted,
+  isValidEmailAddress,
   findUserByEmail,
   createOrUpdateUser,
+  SUPER_ADMIN_EMAIL,
 } from "@/lib/store";
 
 export async function POST(req: Request) {
@@ -40,19 +42,32 @@ export async function POST(req: Request) {
     }
 
     const emailLower = email.toLowerCase().trim();
-    const whitelisted = await isEmailWhitelisted(emailLower);
+    if (!isValidEmailAddress(emailLower)) {
+      return NextResponse.json(
+        { error: "Bitte gib eine gültige E-Mail-Adresse ein." },
+        { status: 400 }
+      );
+    }
 
+    const existing = await findUserByEmail(emailLower);
+    if (existing?.isBanned && emailLower !== SUPER_ADMIN_EMAIL) {
+      return NextResponse.json(
+        { error: "Dieser Account wurde vom Admin gesperrt." },
+        { status: 403 }
+      );
+    }
+
+    const whitelisted = await isEmailWhitelisted(emailLower);
     if (!whitelisted) {
       return NextResponse.json(
         {
           error:
-            "Zugriff verweigert: Deine E-Mail ist noch nicht auf der Freundes-Whitelist. Lass dich von Lukas einladen!",
+            "Zugriff verweigert: Deine E-Mail wurde noch nicht eingeladen oder die Einladung ist abgelaufen. Lass dich von einem Mitglied oder Admin einladen!",
         },
         { status: 403 }
       );
     }
 
-    const existing = await findUserByEmail(emailLower);
     if (existing && existing.password) {
       return NextResponse.json(
         { error: "Für diese E-Mail existiert bereits ein Account. Bitte logge dich ein." },
@@ -63,7 +78,7 @@ export async function POST(req: Request) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await createOrUpdateUser({
       email: emailLower,
-      name: name.trim(),
+      name: cleanName,
       password: hashedPassword,
     });
 

@@ -15,6 +15,10 @@ model User {
   password        String?
   image           String?
   role                    String           @default("USER") // "USER" or "ADMIN"
+  isBanned                Boolean          @default(false)
+  bannedAt                DateTime?
+  banReason               String?
+  invitedByUserId         String?
   subscriptions           String?          // JSON array of streaming provider names (e.g. ["Netflix", "Amazon Prime Video", "Disney Plus"])
   watchlistAlertsEnabled  Boolean          @default(true)
   friendGroups            String?          // JSON array of friend groups (e.g. [{ id, name, emoji, memberNames }])
@@ -43,9 +47,33 @@ model Friendship {
 }
 
 model WhitelistedEmail {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  createdAt DateTime @default(now())
+  id              String    @id @default(cuid())
+  email           String    @unique
+  invitedByUserId String?
+  invitedByName   String?
+  invitedByEmail  String?
+  expiresAt       DateTime?
+  acceptedAt      DateTime?
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([invitedByUserId, createdAt])
+}
+
+model InviteApprovalRequest {
+  id               String    @id @default(cuid())
+  targetEmail      String
+  requesterUserId  String
+  requesterName    String
+  requesterEmail   String
+  blockedReason    String
+  status           String    @default("PENDING") // "PENDING" | "APPROVED" | "REJECTED"
+  reviewedByUserId String?
+  reviewedAt       DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([status, createdAt])
+  @@index([requesterUserId, createdAt])
 }
 
 model MediaStatus {

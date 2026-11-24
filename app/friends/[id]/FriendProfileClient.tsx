@@ -31,7 +31,12 @@ import {
   Calendar,
   ExternalLink,
   ArrowUpDown,
+  Ban,
+  CheckCircle2,
 } from "lucide-react";
+import { BanUserModal } from "@/components/BanUserModal";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
+import { updateUserBanStatus } from "@/lib/admin-client";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -131,12 +136,13 @@ export function FriendProfileClient({
   const [adminLoading, setAdminLoading] = useState(false);
   const [adminError, setAdminError] = useState<string | null>(null);
   const [allAdminUsers, setAllAdminUsers] = useState<AppUserWithStats[]>([]);
+  const [banModalOpen, setBanModalOpen] = useState(false);
+  const [banBusy, setBanBusy] = useState(false);
 
   const myUserId = (session?.user as any)?.id;
   const myName = session?.user?.name || "Kino-Fan";
-  const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
-    (session?.user as any)?.role === "ADMIN";
+  const isSuperAdmin = session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL;
+  const isAdmin = isSuperAdmin || (session?.user as any)?.role === "ADMIN";
 
   const decodedRaw = safeDecodeParam(friendIdParam);
   const decodedParam = decodedRaw.toLowerCase();
@@ -159,6 +165,42 @@ export function FriendProfileClient({
         (f.email && f.email.toLowerCase() === decodedParam)
     );
   }, [communityData.friends, decodedParam]);
+
+  const handleAdminBanChange = async (isBanned: boolean, reason?: string) => {
+    if (!adminProfile) return;
+    try {
+      const result = await updateUserBanStatus({
+        user: {
+          id: adminProfile.user.id,
+          name: adminProfile.user.name,
+          email: adminProfile.user.email,
+        },
+        isBanned,
+        reason,
+        confirmDialog,
+        showToast,
+        onStart: () => setBanBusy(true),
+      });
+      if (!result.ok) return;
+
+      setAdminProfile((prev) =>
+        prev
+          ? {
+              ...prev,
+              user: {
+                ...prev.user,
+                isBanned,
+                bannedAt: result.bannedAt ?? null,
+                banReason: result.banReason ?? null,
+              },
+            }
+          : prev
+      );
+      setBanModalOpen(false);
+    } finally {
+      setBanBusy(false);
+    }
+  };
 
   // Load full profile via admin endpoint exclusively in admin mode (avoids redundant fetches before communityData hydration)
   const shouldLoadAdminProfile = isAdmin && mode === "admin";
@@ -890,6 +932,12 @@ export function FriendProfileClient({
                     <span>Admin-Ansicht</span>
                   </span>
                 )}
+                {adminProfile?.user.isBanned && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold text-[10px] border border-rose-500/40 flex items-center gap-1">
+                    <Ban className="w-3 h-3" />
+                    <span>Gesperrt</span>
+                  </span>
+                )}
                 {!isMe &&
                   (isFriendWithMe ? (
                     <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 font-bold text-[10px] border border-emerald-500/30 flex items-center gap-1">
@@ -903,6 +951,19 @@ export function FriendProfileClient({
                   ))}
               </div>
               <p className="text-xs text-slate-400 truncate">{friend.email}</p>
+
+              {adminProfile?.user.isBanned && (
+                <div className="p-2.5 rounded-xl bg-rose-950/60 border border-rose-500/35 text-xs text-rose-200 flex flex-wrap items-center gap-1.5">
+                  <Ban className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />
+                  <span>
+                    Account gesperrt
+                    {adminProfile.user.bannedAt
+                      ? ` am ${new Date(adminProfile.user.bannedAt).toLocaleDateString("de-DE")}`
+                      : ""}
+                    {adminProfile.user.banReason ? ` · Grund: ${adminProfile.user.banReason}` : ""}
+                  </span>
+                </div>
+              )}
 
               {/* Admin Account Metadata */}
               {adminProfile && (
@@ -931,6 +992,20 @@ export function FriendProfileClient({
                       Watchlist-Alarm: {adminProfile.user.watchlistAlertsEnabled ? "An" : "Aus"}
                     </span>
                   </span>
+                  {adminProfile.user.invitedByUserId && (
+                    <>
+                      <span className="text-slate-700">•</span>
+                      <span>
+                        Eingeladen von:{" "}
+                        <Link
+                          href={`/admin/users/${encodeURIComponent(adminProfile.user.invitedByUserId)}`}
+                          className="text-amber-300 font-semibold hover:underline"
+                        >
+                          @{adminProfile.user.invitedByName || "Mitglied"}
+                        </Link>
+                      </span>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -1005,6 +1080,32 @@ export function FriendProfileClient({
                 >
                   <UserPlus className="w-3.5 h-3.5" />
                   <span>Freundschaftsanfrage senden</span>
+                </button>
+              ))}
+            {isAdminView &&
+              adminProfile &&
+              adminProfile.user.email.toLowerCase() !== SUPER_ADMIN_EMAIL &&
+              !isMe &&
+              (isSuperAdmin || adminProfile.user.role !== "ADMIN") &&
+              (adminProfile.user.isBanned ? (
+                <button
+                  type="button"
+                  disabled={banBusy}
+                  onClick={() => handleAdminBanChange(false)}
+                  className="px-4 py-2.5 rounded-2xl bg-emerald-500/15 hover:bg-emerald-500 text-emerald-300 hover:text-black border border-emerald-500/40 text-xs font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{banBusy ? "Aktualisiert..." : "Nutzer entsperren"}</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  disabled={banBusy}
+                  onClick={() => setBanModalOpen(true)}
+                  className="px-4 py-2.5 rounded-2xl bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/40 text-xs font-bold transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
+                >
+                  <Ban className="w-3.5 h-3.5" />
+                  <span>Nutzer sperren</span>
                 </button>
               ))}
             {requestError && <p className="text-[11px] text-rose-400 text-center">{requestError}</p>}
@@ -1735,6 +1836,42 @@ export function FriendProfileClient({
               )}
             </div>
 
+            {adminProfile?.invitedUsers && adminProfile.invitedUsers.length > 0 && (
+              <div className="space-y-3">
+                <h3 className="text-sm font-black text-white uppercase tracking-wider flex items-center gap-2">
+                  <UserPlus className="w-4 h-4 text-amber-400" />
+                  <span>Von {friend.name} eingeladene Nutzer ({adminProfile.invitedUsers.length})</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {adminProfile.invitedUsers.map((iu) => (
+                    <Link
+                      key={iu.id}
+                      href={`/admin/users/${encodeURIComponent(iu.id)}`}
+                      className="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800 hover:border-amber-500/40 transition group"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-xs font-bold text-white group-hover:text-amber-300 truncate">
+                            {iu.name}
+                          </p>
+                          {iu.isBanned && (
+                            <span className="px-1.5 py-0.5 rounded bg-rose-500/20 text-rose-300 text-[9px] font-bold">
+                              GESPERRT
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-slate-400 truncate">{iu.email}</p>
+                        <p className="text-[10px] text-slate-500">
+                          Registriert am {new Date(iu.createdAt).toLocaleDateString("de-DE")}
+                        </p>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-slate-500 group-hover:text-amber-400 flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {profileFriendGroups.length > 0 && (
               <div className="space-y-3">
                 <h3 className="text-sm font-black text-white uppercase tracking-wider">
@@ -1773,6 +1910,23 @@ export function FriendProfileClient({
           </div>
         )}
       </div>
+
+      {adminProfile && (
+        <BanUserModal
+          target={
+            banModalOpen
+              ? {
+                  id: adminProfile.user.id,
+                  name: adminProfile.user.name,
+                  email: adminProfile.user.email,
+                }
+              : null
+          }
+          submitting={banBusy}
+          onClose={() => setBanModalOpen(false)}
+          onConfirm={(reason) => handleAdminBanChange(true, reason)}
+        />
+      )}
     </div>
   );
 }
