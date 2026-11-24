@@ -172,7 +172,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           ) : null}
         </div>
 
-        {/* Friend Badges on bottom of poster */}
+        {/* Friend Badges on bottom of poster (on narrow mobile < sm show only the highest-priority badge to keep posters legible) */}
         <div className="absolute bottom-2 left-2 right-2 flex flex-col gap-1 pointer-events-none">
           {/* Recommendation Badge */}
           {(myRec || otherFriendsRecs.length > 0) && (
@@ -192,7 +192,11 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
 
           {/* Currently Watching Badge (TV only) */}
           {(myWatching || otherFriendsWatching.length > 0) && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/90 text-black text-[10px] font-bold backdrop-blur-md shadow truncate">
+            <span
+              className={`${
+                myRec || otherFriendsRecs.length > 0 ? "hidden sm:flex" : "flex"
+              } items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/90 text-black text-[10px] font-bold backdrop-blur-md shadow truncate`}
+            >
               <Tv className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">
                 {myWatching
@@ -206,7 +210,13 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
 
           {/* Watched Badge */}
           {(myWatched || otherFriendsWatched.length > 0) && (
-            <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600/90 text-white text-[10px] font-semibold backdrop-blur-md shadow truncate">
+            <span
+              className={`${
+                myRec || otherFriendsRecs.length > 0 || myWatching || otherFriendsWatching.length > 0
+                  ? "hidden sm:flex"
+                  : "flex"
+              } items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600/90 text-white text-[10px] font-semibold backdrop-blur-md shadow truncate`}
+            >
               <Check className="w-3 h-3 flex-shrink-0" />
               <span className="truncate">
                 {myWatched && otherFriendsWatched.length === 0
@@ -293,8 +303,8 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           </span>
         </div>
 
-        {/* Touch-only quick action buttons (keeps desktop hover cards clean while giving 1-tap access on mobile) */}
-        <div className="flex [@media(hover:hover)]:hidden items-center gap-1.5 mt-2.5 pt-2 border-t border-slate-800/70">
+        {/* Touch-only quick action buttons (keeps desktop hover cards clean while giving 44px 1-tap access on mobile) */}
+        <div className="flex [@media(hover:hover)]:hidden items-center gap-2 mt-2.5 pt-2 border-t border-slate-800/70">
           <button
             type="button"
             onClick={handleQuickWatchlist}
@@ -303,10 +313,10 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
                 ? "Von Merkliste entfernen"
                 : "Auf Merkliste setzen"
             }
-            className={`flex-1 min-w-0 min-h-[36px] py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
+            className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHLIST"
                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
+                : "bg-slate-900 text-slate-200 border border-slate-800 active:bg-slate-800"
             }`}
           >
             {myStatusObj?.status === "WATCHLIST" ? (
@@ -325,12 +335,12 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
                 ? "Status oder Bewertung bearbeiten"
                 : "Als gesehen markieren"
             }
-            className={`flex-1 min-w-0 min-h-[36px] py-2 px-2 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
+            className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHING"
                 ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
                 : myStatusObj?.status === "WATCHED"
                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                : "bg-slate-900 text-slate-300 border border-slate-800 active:bg-slate-800"
+                : "bg-slate-900 text-slate-200 border border-slate-800 active:bg-slate-800"
             }`}
           >
             {myStatusObj?.status === "WATCHING" ? (

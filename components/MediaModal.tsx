@@ -43,6 +43,8 @@ import {
   Trash2,
 } from "lucide-react";
 import { RecommendationThread } from "./RecommendationThread";
+import { BottomSheetDialog } from "./BottomSheetDialog";
+import { buildMediaShareUrl, shareOrCopy } from "@/lib/share";
 
 interface MediaModalProps {
   media: {
@@ -165,13 +167,20 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
     };
   }, [media.id, media.mediaType]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  const handleShareMedia = async () => {
+    const title = details?.title || media.title || "CineCircle Empfehlung";
+    const url = buildMediaShareUrl(media.mediaType, media.id);
+    const outcome = await shareOrCopy({
+      title,
+      text: `Schau dir „${title}“ auf CineCircle an (inkl. Streaming- & VPN-Finder):`,
+      url,
+    });
+    if (outcome === "copied") {
+      showToast("Link zum Teilen in die Zwischenablage kopiert!", { type: "success" });
+    } else if (outcome === "error") {
+      showToast("Teilen wird auf diesem Gerät nicht unterstützt.", { type: "error" });
+    }
+  };
 
   // Current user identification
   const myUserId = (session?.user as any)?.id;
@@ -567,34 +576,38 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
   );
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={true}
+      onClose={onClose}
+      ariaLabel={details?.title || media.title || "Filmdetails"}
+      maxWidthClass="max-w-4xl"
+      panelClassName="bg-[#0b0f19] border-0 sm:border sm:border-slate-800 max-h-[95dvh] sm:max-h-[92dvh] h-[95dvh] sm:h-auto"
     >
-      <div
-        className="bg-[#0b0f19] border-0 sm:border sm:border-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden relative max-h-[95dvh] sm:max-h-[92dvh] flex flex-col h-[95dvh] sm:h-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Mobile grab handle */}
-        <div
-          className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto my-2.5 sm:hidden flex-shrink-0 cursor-pointer"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-
-        {/* Close button */}
+      {/* Share & Close buttons */}
+      <div className="absolute top-2.5 sm:top-4 right-2.5 sm:right-4 z-30 flex items-center gap-1.5 sm:gap-2">
         <button
+          type="button"
+          onClick={handleShareMedia}
+          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition shadow-lg"
+          aria-label="Titel teilen"
+          title="Titel teilen"
+        >
+          <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
+        </button>
+        <button
+          type="button"
           onClick={onClose}
-          className="absolute top-3 sm:top-4 right-3 sm:right-4 z-30 p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition shadow-lg"
+          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2.5 rounded-full bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition shadow-lg"
           aria-label="Schließen"
         >
           <X className="w-5 h-5" />
         </button>
+      </div>
 
-        {/* Scrollable Container */}
-        <div className="overflow-y-auto flex-1 overscroll-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
+      {/* Scrollable Container */}
+      <div className="overflow-y-auto flex-1 overscroll-contain pb-[calc(2rem+env(safe-area-inset-bottom))]">
           {/* Hero Backdrop Banner */}
-          <div className="relative h-52 sm:h-80 w-full bg-slate-900">
+          <div className={`relative w-full bg-slate-900 ${showTrailer ? "aspect-video sm:aspect-auto sm:h-80" : "h-52 sm:h-80"}`}>
             {details?.backdropPath ? (
               <Image
                 src={`https://image.tmdb.org/t/p/w1280${details.backdropPath}`}
@@ -791,7 +804,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
                   {/* Targeted Recommendation Badge */}
                   {targetedRecForMe && (
-                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-amber-500/20 border border-purple-500/40 text-purple-200 text-xs font-bold shadow-sm animate-pulse">
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-purple-500/20 to-amber-500/20 border border-purple-500/40 text-purple-200 text-xs font-bold shadow-sm motion-safe:animate-pulse">
                       <Sparkles className="w-3.5 h-3.5 text-purple-400" />
                       <span>
                         {targetedRecForMe.targetNames?.some((t) => t.startsWith("@"))
@@ -1009,7 +1022,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   />
                 )}
 
-                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
                   {myStatusObj?.status === "WATCHED" || myStatusObj?.status === "WATCHING" ? (
                     <button
                       type="button"
@@ -1085,7 +1098,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <button
                     type="button"
                     onClick={() => setShowRecForm(false)}
-                    className="text-slate-400 hover:text-white"
+                    aria-label="Empfehlungsformular schließen"
+                    className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center rounded-lg text-slate-400 hover:text-white"
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -1467,7 +1481,8 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                   <button
                     type="button"
                     onClick={openSubscriptions}
-                    className="text-xs text-slate-400 hover:text-amber-400 underline whitespace-nowrap"
+                    aria-label={`Streaming-Abos anpassen (${userSubscriptions.length} aktiv)`}
+                    className="min-h-[40px] sm:min-h-0 px-2 sm:px-0 text-xs text-slate-400 hover:text-amber-400 underline whitespace-nowrap"
                   >
                     ({userSubscriptions.length})
                   </button>
@@ -1942,22 +1957,24 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                                   {rec.rating}/10
                                 </div>
                                 {isMine && (
-                                  <div className="flex items-center gap-0.5">
+                                  <div className="flex items-center gap-1.5 sm:gap-0.5">
                                     <button
                                       type="button"
                                       onClick={handleOpenRecForm}
-                                      className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+                                      aria-label="Empfehlung bearbeiten"
+                                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
                                       title="Empfehlung bearbeiten"
                                     >
-                                      <Pencil className="w-3.5 h-3.5" />
+                                      <Pencil className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                     </button>
                                     <button
                                       type="button"
                                       onClick={handleDeleteMyRec}
-                                      className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
+                                      aria-label="Empfehlung entfernen"
+                                      className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition"
                                       title="Empfehlung entfernen"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                                     </button>
                                   </div>
                                 )}
@@ -2046,25 +2063,6 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
 
             {/* Overview & Crew */}
             <div className="border-t border-slate-800 pt-6 pb-8 space-y-4">
-              {itemGenres.length > 0 && (
-                <div>
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
-                    Genres
-                  </h4>
-                  <div className="flex flex-wrap gap-2">
-                    {itemGenres.map((g) => (
-                      <span
-                        key={g.id || g.name}
-                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-200 font-medium"
-                      >
-                        <span className="text-sm">{g.emoji}</span>
-                        <span>{g.name}</span>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               {/* Recommendation Reason Banner if present */}
               {(media as any).reasons && (media as any).reasons.length > 0 && (
                 <div
@@ -2193,7 +2191,7 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                           className={`group/part relative rounded-2xl overflow-hidden bg-slate-900/90 border transition-all duration-300 flex flex-col ${
                             isCurrent
                               ? "border-amber-500 ring-2 ring-amber-500/40 shadow-xl shadow-amber-500/10 cursor-default"
-                              : "border-slate-800 hover:border-amber-500/50 hover:-translate-y-1 cursor-pointer shadow-lg hover:shadow-2xl"
+                              : "border-slate-800 hover:border-amber-500/50 [@media(hover:hover)]:hover:-translate-y-1 cursor-pointer shadow-lg hover:shadow-2xl"
                           }`}
                         >
                           {/* Poster */}
@@ -2309,16 +2307,15 @@ export function MediaModal({ media, onClose }: MediaModalProps) {
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full py-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 font-bold text-xs active:bg-slate-800 transition flex items-center justify-center gap-2"
+                  className="w-full min-h-[44px] py-3 rounded-2xl bg-slate-900 border border-slate-800 text-slate-300 font-bold text-xs active:bg-slate-800 transition flex items-center justify-center gap-2"
                 >
                   <X className="w-4 h-4 text-slate-400" />
-                  <span>Modal schließen</span>
+                  <span>Schließen</span>
                 </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

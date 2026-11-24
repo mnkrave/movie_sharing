@@ -50,8 +50,12 @@ export function RecommendationThread({
   const currentUserName = session?.user?.name;
 
   useEffect(() => {
-    // Focus input on mount
-    if (inputRef.current) {
+    // Only auto-focus on pointer-hover devices so mobile virtual keyboards don't hide existing replies
+    if (
+      inputRef.current &&
+      typeof window !== "undefined" &&
+      window.matchMedia("(hover: hover)").matches
+    ) {
       inputRef.current.focus();
     }
   }, []);
@@ -221,7 +225,7 @@ export function RecommendationThread({
                         deleteRecommendationReply(rep.id);
                       }
                     }}
-                    className="text-slate-500 hover:text-rose-400 p-1 rounded transition opacity-60 hover:opacity-100 flex-shrink-0"
+                    className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-500 hover:text-rose-400 p-2 sm:p-1 rounded transition opacity-70 hover:opacity-100 flex-shrink-0"
                     title="Antwort löschen"
                   >
                     <Trash2 className="w-3 h-3" />

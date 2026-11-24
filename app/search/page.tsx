@@ -245,7 +245,7 @@ function ExtendedSearchContent() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07090e] text-slate-100 pb-20">
+    <div className="min-h-screen bg-[#07090e] text-slate-100 pb-8 md:pb-20">
       {/* Top Hero Section */}
       <div className="relative border-b border-slate-800/80 bg-gradient-to-b from-[#0e1424] via-[#090d19] to-[#07090e] pt-10 pb-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
@@ -371,17 +371,19 @@ function ExtendedSearchContent() {
           <div className="relative">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Zusätzlicher Titel oder Stichwort (z. B. Batman, Cyberpunk, Zeitreise)..."
-              className="w-full pl-10 pr-9 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 shadow-inner"
+              className="w-full min-h-[44px] sm:min-h-0 pl-10 pr-10 py-2.5 bg-slate-950/70 border border-slate-800 rounded-xl text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/50 shadow-inner"
             />
             {query && (
               <button
                 type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                aria-label="Suche leeren"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-400 hover:text-white p-1"
               >
                 <X className="w-4 h-4" />
               </button>

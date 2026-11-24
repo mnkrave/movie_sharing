@@ -5,8 +5,13 @@ import { MediaItem } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
 import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
-import { Award, Film, Tv, Flame, ArrowRight, Sparkles, Dices, Gem } from "lucide-react";
+import { Award, Film, Tv, Flame, ArrowRight, Sparkles, Dices, Gem, Layers, Zap } from "lucide-react";
 import Link from "next/link";
+import { MobileOnboardingBanner } from "@/components/MobileOnboardingBanner";
+
+const MOBILE_RAIL_GRID_CLASS =
+  "flex overflow-x-auto snap-x snap-mandatory overscroll-x-contain snap-smooth gap-3.5 -mx-4 px-4 pb-2 scrollbar-none sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-6";
+const MOBILE_RAIL_ITEM_CLASS = "w-[43vw] max-w-[176px] shrink-0 snap-start sm:w-auto sm:max-w-none";
 
 interface HomeContentClientProps {
   topMovies: MediaItem[];
@@ -134,7 +139,34 @@ export function HomeContentClient({
   });
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-8 sm:space-y-12">
+      {/* Mobile-only 2-step starter onboarding for new users */}
+      <MobileOnboardingBanner />
+
+      {/* Mobile-only horizontal Discover quick links so key destinations aren't hidden in top drawer */}
+      <div className="md:hidden -mx-4 px-4 flex items-center gap-2 overflow-x-auto scrollbar-none scroll-fade-x">
+        {[
+          { href: "/recommendations", label: "KI-Berater", icon: Sparkles, accent: "text-purple-300 border-purple-500/35 bg-purple-500/15" },
+          { href: "/quick-rate", label: "Bewerten", icon: Zap, accent: "text-amber-300 border-amber-500/35 bg-amber-500/15" },
+          { href: "/collections", label: "Kollektionen", icon: Layers, accent: "text-indigo-300 border-indigo-500/35 bg-indigo-500/15" },
+          { href: "/movies", label: "Top 250", icon: Film, accent: "text-sky-300 border-sky-500/30 bg-sky-500/10" },
+          { href: "/tv", label: "Top Serien", icon: Tv, accent: "text-cyan-300 border-cyan-500/30 bg-cyan-500/10" },
+          { href: "/oscars", label: "Oscars", icon: Award, accent: "text-amber-300 border-amber-500/30 bg-amber-500/10" },
+        ].map((item) => {
+          const Icon = item.icon;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`min-h-[40px] px-3.5 py-2 rounded-2xl border text-xs font-bold whitespace-nowrap flex items-center gap-1.5 flex-shrink-0 active:scale-95 transition ${item.accent}`}
+            >
+              <Icon className="w-3.5 h-3.5 flex-shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </div>
+
       {/* Top Filter Bar with Mode Switcher */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 sm:p-5 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
         <div className="space-y-0.5">
@@ -154,11 +186,18 @@ export function HomeContentClient({
             {filterMode === "ALL" && <span>🍿 Filme & Serien entdecken</span>}
           </h2>
           <p className="text-xs text-slate-400">
-            {filterMode === "movie"
-              ? "Zeigt nur Filme: Oscar-Gewinner, IMDb Top 250 und Kinotrends"
-              : filterMode === "tv"
-              ? "Zeigt nur Serien: Staffel-Highlights, TV-Bestenlisten und Serientrends"
-              : "Alles auf einen Blick – wähle rechts oben, um die Ansicht auf nur Filme oder Serien umzuschalten"}
+            {filterMode === "movie" ? (
+              "Zeigt nur Filme: Oscar-Gewinner, IMDb Top 250 und Kinotrends"
+            ) : filterMode === "tv" ? (
+              "Zeigt nur Serien: Staffel-Highlights, TV-Bestenlisten und Serientrends"
+            ) : (
+              <>
+                Alles auf einen Blick –{" "}
+                <span className="sm:hidden">wähle unten,</span>
+                <span className="hidden sm:inline">wähle rechts oben,</span> um die Ansicht auf nur
+                Filme oder Serien umzuschalten
+              </>
+            )}
           </p>
         </div>
 
@@ -224,12 +263,12 @@ export function HomeContentClient({
           </div>
 
           {/* Category Quick-Pills & Interactive Shuffle Button */}
-          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto">
-            <div className="flex items-center p-1 rounded-2xl bg-slate-900/90 border border-slate-800">
+          <div className="flex flex-wrap items-center gap-2 self-start lg:self-auto w-full lg:w-auto min-w-0">
+            <div className="flex items-center p-1 rounded-2xl bg-slate-900/90 border border-slate-800 overflow-x-auto scrollbar-none max-w-full">
               <button
                 type="button"
                 onClick={() => setDiscoveryCategory("MIX")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`whitespace-nowrap flex-shrink-0 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   discoveryCategory === "MIX"
                     ? "bg-purple-500 text-white shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -240,7 +279,7 @@ export function HomeContentClient({
               <button
                 type="button"
                 onClick={() => setDiscoveryCategory("TRENDING")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`whitespace-nowrap flex-shrink-0 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   discoveryCategory === "TRENDING"
                     ? "bg-rose-500 text-white shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -251,7 +290,7 @@ export function HomeContentClient({
               <button
                 type="button"
                 onClick={() => setDiscoveryCategory("GEMS")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
+                className={`whitespace-nowrap flex-shrink-0 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer flex items-center gap-1 ${
                   discoveryCategory === "GEMS"
                     ? "bg-emerald-500 text-slate-950 shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -263,7 +302,7 @@ export function HomeContentClient({
               <button
                 type="button"
                 onClick={() => setDiscoveryCategory("CLASSICS")}
-                className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                className={`whitespace-nowrap flex-shrink-0 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
                   discoveryCategory === "CLASSICS"
                     ? "bg-amber-500 text-slate-950 shadow-sm"
                     : "text-slate-400 hover:text-white"
@@ -276,7 +315,7 @@ export function HomeContentClient({
             <button
               type="button"
               onClick={handleReshuffle}
-              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 border border-purple-400/30 transition active:scale-95 cursor-pointer"
+              className="flex items-center gap-2 min-h-[40px] sm:min-h-0 px-3.5 py-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-purple-500/20 border border-purple-400/30 transition active:scale-95 cursor-pointer"
               title="10 neue Filme & Serien würfeln"
             >
               <Dices
@@ -289,13 +328,11 @@ export function HomeContentClient({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+        <div className={MOBILE_RAIL_GRID_CLASS}>
           {discoveryItems.map((item, idx) => (
-            <MediaCard
-              key={`discover_${item.mediaType}_${item.id}`}
-              item={item}
-              priority={idx < 5}
-            />
+            <div key={`discover_${item.mediaType}_${item.id}`} className={MOBILE_RAIL_ITEM_CLASS}>
+              <MediaCard item={item} priority={idx < 5} />
+            </div>
           ))}
         </div>
       </section>
@@ -313,7 +350,10 @@ export function HomeContentClient({
                   Oscar-Gewinner & Bester Film
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-400">
-                  Prämierte Meisterwerke von Oppenheimer bis Parasite – klicke auf einen Film für den weltweiten Streaming-Finder!
+                  Prämierte Meisterwerke von Oppenheimer bis Parasite –{" "}
+                  <span className="sm:hidden">tippe</span>
+                  <span className="hidden sm:inline">klicke</span> auf einen Film für den weltweiten
+                  Streaming-Finder!
                 </p>
               </div>
             </div>
@@ -326,9 +366,11 @@ export function HomeContentClient({
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+          <div className={MOBILE_RAIL_GRID_CLASS}>
             {oscarWinners.map((item, idx) => (
-              <MediaCard key={item.id} item={item} priority={idx < 5} />
+              <div key={item.id} className={MOBILE_RAIL_ITEM_CLASS}>
+                <MediaCard item={item} priority={idx < 5} />
+              </div>
             ))}
           </div>
         </section>
@@ -360,9 +402,11 @@ export function HomeContentClient({
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+          <div className={MOBILE_RAIL_GRID_CLASS}>
             {topMovies.slice(0, 15).map((item) => (
-              <MediaCard key={item.id} item={item} />
+              <div key={item.id} className={MOBILE_RAIL_ITEM_CLASS}>
+                <MediaCard item={item} />
+              </div>
             ))}
           </div>
 
@@ -405,9 +449,11 @@ export function HomeContentClient({
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+          <div className={MOBILE_RAIL_GRID_CLASS}>
             {topTv.slice(0, 15).map((item) => (
-              <MediaCard key={item.id} item={item} />
+              <div key={item.id} className={MOBILE_RAIL_ITEM_CLASS}>
+                <MediaCard item={item} />
+              </div>
             ))}
           </div>
 
@@ -446,9 +492,11 @@ export function HomeContentClient({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+        <div className={MOBILE_RAIL_GRID_CLASS}>
           {displayedTrending.slice(0, 15).map((item) => (
-            <MediaCard key={item.id} item={item} />
+            <div key={item.id} className={MOBILE_RAIL_ITEM_CLASS}>
+              <MediaCard item={item} />
+            </div>
           ))}
         </div>
       </section>

@@ -5,6 +5,7 @@ import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import { Bell, Check, Tv, X, Filter } from "lucide-react";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -41,6 +42,8 @@ export function SubscriptionModal({
       .catch(() => {});
   }, [isOpen, session]);
 
+  if (!isOpen) return null;
+
   const toggleWatchlistAlerts = async () => {
     if (!session?.user || savingAlerts) return;
     const next = !watchlistAlerts;
@@ -65,17 +68,6 @@ export function SubscriptionModal({
     }
   };
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  if (!isOpen) return null;
-
   const toggle = (key: string) => {
     if (current.includes(key)) {
       setCurrent(current.filter((k) => k !== key));
@@ -90,17 +82,18 @@ export function SubscriptionModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Deine Streaming-Abos"
+      maxWidthClass="max-w-lg"
+      panelClassName="bg-[#0f1422] border-0 sm:border sm:border-slate-800 max-h-[90dvh]"
     >
-      <div
-        className="bg-[#0f1422] border border-slate-800 rounded-2xl w-full max-w-lg max-h-[90dvh] flex flex-col p-5 sm:p-6 shadow-2xl relative overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="flex flex-col flex-1 min-h-0 p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6 relative overflow-hidden">
         <button
+          type="button"
           onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800/60 transition"
+          className="absolute top-3 right-3 sm:top-4 sm:right-4 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800/60 transition"
           aria-label="Schließen"
         >
           <X className="w-5 h-5" />
@@ -197,11 +190,11 @@ export function SubscriptionModal({
           })}
         </div>
 
-        <div className="flex items-center justify-between pt-4 border-t border-slate-800">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-4 border-t border-slate-800">
           <button
             type="button"
             onClick={() => setCurrent([])}
-            className="text-xs text-slate-400 hover:text-white underline"
+            className="min-h-[40px] sm:min-h-0 text-xs text-slate-400 hover:text-white underline"
           >
             Alle abwählen
           </button>
@@ -209,20 +202,20 @@ export function SubscriptionModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition"
+              className="min-h-[44px] sm:min-h-0 px-4 py-2 rounded-xl text-sm font-medium text-slate-400 hover:text-white hover:bg-slate-800 transition"
             >
               Abbrechen
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="px-5 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black transition shadow-lg shadow-amber-500/20"
+              className="min-h-[44px] sm:min-h-0 px-5 py-2 rounded-xl text-sm font-semibold bg-amber-500 hover:bg-amber-400 text-black transition shadow-lg shadow-amber-500/20"
             >
               Speichern ({current.length})
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "./MediaContext";
+import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 import {
   Video,
   Film,
@@ -27,6 +28,19 @@ import {
   BarChart3,
   Zap,
 } from "lucide-react";
+
+export function isDiscoverRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return (
+    pathname === "/" ||
+    pathname === "/movies" ||
+    pathname === "/tv" ||
+    pathname.startsWith("/collections") ||
+    pathname === "/oscars" ||
+    pathname.startsWith("/recommendations") ||
+    pathname === "/quick-rate"
+  );
+}
 
 export function Navbar() {
   const pathname = usePathname();
@@ -87,14 +101,7 @@ export function Navbar() {
   ).length;
   const showQuickRateNav = Boolean(session?.user && myWatchedCount < 250);
 
-  const isDiscoverActive =
-    pathname === "/" ||
-    pathname === "/movies" ||
-    pathname === "/tv" ||
-    pathname.startsWith("/collections") ||
-    pathname === "/oscars" ||
-    pathname.startsWith("/recommendations") ||
-    pathname === "/quick-rate";
+  const isDiscoverActive = isDiscoverRoute(pathname);
 
   const mainNavLinks = [
     { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
@@ -292,11 +299,11 @@ export function Navbar() {
 
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2 sm:gap-3">
-          {/* Search Trigger Button (Desktop/Tablet - on mobile Search is prominent in MobileBottomNav) */}
+          {/* Search Trigger Button (Desktop - on mobile/tablet < md Search is prominent in MobileBottomNav) */}
           <button
             type="button"
             onClick={openSearch}
-            className="hidden sm:flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-xs font-medium transition shadow-sm"
+            className="hidden md:flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-xs font-medium transition shadow-sm"
           >
             <Search className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">Suchen...</span>
@@ -310,11 +317,12 @@ export function Navbar() {
             type="button"
             onClick={openSubscriptions}
             title="Deine Streaming-Abos verwalten"
-            className="flex items-center gap-1.5 px-3 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-slate-300 text-xs font-semibold transition"
+            aria-label={`Deine Streaming-Abos verwalten (${userSubscriptions.length} aktiv)`}
+            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 px-3 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-slate-300 text-xs font-semibold transition"
           >
             <Tv className="w-4 h-4 text-amber-400" />
             <span className="hidden sm:inline">Abos</span>
-            <span className="text-[11px] bg-amber-500/20 text-amber-300 px-1.5 py-0.2 rounded font-mono font-bold">
+            <span className="text-[11px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 md:py-0.2 rounded font-mono font-bold">
               {userSubscriptions.length}
             </span>
           </button>
@@ -325,7 +333,8 @@ export function Navbar() {
               <button
                 type="button"
                 onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                className="flex items-center gap-2 p-1.5 sm:pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition"
+                aria-label="Benutzermenü öffnen"
+                className="flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-1.5 sm:pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition"
               >
                 {currentUserAvatar ? (
                   <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-amber-500/50 flex-shrink-0">
@@ -412,7 +421,10 @@ export function Navbar() {
 
                   <button
                     type="button"
-                    onClick={() => signOut({ callbackUrl: "/" })}
+                    onClick={() => {
+                      clearOfflineWatchlist();
+                      signOut({ callbackUrl: "/" });
+                    }}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 transition mt-1 border-t border-slate-800/60"
                   >
                     <LogOut className="w-3.5 h-3.5" />
@@ -424,7 +436,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow-lg shadow-amber-500/20"
+              className="flex items-center gap-1.5 min-h-[44px] md:min-h-0 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow-lg shadow-amber-500/20"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Einloggen</span>
@@ -435,7 +447,8 @@ export function Navbar() {
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="md:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+            aria-expanded={mobileMenuOpen}
+            className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
             aria-label="Navigation umschalten"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -446,62 +459,72 @@ export function Navbar() {
       {/* Mobile Drawer Backdrop */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 top-16 bg-black/60 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-200"
+          className="fixed inset-0 top-[calc(4rem+env(safe-area-inset-top))] bg-black/60 backdrop-blur-sm z-30 md:hidden animate-in fade-in duration-200"
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Mobile Drawer */}
+      {/* Mobile Drawer (Secondary destinations only; Feed, Liste & Freunde live in MobileBottomNav) */}
       {mobileMenuOpen && (
         <div className="md:hidden relative z-40 bg-[#0a0e1a] border-b border-slate-800 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain space-y-1 text-sm shadow-2xl animate-in slide-in-from-top-2 duration-200">
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 py-1">
-            Entdecken
+          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1">
+            Entdecken & Listen
           </div>
           {discoverItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setMobileMenuOpen(false)}
-              className={`flex items-center gap-3 px-4 py-2 rounded-xl font-semibold transition ${
+              className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
                 pathname === item.href
                   ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "text-slate-300 hover:bg-slate-800/60"
+                  : "text-slate-200 hover:bg-slate-800/60"
               }`}
             >
-              <item.icon className="w-4 h-4 text-amber-400" />
-              <span>{item.label}</span>
+              <item.icon className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <div className="min-w-0">
+                <span className="block leading-tight">{item.label}</span>
+                <span className="block text-xs font-normal text-slate-400 truncate">{item.sub}</span>
+              </div>
             </Link>
           ))}
 
-          <div className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-3 pt-3 pb-1">
-            Community
-          </div>
-          {mainNavLinks.map((link) => {
-            const showBadge = link.href === "/friends" && pendingRequestsCount > 0;
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => setMobileMenuOpen(false)}
-                className={`flex items-center justify-between px-4 py-2 rounded-xl font-semibold transition ${
-                  pathname === link.href
-                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                    : "text-slate-300 hover:bg-slate-800/60"
-                }`}
-              >
-                <div className="flex items-center gap-3">
-                  <link.icon className="w-4 h-4" />
-                  <span>{link.label}</span>
-                </div>
-                {showBadge && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-500 text-black font-black text-xs">
-                    {pendingRequestsCount} neu
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+          {(session?.user || isAdmin) && (
+            <>
+              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">
+                Konto & Verwaltung
+              </div>
+              {session?.user && (
+                <Link
+                  href="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
+                    pathname === "/profile"
+                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                      : "text-slate-200 hover:bg-slate-800/60"
+                  }`}
+                >
+                  <BarChart3 className="w-4 h-4 text-amber-400" />
+                  <span>Mein Profil & Kino-DNA</span>
+                </Link>
+              )}
+              {isAdmin && (
+                <Link
+                  href="/admin"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
+                    pathname === "/admin"
+                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                      : "text-amber-300 hover:bg-amber-500/10"
+                  }`}
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>Admin-Verwaltung</span>
+                </Link>
+              )}
+            </>
+          )}
         </div>
       )}
     </nav>

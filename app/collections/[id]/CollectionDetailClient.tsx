@@ -922,7 +922,7 @@ export function CollectionDetailClient({
       </div>
 
       {/* Edit Custom Collection Modal */}
-      {customCollection && (
+      {customCollection && isEditModalOpen && (
         <CustomCollectionModal
           isOpen={isEditModalOpen}
           onClose={() => setIsEditModalOpen(false)}

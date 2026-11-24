@@ -17,6 +17,7 @@ import {
   User,
 } from "lucide-react";
 import Image from "next/image";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -47,15 +48,6 @@ export function SearchModal({
   }, [isOpen]);
 
   useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
-  useEffect(() => {
     if (!query.trim()) {
       setResults([]);
       setPersons([]);
@@ -83,57 +75,69 @@ export function SearchModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-start justify-center pt-[calc(env(safe-area-inset-top)+0.5rem)] sm:pt-20 p-2 sm:p-4 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Schnellsuche"
+      mobilePosition="top"
+      showHandle={false}
+      maxWidthClass="max-w-2xl"
+      panelClassName="bg-[#0e1320] border border-slate-800 max-h-[88dvh] sm:max-h-[82dvh]"
     >
-      <div
-        className="bg-[#0e1320] border border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[82dvh]"
-        onClick={(e) => e.stopPropagation()}
+      {/* Search Bar Row with Quick Input & Extended Search Button on Right */}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          inputRef.current?.blur();
+        }}
+        className="flex items-center gap-1.5 sm:gap-2.5 p-2.5 sm:p-3.5 border-b border-slate-800/80 bg-slate-900/60"
       >
-        {/* Search Bar Row with Quick Input & Extended Search Button on Right */}
-        <div className="flex items-center gap-2.5 p-3.5 border-b border-slate-800/80 bg-slate-900/60">
-          <Search className="w-5 h-5 text-amber-400 flex-shrink-0" />
-          <input
-            ref={inputRef}
-            type="text"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filme, Serien oder Schauspieler suchen (z. B. DiCaprio, Nolan, Inception)..."
-            className="w-full min-w-0 flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base"
-          />
-          {loading && <Loader2 className="w-5 h-5 text-amber-400 animate-spin flex-shrink-0" />}
-          {query && (
-            <button
-              type="button"
-              onClick={() => setQuery("")}
-              className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 flex-shrink-0"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-
-          {/* Prominent Extended Search Button on the Right */}
-          <Link
-            href={query.trim() ? `/search?q=${encodeURIComponent(query)}` : "/search"}
-            onClick={onClose}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition hover:scale-102 flex-shrink-0 shadow-sm"
-            title="Zur vollständigen Extended Search Seite mit Regie-, Cast- & Länderfiltern"
-          >
-            <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
-            <span className="hidden sm:inline">Extended Search</span>
-            <ChevronRight className="w-3.5 h-3.5 text-amber-400/80" />
-          </Link>
-
+        <Search className="w-5 h-5 text-amber-400 flex-shrink-0 ml-1 sm:ml-0" />
+        <input
+          ref={inputRef}
+          type="search"
+          enterKeyHint="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Filme, Serien oder Stars suchen..."
+          aria-label="Filme, Serien oder Schauspieler suchen"
+          className="w-full min-w-0 flex-1 bg-transparent text-white placeholder-slate-500 focus:outline-none text-sm sm:text-base"
+        />
+        {loading && <Loader2 className="w-5 h-5 text-amber-400 animate-spin flex-shrink-0" />}
+        {query && (
           <button
             type="button"
-            onClick={onClose}
-            className="p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition flex-shrink-0"
-            title="Schließen"
+            onClick={() => setQuery("")}
+            aria-label="Suchfeld leeren"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 flex-shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
-        </div>
+        )}
+
+        {/* Prominent Extended Search Button on the Right */}
+        <Link
+          href={query.trim() ? `/search?q=${encodeURIComponent(query)}` : "/search"}
+          onClick={onClose}
+          className="flex items-center gap-1.5 min-h-[40px] sm:min-h-0 px-2.5 sm:px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 text-xs font-bold transition hover:scale-102 flex-shrink-0 shadow-sm"
+          title="Zur vollständigen Extended Search Seite mit Regie-, Cast- & Länderfiltern"
+        >
+          <SlidersHorizontal className="w-3.5 h-3.5 text-amber-400" />
+          <span className="sm:hidden">Filter</span>
+          <span className="hidden sm:inline">Extended Search</span>
+          <ChevronRight className="w-3.5 h-3.5 text-amber-400/80 hidden sm:inline" />
+        </Link>
+
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Suche schließen"
+          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition flex-shrink-0"
+          title="Schließen"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </form>
 
         {/* Results List */}
         <div className="overflow-y-auto overscroll-contain p-3 divide-y divide-slate-800/50 flex-1">
@@ -295,7 +299,6 @@ export function SearchModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

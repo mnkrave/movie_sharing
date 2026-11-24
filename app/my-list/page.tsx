@@ -17,10 +17,12 @@ import {
   Trash2,
   Sparkles,
   ArrowUpDown,
+  WifiOff,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { MobileFilterBar } from "@/components/MobileFilterBar";
 import { formatWatchedSeasons } from "@/lib/seasons";
 
 export default function MyListPage() {
@@ -33,6 +35,7 @@ export default function MyListPage() {
     openRatingModal,
     refreshCommunity,
     showToast,
+    isOfflineSnapshot,
   } = useMedia();
 
   const [activeTab, setActiveTab] = useState<"WATCHLIST" | "WATCHING" | "WATCHED">("WATCHLIST");
@@ -192,9 +195,29 @@ export default function MyListPage() {
     }
   };
 
+  const myListActiveFilterCount =
+    (mediaTypeFilter !== "ALL" ? 1 : 0) +
+    (selectedCategory !== "ALL" ? 1 : 0) +
+    (searchQuery.trim() ? 1 : 0) +
+    (sortBy !== "date_desc" ? 1 : 0);
+
+  const myListFilterSummary = [
+    mediaTypeFilter === "movie" ? "Filme" : mediaTypeFilter === "tv" ? "Serien" : "Suche & Filter",
+    selectedCategory !== "ALL" ? selectedCategory : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 space-y-6 md:space-y-8">
+      {isOfflineSnapshot && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs font-semibold flex items-center gap-2.5">
+          <WifiOff className="w-4 h-4 text-amber-400 flex-shrink-0" />
+          <span>Offline-Ansicht: Zeigt deinen zuletzt gespeicherten Stand deiner Liste.</span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
         <div className="space-y-1">
@@ -307,24 +330,37 @@ export default function MyListPage() {
         )}
       </div>
 
-      {/* Filter and Search Bar */}
+      {/* Filter and Search Bar (collapsible on mobile, always expanded on desktop) */}
+      <MobileFilterBar
+        summary={myListFilterSummary}
+        activeCount={myListActiveFilterCount}
+        resultLabel={`${filteredItems.length} Titel`}
+        onReset={() => {
+          setMediaTypeFilter("ALL");
+          setSelectedCategory("ALL");
+          setSearchQuery("");
+          setSortBy("date_desc");
+        }}
+      >
       <div className="space-y-4">
         {/* Search Input & Sort Selector */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="In deiner Liste suchen..."
-              className="w-full bg-slate-900 border border-slate-800 focus:border-amber-400 rounded-xl pl-9 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition"
+              className="w-full min-h-[44px] sm:min-h-0 bg-slate-900 border border-slate-800 focus:border-amber-400 rounded-xl pl-9 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                aria-label="Suchfeld leeren"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-500 hover:text-white"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -349,7 +385,7 @@ export default function MyListPage() {
 
         {/* Category & Genre Pills Filter */}
         {availableGenres.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none scroll-fade-x">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 pr-2 flex-shrink-0">
               <Filter className="w-3.5 h-3.5 text-amber-400" />
               <span>Kategorien:</span>
@@ -385,6 +421,7 @@ export default function MyListPage() {
           </div>
         )}
       </div>
+      </MobileFilterBar>
 
       {/* Grid of Saved Items */}
       {filteredItems.length > 0 ? (
@@ -403,7 +440,7 @@ export default function MyListPage() {
                     posterPath: item.posterPath,
                   })
                 }
-                className="group relative cursor-pointer flex flex-col rounded-2xl overflow-hidden bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/40 transition duration-300 hover:-translate-y-1.5 shadow-md hover:shadow-2xl"
+                className="group relative cursor-pointer flex flex-col rounded-2xl overflow-hidden bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/40 transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 shadow-md hover:shadow-2xl"
               >
                 {/* Poster container */}
                 <div className="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-950">
@@ -603,17 +640,37 @@ export default function MyListPage() {
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
+                        const snapshot = {
+                          tmdbId: item.tmdbId,
+                          mediaType: item.mediaType,
+                          title: item.title,
+                          posterPath: item.posterPath,
+                          releaseYear: item.releaseYear,
+                          status: item.status,
+                          rating: item.rating ?? undefined,
+                          watchedSeasons: item.watchedSeasons ?? undefined,
+                          totalSeasons: item.totalSeasons ?? undefined,
+                        };
                         updateMediaStatus({
                           tmdbId: item.tmdbId,
                           mediaType: item.mediaType,
                           title: item.title,
                           status: "NONE",
                         });
+                        showToast(`„${item.title}“ aus deiner Liste entfernt.`, {
+                          type: "info",
+                          actionLabel: "Rückgängig",
+                          onAction: () => {
+                            updateMediaStatus(snapshot);
+                          },
+                          durationMs: 6000,
+                        });
                       }}
-                      className="text-slate-500 hover:text-rose-400 p-1.5 sm:p-1 rounded hover:bg-rose-500/10 transition"
+                      aria-label={`${item.title} aus Liste entfernen`}
+                      className="min-w-[38px] min-h-[38px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-400 sm:text-slate-500 hover:text-rose-400 p-2 sm:p-1 rounded-lg hover:bg-rose-500/10 transition"
                       title="Aus Liste entfernen"
                     >
-                      <Trash2 className="w-3.5 h-3.5" />
+                      <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                     </button>
                   </div>
                 </div>

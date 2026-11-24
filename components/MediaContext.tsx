@@ -21,6 +21,12 @@ import type {
   AppCustomCollectionMovie,
 } from "@/lib/store";
 import { useSession } from "next-auth/react";
+import { parseMediaDeepLink } from "@/lib/share";
+import {
+  clearOfflineWatchlist,
+  readOfflineWatchlist,
+  saveOfflineWatchlist,
+} from "@/lib/offline-watchlist";
 
 export interface FriendRequestItem {
   requestId: string;
@@ -150,12 +156,13 @@ interface MediaContextType {
   updateUserAvatar: (avatarUrl: string | null) => Promise<void>;
   showToast: (message: string, options?: ToastOptions) => void;
   confirmDialog: (options: ConfirmDialogOptions) => Promise<boolean>;
+  isOfflineSnapshot: boolean;
 }
 
 const MediaContext = createContext<MediaContextType | null>(null);
 
 export function MediaProvider({ children }: { children: React.ReactNode }) {
-  const { data: session } = useSession();
+  const { data: session, status: sessionStatus } = useSession();
   const [selectedMedia, setSelectedMedia] = useState<{
     id: number;
     mediaType: "movie" | "tv";
@@ -184,6 +191,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
   const [userSubscriptions, setUserSubscriptionsState] = useState<string[]>(["netflix", "prime", "disney"]);
   const [onlyMySubs, setOnlyMySubsState] = useState<boolean>(true);
   const [friendGroups, setFriendGroupsState] = useState<FriendGroup[]>([]);
+  const [isOfflineSnapshot, setIsOfflineSnapshot] = useState<boolean>(false);
+  const [hasSyncedCommunity, setHasSyncedCommunity] = useState<boolean>(false);
   const [communityData, setCommunityData] = useState<{
     mediaStatuses: AppMediaStatus[];
     recommendations: AppRecommendation[];
@@ -231,19 +240,55 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // Lock body scroll when any modal is open (avoids scroll chaining and rubber-banding on iOS/Android)
-  const isAnyModalOpen = Boolean(
-    selectedMedia || isSearchOpen || isSubsOpen || ratingTarget || isAvatarPickerOpen || activeConfirm
-  );
-
+  // Open shared movie/series deep-link (`/?media=movie-27205`) once on initial page load
   useEffect(() => {
-    if (!isAnyModalOpen) return;
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
-  }, [isAnyModalOpen]);
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const parsed = parseMediaDeepLink(params.get("media"));
+    if (parsed) {
+      setSelectedMedia({ id: parsed.id, mediaType: parsed.mediaType });
+      params.delete("media");
+      const nextUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ""}${window.location.hash}`;
+      try {
+        window.history.replaceState(window.history.state, "", nextUrl);
+      } catch {
+        // Ignore restricted history API contexts
+      }
+    }
+  }, []);
+
+  // Persist a read-only offline snapshot of the signed-in user's own list (cleared on confirmed logout)
+  useEffect(() => {
+    if (sessionStatus === "unauthenticated") {
+      if (typeof navigator === "undefined" || navigator.onLine !== false) {
+        clearOfflineWatchlist();
+      }
+      return;
+    }
+    if (sessionStatus !== "authenticated" || !session?.user) {
+      return;
+    }
+    const rawUserId = (session.user as { id?: unknown }).id;
+    const myUserId = typeof rawUserId === "string" ? rawUserId.trim() : "";
+    if (!myUserId) return;
+
+    // Immediately evict any snapshot belonging to a different account before sync completes
+    const existing = readOfflineWatchlist();
+    if (existing && existing.ownerId !== myUserId) {
+      clearOfflineWatchlist();
+    }
+
+    if (isOfflineSnapshot || !hasSyncedCommunity) {
+      return;
+    }
+
+    const myItems = communityData.mediaStatuses.filter((m) => m.userId === myUserId);
+    if (myItems.length > 0) {
+      saveOfflineWatchlist(myUserId, myItems);
+    } else {
+      clearOfflineWatchlist();
+    }
+  }, [session, sessionStatus, communityData.mediaStatuses, isOfflineSnapshot, hasSyncedCommunity]);
 
   // Normalize user aliases in friendGroups whenever session user name is loaded
   useEffect(() => {
@@ -421,6 +466,8 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       if (res.ok) {
         const data = await res.json();
         setCommunityData(data);
+        setIsOfflineSnapshot(false);
+        setHasSyncedCommunity(true);
 
         // Synchronize friendGroups from Database <-> localStorage
         if (Array.isArray(data.friendGroups)) {
@@ -450,10 +497,31 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (err) {
       console.error("Failed to fetch community data:", err);
+      const rawUserId = (session?.user as { id?: unknown } | undefined)?.id;
+      const myUserId = typeof rawUserId === "string" ? rawUserId.trim() : "";
+      const snapshot = myUserId ? readOfflineWatchlist(myUserId) : null;
+      if (snapshot && snapshot.items.length > 0 && session?.user) {
+        const myName = session.user.name || "Ich";
+        setIsOfflineSnapshot(true);
+        setCommunityData((prev) =>
+          prev.mediaStatuses.length > 0
+            ? prev
+            : {
+                ...prev,
+                mediaStatuses: snapshot.items.map((item) => ({
+                  ...item,
+                  userId: myUserId,
+                  userName: myName,
+                  updatedAt: item.updatedAt || snapshot.savedAt,
+                })),
+              }
+        );
+      }
     }
   };
 
   useEffect(() => {
+    setHasSyncedCommunity(false);
     refreshCommunity();
   }, [session]);
 
@@ -1011,8 +1079,10 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         type: options?.type ?? "info",
         actionLabel: options?.actionLabel,
         actionHref: options?.actionHref,
+        onAction: options?.onAction,
       };
-      const durationMs = options?.durationMs ?? (options?.actionHref ? 6500 : 4000);
+      const durationMs =
+        options?.durationMs ?? (options?.actionHref || options?.onAction ? 6000 : 4000);
 
       setToasts((prev) => [...prev.slice(-2), item]);
       scheduleToastRemoval(id, durationMs);
@@ -1131,6 +1201,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         updateUserAvatar,
         showToast,
         confirmDialog,
+        isOfflineSnapshot,
       }}
     >
       {children}
@@ -1142,34 +1213,42 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      <SearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectMedia={(item) => setSelectedMedia(item)}
-        initialMode={searchInitialMode}
-      />
+      {isSearchOpen && (
+        <SearchModal
+          isOpen={isSearchOpen}
+          onClose={() => setIsSearchOpen(false)}
+          onSelectMedia={(item) => setSelectedMedia(item)}
+          initialMode={searchInitialMode}
+        />
+      )}
 
-      <SubscriptionModal
-        isOpen={isSubsOpen}
-        onClose={() => setIsSubsOpen(false)}
-        selectedSubscriptions={userSubscriptions}
-        onSave={setUserSubscriptions}
-      />
+      {isSubsOpen && (
+        <SubscriptionModal
+          isOpen={isSubsOpen}
+          onClose={() => setIsSubsOpen(false)}
+          selectedSubscriptions={userSubscriptions}
+          onSave={setUserSubscriptions}
+        />
+      )}
 
-      <QuickRatingModal
-        target={ratingTarget}
-        onClose={() => setRatingTarget(null)}
-        onSaveRating={handleSaveRating}
-        onRemoveWatched={handleRemoveWatched}
-      />
+      {ratingTarget && (
+        <QuickRatingModal
+          target={ratingTarget}
+          onClose={() => setRatingTarget(null)}
+          onSaveRating={handleSaveRating}
+          onRemoveWatched={handleRemoveWatched}
+        />
+      )}
 
-      <AvatarPickerModal
-        isOpen={isAvatarPickerOpen}
-        onClose={() => setIsAvatarPickerOpen(false)}
-        currentAvatar={currentUserAvatar}
-        userName={session?.user?.name || "Kino-Fan"}
-        onSave={updateUserAvatar}
-      />
+      {isAvatarPickerOpen && (
+        <AvatarPickerModal
+          isOpen={isAvatarPickerOpen}
+          onClose={() => setIsAvatarPickerOpen(false)}
+          currentAvatar={currentUserAvatar}
+          userName={session?.user?.name || "Kino-Fan"}
+          onSave={updateUserAvatar}
+        />
+      )}
 
       <ConfirmDialogModal
         request={activeConfirm?.request ?? null}

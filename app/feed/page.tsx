@@ -24,6 +24,7 @@ import {
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 import { RecommendationThread } from "@/components/RecommendationThread";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { MobileFilterBar } from "@/components/MobileFilterBar";
 
 export default function FeedPage() {
   const { data: session } = useSession();
@@ -210,11 +211,39 @@ export default function FeedPage() {
     }
   };
 
+  const resetFilters = () => {
+    setFilterType("ALL");
+    setAuthorFilter("ALL");
+    setHideWatched(false);
+    setOnlyStreamable(false);
+    setSelectedTag("ALL");
+  };
+
+  const feedActiveFilters =
+    (filterType !== "ALL" ? 1 : 0) +
+    (authorFilter !== "ALL" ? 1 : 0) +
+    (hideWatched ? 1 : 0) +
+    (onlyStreamable ? 1 : 0) +
+    (selectedTag !== "ALL" ? 1 : 0);
+
+  const feedSummaryParts = [
+    authorFilter === "FRIENDS"
+      ? "Von Freunden"
+      : authorFilter === "TARGETED"
+      ? "An mich"
+      : authorFilter === "MINE"
+      ? "Meine"
+      : "Alle",
+    hideWatched ? "Ungesehen" : null,
+    onlyStreamable ? "Im Abo" : null,
+    selectedTag !== "ALL" ? selectedTag : null,
+  ].filter(Boolean);
+
   return (
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-10 space-y-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 md:py-10 space-y-6 md:space-y-8">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 sm:gap-6 p-4 sm:p-8 rounded-3xl bg-gradient-to-br from-rose-950/40 via-slate-900 to-[#0e1320] border border-rose-500/20 shadow-xl">
         <div className="space-y-1 max-w-md">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-500/20 text-rose-300 text-xs font-bold uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5" />
@@ -241,7 +270,13 @@ export default function FeedPage() {
         </div>
       </div>
 
-      {/* Filter Bar: Format, Author, Smart Filters & Genre Tags */}
+      {/* Filter Bar: Format, Author, Smart Filters & Genre Tags (collapsible on mobile, always expanded on md+) */}
+      <MobileFilterBar
+        summary={feedSummaryParts.join(" · ")}
+        activeCount={feedActiveFilters}
+        resultLabel={`${filteredRecommendations.length} Tipps`}
+        onReset={resetFilters}
+      >
       <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-4 shadow-xl">
         {/* Row 1: Format & Author Switchers */}
         <div className="flex flex-wrap items-center justify-between gap-3.5">
@@ -409,7 +444,7 @@ export default function FeedPage() {
         </div>
 
         {/* Row 3: Genre & Tag Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-2 border-t border-slate-800/60">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-2 border-t border-slate-800/60">
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1 flex-shrink-0">
             Genre / Typ:
           </span>
@@ -428,6 +463,7 @@ export default function FeedPage() {
           ))}
         </div>
       </div>
+      </MobileFilterBar>
 
       {/* Feed List */}
       {filteredRecommendations.length > 0 ? (
@@ -561,7 +597,7 @@ export default function FeedPage() {
                         <span>{rec.rating}/10</span>
                       </div>
                       {isMyOwn && (
-                        <div className="flex items-center gap-0.5 ml-1">
+                        <div className="flex items-center gap-1.5 sm:gap-0.5 ml-1">
                           <button
                             type="button"
                             onClick={() =>
@@ -572,10 +608,11 @@ export default function FeedPage() {
                                 posterPath: rec.posterPath,
                               })
                             }
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
+                            aria-label="Empfehlung bearbeiten"
+                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1.5 rounded-lg text-slate-400 hover:text-amber-400 hover:bg-slate-800 transition"
                             title="Empfehlung bearbeiten"
                           >
-                            <Pencil className="w-3.5 h-3.5" />
+                            <Pencil className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                           </button>
                           <button
                             type="button"
@@ -590,10 +627,11 @@ export default function FeedPage() {
                                 deleteRecommendation(rec.id);
                               }
                             }}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
+                            aria-label="Empfehlung entfernen"
+                            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1.5 rounded-lg text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 transition"
                             title="Empfehlung entfernen"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
                           </button>
                         </div>
                       )}
@@ -789,14 +827,10 @@ export default function FeedPage() {
               </>
             )}
 
-            {(hideWatched || onlyStreamable) && (
+            {(hideWatched || onlyStreamable || filterType !== "ALL" || selectedTag !== "ALL") && (
               <button
                 type="button"
-                onClick={() => {
-                  setHideWatched(false);
-                  setOnlyStreamable(false);
-                  setAuthorFilter("ALL");
-                }}
+                onClick={resetFilters}
                 className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-300 text-xs font-bold transition"
               >
                 <RotateCcw className="w-3.5 h-3.5" />

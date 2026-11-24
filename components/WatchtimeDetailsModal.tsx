@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { useMedia } from "./MediaContext";
 import type { AppMediaStatus } from "@/lib/store";
@@ -22,6 +22,7 @@ import {
   Percent,
 } from "lucide-react";
 import { ALL_GENRES_MAP, OFFICIAL_MOVIE_GENRES, OFFICIAL_TV_GENRES } from "@/lib/tmdb";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 
 function getEmojiForGenre(name: string, id?: number): string {
   if (id && ALL_GENRES_MAP[id]) return ALL_GENRES_MAP[id].emoji;
@@ -70,15 +71,6 @@ export function WatchtimeDetailsModal({
   const [activeTab, setActiveTab] = useState<"contributors" | "genres">("contributors");
   // Contributor limit: 10 vs 15
   const [contributorLimit, setContributorLimit] = useState<10 | 15>(15);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   // Overall totals
   const totalStats = useMemo(() => {
@@ -264,51 +256,43 @@ export function WatchtimeDetailsModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/85 backdrop-blur-md overflow-hidden animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Lifetime Watchtime Analyse"
+      maxWidthClass="max-w-4xl"
+      panelClassName="bg-[#0b101e] border-0 sm:border sm:border-slate-800 max-h-[94dvh] sm:max-h-[90dvh] h-[94dvh] sm:h-auto"
     >
-      <div
-        className="bg-[#0b101e] border-0 sm:border sm:border-slate-800 rounded-t-3xl sm:rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden relative max-h-[94dvh] sm:max-h-[90dvh] flex flex-col h-[94dvh] sm:h-auto"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Mobile Grab Handle */}
-        <div
-          className="w-12 h-1.5 bg-slate-700/80 rounded-full mx-auto my-2.5 sm:hidden flex-shrink-0 cursor-pointer"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-
-        {/* Modal Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-800 flex items-start sm:items-center justify-between gap-4 bg-slate-900/40 flex-shrink-0">
-          <div className="flex items-center gap-3.5">
-            <div className="w-11 h-11 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 flex-shrink-0 shadow-lg shadow-sky-500/10">
-              <Clock className="w-6 h-6 stroke-[2.2]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
-                  Lifetime Watchtime Analyse
-                </h2>
-                <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase">
-                  {totalStats.totalHours} Std. Gesamt
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Top Contributor & Spielzeit-Aufschlüsselung nach Genre
-              </p>
-            </div>
+      {/* Modal Header */}
+      <div className="p-4 sm:p-6 border-b border-slate-800 flex items-start sm:items-center justify-between gap-4 bg-slate-900/40 flex-shrink-0">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-2xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 flex-shrink-0 shadow-lg shadow-sky-500/10">
+            <Clock className="w-6 h-6 stroke-[2.2]" />
           </div>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition flex-shrink-0"
-            aria-label="Schließen"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg sm:text-2xl font-black text-white tracking-tight">
+                Lifetime Watchtime Analyse
+              </h2>
+              <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/30 uppercase">
+                {totalStats.totalHours} Std. Gesamt
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+              Top Contributor & Spielzeit-Aufschlüsselung nach Genre
+            </p>
+          </div>
         </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition flex-shrink-0"
+          aria-label="Schließen"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
         {/* Key KPI Ribbon */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 p-4 sm:p-5 bg-slate-950/70 border-b border-slate-800/80 flex-shrink-0">
@@ -363,11 +347,11 @@ export function WatchtimeDetailsModal({
 
         {/* Tab Switcher & Limit Toggle */}
         <div className="p-4 sm:px-6 pb-2 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/20 flex-shrink-0">
-          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800">
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-950 border border-slate-800 overflow-x-auto scrollbar-none max-w-full">
             <button
               type="button"
               onClick={() => setActiveTab("contributors")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                 activeTab === "contributors"
                   ? "bg-sky-500 text-black shadow-md shadow-sky-500/20"
                   : "text-slate-400 hover:text-white"
@@ -380,7 +364,7 @@ export function WatchtimeDetailsModal({
             <button
               type="button"
               onClick={() => setActiveTab("genres")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+              className={`whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition ${
                 activeTab === "genres"
                   ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
                   : "text-slate-400 hover:text-white"
@@ -643,19 +627,18 @@ export function WatchtimeDetailsModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-800/90 bg-slate-950/70 flex items-center justify-between gap-3 flex-shrink-0">
+        <div className="p-4 sm:p-5 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-5 border-t border-slate-800/90 bg-slate-950/70 flex items-center justify-between gap-3 flex-shrink-0">
           <p className="text-xs text-slate-500 hidden sm:block">
             Tipp: Klicke auf einen der Top-Contributor, um Details, Trailer & Streams zu öffnen.
           </p>
           <button
             type="button"
             onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition ml-auto"
+            className="w-full sm:w-auto min-h-[44px] sm:min-h-0 px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition ml-auto"
           >
             Schließen
           </button>
         </div>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }
