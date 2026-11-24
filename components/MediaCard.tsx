@@ -6,7 +6,23 @@ import { formatWatchedSeasons } from "@/lib/seasons";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
-import { Star, Award, Film, Tv, Check, Plus, Sparkles } from "lucide-react";
+import {
+  Star,
+  Award,
+  Film,
+  Tv,
+  Check,
+  Plus,
+  Sparkles,
+  BookmarkPlus,
+  BookmarkCheck,
+  Eye,
+} from "lucide-react";
+
+const getFirstName = (name?: string | null) => {
+  const trimmed = name?.trim();
+  return trimmed ? trimmed.split(/\s+/)[0] : "Freund";
+};
 
 interface MediaCardProps {
   item: MediaItem;
@@ -111,7 +127,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
   return (
     <div
       onClick={() => openMediaModal(item)}
-      className="group relative cursor-pointer flex flex-col transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 active:opacity-95 focus:outline-none"
+      className="group relative cursor-pointer flex flex-col h-full transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 active:opacity-95 focus:outline-none"
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -178,7 +194,16 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           {(myRec || otherFriendsRecs.length > 0) && (
             <span className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-rose-600/90 text-white text-[11px] font-bold backdrop-blur-md shadow truncate">
               <Sparkles className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">
+              <span className="truncate sm:hidden">
+                {myRec && otherFriendsRecs.length === 0
+                  ? "Dein Tipp"
+                  : myRec && otherFriendsRecs.length > 0
+                  ? `Du & ${getFirstName(otherFriendsRecs[0].userName)}`
+                  : otherFriendsRecs.length === 1
+                  ? `Tipp: ${getFirstName(otherFriendsRecs[0].userName)}`
+                  : `Tipp: ${getFirstName(otherFriendsRecs[0].userName)} +${otherFriendsRecs.length - 1}`}
+              </span>
+              <span className="truncate hidden sm:inline">
                 {myRec && otherFriendsRecs.length === 0
                   ? "Von dir empfohlen"
                   : myRec && otherFriendsRecs.length > 0
@@ -198,7 +223,16 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
               } items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/90 text-black text-[10px] font-bold backdrop-blur-md shadow truncate`}
             >
               <Tv className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">
+              <span className="truncate sm:hidden">
+                {myWatching
+                  ? myWatching.watchedSeasons?.length
+                    ? formatWatchedSeasons(myWatching.watchedSeasons, myWatching.totalSeasons)
+                    : "Schaue ich"
+                  : otherFriendsWatching.length === 1
+                  ? getFirstName(otherFriendsWatching[0].userName)
+                  : `${otherFriendsWatching.length} Freunde`}
+              </span>
+              <span className="truncate hidden sm:inline">
                 {myWatching
                   ? `Schaue ich${myWatching.watchedSeasons?.length ? ` (${formatWatchedSeasons(myWatching.watchedSeasons, myWatching.totalSeasons)})` : ""}`
                   : otherFriendsWatching.length === 1
@@ -218,7 +252,18 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
               } items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-600/90 text-white text-[10px] font-semibold backdrop-blur-md shadow truncate`}
             >
               <Check className="w-3 h-3 flex-shrink-0" />
-              <span className="truncate">
+              <span className="truncate sm:hidden">
+                {myWatched && otherFriendsWatched.length === 0
+                  ? item.mediaType === "tv" && myStatusObj?.watchedSeasons && myStatusObj.totalSeasons && myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
+                    ? formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)
+                    : "Gesehen"
+                  : myWatched && otherFriendsWatched.length > 0
+                  ? `Du +${otherFriendsWatched.length}`
+                  : otherFriendsWatched.length === 1
+                  ? getFirstName(otherFriendsWatched[0].userName)
+                  : `${otherFriendsWatched.length} Freunde`}
+              </span>
+              <span className="truncate hidden sm:inline">
                 {myWatched && otherFriendsWatched.length === 0
                   ? item.mediaType === "tv" && myStatusObj?.watchedSeasons && myStatusObj.totalSeasons && myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
                     ? `Gesehen (${formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)})`
@@ -286,7 +331,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
       </div>
 
       {/* Title & Metadata */}
-      <div className="mt-2.5 px-0.5">
+      <div className="mt-2.5 px-0.5 flex-1 flex flex-col">
         <h3 className="text-sm font-semibold text-white truncate group-hover:text-amber-400 transition">
           {item.title}
         </h3>
@@ -303,39 +348,48 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
           </span>
         </div>
 
-        {/* Touch-only quick action buttons (keeps desktop hover cards clean while giving 44px 1-tap access on mobile) */}
-        <div className="flex [@media(hover:hover)]:hidden items-center gap-2 mt-2.5 pt-2 border-t border-slate-800/70">
+        {/* Touch-only quick action icons (keeps desktop hover cards clean while avoiding truncated labels on narrow phones) */}
+        <div className="flex [@media(hover:hover)]:hidden items-center gap-2 mt-auto pt-2.5">
           <button
             type="button"
             onClick={handleQuickWatchlist}
+            title={
+              myStatusObj?.status === "WATCHLIST"
+                ? "Von Merkliste entfernen"
+                : "Auf Merkliste setzen"
+            }
             aria-label={
               myStatusObj?.status === "WATCHLIST"
                 ? "Von Merkliste entfernen"
                 : "Auf Merkliste setzen"
             }
-            className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
+            className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl flex items-center justify-center transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHLIST"
                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                 : "bg-slate-900 text-slate-200 border border-slate-800 active:bg-slate-800"
             }`}
           >
             {myStatusObj?.status === "WATCHLIST" ? (
-              <Check className="w-3.5 h-3.5 flex-shrink-0 stroke-[2.5]" />
+              <BookmarkCheck className="w-[18px] h-[18px]" />
             ) : (
-              <Plus className="w-3.5 h-3.5 flex-shrink-0" />
+              <BookmarkPlus className="w-[18px] h-[18px]" />
             )}
-            <span className="truncate">Liste</span>
           </button>
 
           <button
             type="button"
             onClick={handleQuickWatched}
+            title={
+              myStatusObj?.status === "WATCHING" || myStatusObj?.status === "WATCHED"
+                ? "Status oder Bewertung bearbeiten"
+                : "Als gesehen markieren"
+            }
             aria-label={
               myStatusObj?.status === "WATCHING" || myStatusObj?.status === "WATCHED"
                 ? "Status oder Bewertung bearbeiten"
                 : "Als gesehen markieren"
             }
-            className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition active:scale-[0.97] ${
+            className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHING"
                 ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
                 : myStatusObj?.status === "WATCHED"
@@ -344,25 +398,17 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             }`}
           >
             {myStatusObj?.status === "WATCHING" ? (
-              <Tv className="w-3.5 h-3.5 flex-shrink-0" />
+              <Tv className="w-[18px] h-[18px]" />
+            ) : myStatusObj?.status === "WATCHED" && myWatched?.rating ? (
+              <>
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 flex-shrink-0" />
+                <span className="tabular-nums">{myWatched.rating}</span>
+              </>
+            ) : myStatusObj?.status === "WATCHED" ? (
+              <Check className="w-[18px] h-[18px] stroke-[2.5]" />
             ) : (
-              <Check className="w-3.5 h-3.5 flex-shrink-0 stroke-[2.5]" />
+              <Eye className="w-[18px] h-[18px]" />
             )}
-            <span className="truncate">
-              {myStatusObj?.status === "WATCHING"
-                ? myStatusObj.watchedSeasons?.length
-                  ? formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)
-                  : "Schaut"
-                : myStatusObj?.status === "WATCHED" && myWatched?.rating
-                ? `${myWatched.rating}/10`
-                : myStatusObj?.status === "WATCHED" &&
-                  item.mediaType === "tv" &&
-                  myStatusObj.watchedSeasons &&
-                  myStatusObj.totalSeasons &&
-                  myStatusObj.watchedSeasons.length < myStatusObj.totalSeasons
-                ? formatWatchedSeasons(myStatusObj.watchedSeasons, myStatusObj.totalSeasons)
-                : "Gesehen"}
-            </span>
           </button>
         </div>
       </div>
