@@ -402,13 +402,18 @@ export default function AdminPage() {
 
       {/* Whitelisted Emails Table */}
       <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <h3 id="admin-whitelist-heading" className="text-lg font-bold text-white flex items-center gap-2">
           <Mail className="w-5 h-5 text-sky-400" />
           <span>Freigeschaltete E-Mails ({whitelist.length})</span>
         </h3>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-labelledby="admin-whitelist-heading"
+          className="responsive-table-wrap"
+        >
+          <table className="responsive-table w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/60 uppercase tracking-wider text-slate-500 border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">E-Mail</th>
@@ -421,18 +426,18 @@ export default function AdminPage() {
                 const inviteUrl = `${typeof window !== "undefined" ? window.location.origin : ""}/register?email=${encodeURIComponent(item.email)}`;
                 return (
                   <tr key={item.id} className="hover:bg-slate-800/40">
-                    <td className="py-3 px-4 font-medium text-white flex items-center gap-2">
-                      <span>{item.email}</span>
+                    <td data-label="E-Mail" className="py-3 px-4 font-medium text-white flex items-center gap-2">
+                      <span className="break-all">{item.email}</span>
                       {item.email.toLowerCase() === "lukasreinle0@gmail.com" && (
-                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold">
+                        <span className="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-bold shrink-0">
                           Admin
                         </span>
                       )}
                     </td>
-                    <td className="py-3 px-4 text-slate-500">
+                    <td data-label="Freigeschaltet" className="py-3 px-4 text-slate-500">
                       {new Date(item.createdAt).toLocaleDateString("de-DE")}
                     </td>
-                    <td className="py-3 px-4 text-right space-x-2">
+                    <td data-label="Aktionen" className="py-3 px-4 text-right space-x-2">
                       <button
                         type="button"
                         onClick={() => handleResendInvite(item.email)}
@@ -566,13 +571,18 @@ export default function AdminPage() {
 
       {/* Registered Users Overview */}
       <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+        <h3 id="admin-users-heading" className="text-lg font-bold text-white flex items-center gap-2">
           <Users className="w-5 h-5 text-indigo-400" />
           <span>Registrierte Freunde ({users.length})</span>
         </h3>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs text-slate-300">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-labelledby="admin-users-heading"
+          className="responsive-table-wrap"
+        >
+          <table className="responsive-table w-full text-left text-xs text-slate-300">
             <thead className="bg-slate-950/60 uppercase tracking-wider text-slate-500 border-b border-slate-800">
               <tr>
                 <th className="py-3 px-4">Name</th>
@@ -586,9 +596,9 @@ export default function AdminPage() {
             <tbody className="divide-y divide-slate-800/60">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-slate-800/40">
-                  <td className="py-3 px-4 font-bold text-white">{u.name}</td>
-                  <td className="py-3 px-4 text-slate-400">{u.email}</td>
-                  <td className="py-3 px-4">
+                  <td data-label="Name" className="py-3 px-4 font-bold text-white">{u.name}</td>
+                  <td data-label="E-Mail" className="py-3 px-4 text-slate-400 break-all">{u.email}</td>
+                  <td data-label="Rolle" className="py-3 px-4">
                     <span
                       className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                         u.role === "ADMIN"
@@ -599,13 +609,13 @@ export default function AdminPage() {
                       {u.role}
                     </span>
                   </td>
-                  <td className="py-3 px-4 text-center font-semibold text-emerald-400">
+                  <td data-label="Gesehen" className="py-3 px-4 text-center font-semibold text-emerald-400">
                     {u.watchedCount}
                   </td>
-                  <td className="py-3 px-4 text-center font-semibold text-sky-400">
+                  <td data-label="Watchlist" className="py-3 px-4 text-center font-semibold text-sky-400">
                     {u.watchlistCount}
                   </td>
-                  <td className="py-3 px-4 text-center font-semibold text-rose-400">
+                  <td data-label="Tipps" className="py-3 px-4 text-center font-semibold text-rose-400">
                     {u.recommendationsCount}
                   </td>
                 </tr>

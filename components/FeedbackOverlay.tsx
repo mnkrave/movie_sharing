@@ -10,6 +10,7 @@ export interface ToastOptions {
   type?: ToastType;
   actionLabel?: string;
   actionHref?: string;
+  onAction?: () => void;
   durationMs?: number;
 }
 
@@ -19,6 +20,7 @@ export interface ToastItem {
   type: ToastType;
   actionLabel?: string;
   actionHref?: string;
+  onAction?: () => void;
 }
 
 export interface ConfirmDialogOptions {
@@ -114,10 +116,22 @@ export function ToastStack({ toasts, onDismiss, onPauseChange }: ToastStackProps
                   <Link
                     href={toast.actionHref}
                     onClick={() => onDismiss(toast.id)}
-                    className="inline-flex items-center mt-2 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors"
+                    className="inline-flex items-center mt-2 min-h-[36px] sm:min-h-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors"
                   >
                     {toast.actionLabel}
                   </Link>
+                )}
+                {toast.actionLabel && !toast.actionHref && toast.onAction && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      toast.onAction?.();
+                      onDismiss(toast.id);
+                    }}
+                    className="inline-flex items-center mt-2 min-h-[36px] sm:min-h-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-colors cursor-pointer"
+                  >
+                    {toast.actionLabel}
+                  </button>
                 )}
               </div>
 
@@ -125,7 +139,7 @@ export function ToastStack({ toasts, onDismiss, onPauseChange }: ToastStackProps
                 type="button"
                 onClick={() => onDismiss(toast.id)}
                 aria-label="Benachrichtigung schließen"
-                className="flex-shrink-0 -mr-1 -mt-1 p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
+                className="flex-shrink-0 -mr-1.5 -mt-1.5 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2.5 sm:p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/80 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>

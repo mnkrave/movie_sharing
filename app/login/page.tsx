@@ -4,13 +4,15 @@ import React, { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Film, Lock, Mail, AlertCircle, LogIn } from "lucide-react";
+import { Film, Lock, Mail, AlertCircle, LogIn, Eye, EyeOff } from "lucide-react";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [isStandalone, setIsStandalone] = useState(false);
@@ -28,6 +30,7 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
+      clearOfflineWatchlist();
       const res = await signIn("credentials", {
         redirect: false,
         email,
@@ -69,63 +72,89 @@ export default function LoginPage() {
           </div>
         )}
 
-        {/* Google OAuth Login */}
-        <GoogleSignInButton />
+        <div className="flex flex-col gap-6">
+          {/* Google OAuth Login (shown below E-Mail form in installed Home-Screen PWA where OAuth leaves app) */}
+          <div className={isStandalone ? "order-3 space-y-3" : "order-1 space-y-3"}>
+            <GoogleSignInButton />
+            {isStandalone && (
+              <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 leading-relaxed">
+                Hinweis für die Home-Screen-App: Für den direkten Login ohne Browser-Wechsel nutze am besten E-Mail &amp; Passwort oben.
+              </p>
+            )}
+          </div>
 
-        {isStandalone && (
-          <p className="text-[11px] text-amber-300/90 bg-amber-500/10 border border-amber-500/20 rounded-xl px-3 py-2 leading-relaxed">
-            Hinweis für die Home-Screen-App: Für den direkten Login ohne Browser-Wechsel nutze am besten E-Mail &amp; Passwort unten.
-          </p>
-        )}
+          <div className="order-2 flex items-center gap-3">
+            <div className="h-px bg-slate-800 flex-1" />
+            <span className="text-[11px] uppercase tracking-wider text-slate-500 font-mono">
+              {isStandalone ? "Oder mit Google" : "Oder mit E-Mail"}
+            </span>
+            <div className="h-px bg-slate-800 flex-1" />
+          </div>
 
-        <div className="flex items-center gap-3">
-          <div className="h-px bg-slate-800 flex-1" />
-          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-mono">
-            Oder mit E-Mail
-          </span>
-          <div className="h-px bg-slate-800 flex-1" />
+          {/* Credentials Login Form */}
+          <form onSubmit={handleSubmit} className={isStandalone ? "order-1 space-y-4" : "order-3 space-y-4"}>
+            <div>
+              <label htmlFor="login-email" className="block text-xs font-semibold text-slate-300 mb-1.5">
+                E-Mail
+              </label>
+              <div className="relative">
+                <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  id="login-email"
+                  name="email"
+                  type="email"
+                  inputMode="email"
+                  autoComplete="username"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  enterKeyHint="next"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="deine@email.de"
+                  className="w-full min-h-[44px] sm:min-h-0 bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="login-password" className="block text-xs font-semibold text-slate-300 mb-1.5">
+                Passwort
+              </label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  id="login-password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  enterKeyHint="done"
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full min-h-[44px] sm:min-h-0 bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-11 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
+                  className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 text-slate-400 hover:text-white rounded-lg flex items-center justify-center transition"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full min-h-[44px] sm:min-h-0 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 disabled:opacity-50"
+            >
+              {loading ? "Wird angemeldet..." : "Einloggen"}
+            </button>
+          </form>
         </div>
-
-        {/* Credentials Login Form */}
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">E-Mail</label>
-            <div className="relative">
-              <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="deine@email.de"
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Passwort</label>
-            <div className="relative">
-              <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 disabled:opacity-50"
-          >
-            {loading ? "Wird angemeldet..." : "Einloggen"}
-          </button>
-        </form>
 
         <div className="pt-2 text-center text-xs text-slate-400">
           Noch keinen Account?{" "}

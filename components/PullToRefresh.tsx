@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import { ArrowDown, Loader2, Check } from "lucide-react";
 
 interface PullToRefreshProps {
@@ -26,44 +26,56 @@ export function PullToRefresh({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [justCompleted, setJustCompleted] = useState(false);
 
+  const startXRef = useRef<number | null>(null);
   const startYRef = useRef<number | null>(null);
   const isPullingRef = useRef(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const axisLockedRef = useRef<"x" | "y" | null>(null);
   const hasVibratedRef = useRef(false);
 
-  const isAtTop = () => {
-    if (typeof window === "undefined") return false;
-    return window.scrollY <= 1;
+  const isAtTop = () => typeof window !== "undefined" && window.scrollY <= 1;
+
+  const resetGesture = () => {
+    startXRef.current = null;
+    startYRef.current = null;
+    isPullingRef.current = false;
+    axisLockedRef.current = null;
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    if (isRefreshing || !isAtTop()) return;
+    if (isRefreshing || !isAtTop() || e.touches.length !== 1) return;
+    startXRef.current = e.touches[0].clientX;
     startYRef.current = e.touches[0].clientY;
+    axisLockedRef.current = null;
     hasVibratedRef.current = false;
   };
 
   const handleTouchMove = (e: React.TouchEvent) => {
-    if (startYRef.current === null || isRefreshing) return;
+    if (startYRef.current === null || startXRef.current === null || isRefreshing) return;
 
-    // If user scrolled down before pulling, don't initiate pull
     if (!isAtTop()) {
-      startYRef.current = null;
+      resetGesture();
+      setPullDistance(0);
+      return;
+    }
+
+    const dx = e.touches[0].clientX - startXRef.current;
+    const dy = e.touches[0].clientY - startYRef.current;
+
+    // Lock gesture axis once finger moves >= 8px so horizontal pill scrolling never triggers PTR
+    if (axisLockedRef.current === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      axisLockedRef.current = Math.abs(dy) > Math.abs(dx) * 1.25 ? "y" : "x";
+    }
+    if (axisLockedRef.current === "x") {
       isPullingRef.current = false;
       setPullDistance(0);
       return;
     }
 
-    const currentY = e.touches[0].clientY;
-    const diff = currentY - startYRef.current;
-
-    if (diff > 0) {
+    if (dy > 0 && axisLockedRef.current === "y") {
       isPullingRef.current = true;
-      // Damping resistance: pull becomes progressively stiffer
-      const resistance = 0.42;
-      const calculated = Math.min(diff * resistance, maxPull);
+      const calculated = Math.min(dy * 0.42, maxPull);
       setPullDistance(calculated);
 
-      // Light haptic feedback once threshold is crossed
       if (calculated >= threshold && !hasVibratedRef.current) {
         hasVibratedRef.current = true;
         try {
@@ -76,7 +88,7 @@ export function PullToRefresh({
       } else if (calculated < threshold) {
         hasVibratedRef.current = false;
       }
-    } else {
+    } else if (dy <= 0) {
       isPullingRef.current = false;
       setPullDistance(0);
     }
@@ -84,18 +96,17 @@ export function PullToRefresh({
 
   const handleTouchEnd = async () => {
     if (!isPullingRef.current || startYRef.current === null) {
-      startYRef.current = null;
+      resetGesture();
       setPullDistance(0);
       return;
     }
 
     const shouldRefresh = pullDistance >= threshold;
-    startYRef.current = null;
-    isPullingRef.current = false;
+    resetGesture();
 
     if (shouldRefresh && !isRefreshing) {
       setIsRefreshing(true);
-      setPullDistance(48); // Hold at comfortable height while spinning
+      setPullDistance(48);
       try {
         await onRefresh();
         setJustCompleted(true);
@@ -115,59 +126,77 @@ export function PullToRefresh({
 
   const progress = Math.min(pullDistance / threshold, 1);
   const isReady = pullDistance >= threshold;
+  const showIndicator = pullDistance > 2 || isRefreshing;
 
   return (
     <div
-      ref={containerRef}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       className="relative"
     >
-      {/* Pull Indicator Area */}
-      <div
-        style={{
-          height: `${pullDistance}px`,
-          transition: isPullingRef.current ? "none" : "height 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
-        }}
-        className="overflow-hidden flex items-center justify-center pointer-events-none select-none"
-        aria-hidden="true"
-      >
-        <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-800 backdrop-blur-md shadow-lg text-xs font-semibold">
-          {isRefreshing ? (
-            justCompleted ? (
-              <>
-                <Check className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
-                <span className="text-emerald-300 font-bold">Aktualisiert ✓</span>
-              </>
+      {/* Compositor-only Pull Indicator (no height reflow per frame) */}
+      {showIndicator && (
+        <div
+          style={{
+            transform: `translateY(${Math.max(0, pullDistance - 44)}px)`,
+            opacity: Math.min(1, pullDistance / 36),
+            transition: isPullingRef.current
+              ? "none"
+              : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease-out",
+          }}
+          className="fixed md:hidden top-[calc(4.5rem+env(safe-area-inset-top))] inset-x-0 z-30 flex items-center justify-center pointer-events-none select-none"
+          aria-hidden="true"
+        >
+          <div className="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-slate-900/95 border border-slate-700/90 backdrop-blur-md shadow-xl text-xs font-semibold">
+            {isRefreshing ? (
+              justCompleted ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400 stroke-[2.5]" />
+                  <span className="text-emerald-300 font-bold">Aktualisiert ✓</span>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
+                  <span className="text-slate-300 font-medium">{refreshingText}</span>
+                </>
+              )
             ) : (
               <>
-                <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
-                <span className="text-slate-300 font-medium">{refreshingText}</span>
+                <ArrowDown
+                  style={{
+                    transform: `rotate(${isReady ? 180 : progress * 180}deg)`,
+                    transition: "transform 0.15s ease-out",
+                  }}
+                  className={`w-4 h-4 ${
+                    isReady ? "text-amber-400 stroke-[2.5]" : "text-slate-400"
+                  }`}
+                />
+                <span className={isReady ? "text-amber-300 font-bold" : "text-slate-400"}>
+                  {isReady ? releaseText : pullingText}
+                </span>
               </>
-            )
-          ) : (
-            <>
-              <ArrowDown
-                style={{
-                  transform: `rotate(${isReady ? 180 : progress * 180}deg)`,
-                  transition: "transform 0.15s ease-out",
-                }}
-                className={`w-4 h-4 ${
-                  isReady ? "text-amber-400 stroke-[2.5]" : "text-slate-400"
-                }`}
-              />
-              <span className={isReady ? "text-amber-300 font-bold" : "text-slate-400"}>
-                {isReady ? releaseText : pullingText}
-              </span>
-            </>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
-      {/* Main Content */}
-      {children}
+      {/* Main Content shifted on GPU compositor only while actively pulling */}
+      <div
+        style={
+          pullDistance > 0
+            ? {
+                transform: `translateY(${pullDistance}px)`,
+                transition: isPullingRef.current
+                  ? "none"
+                  : "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)",
+              }
+            : undefined
+        }
+      >
+        {children}
+      </div>
     </div>
   );
 }

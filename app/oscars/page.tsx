@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { getOscarWinnersList } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
 import { useMedia } from "@/components/MediaContext";
+import { MobileFilterBar } from "@/components/MobileFilterBar";
 import { useSession } from "next-auth/react";
 import {
   Trophy,
@@ -228,7 +229,28 @@ export default function OscarsPage() {
         </div>
       </div>
 
-      {/* Controls & Filter Bar */}
+      {/* Controls & Filter Bar (collapsible on mobile, always visible on desktop) */}
+      <MobileFilterBar
+        summary={[
+          selectedDecade === "ALL" ? "Alle Jahrzehnte" : DECADE_TABS.find((t) => t.key === selectedDecade)?.label,
+          statusFilter !== "ALL"
+            ? statusFilter === "WATCHED"
+              ? "Gesehen"
+              : statusFilter === "UNSEEN"
+              ? "Ungesehen"
+              : "Merkliste"
+            : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        activeCount={
+          (selectedDecade !== "ALL" ? 1 : 0) +
+          (statusFilter !== "ALL" ? 1 : 0) +
+          (searchQuery.trim() ? 1 : 0)
+        }
+        resultLabel={`${filteredWinners.length}/${totalWinners}`}
+        onReset={resetFilters}
+      >
       <div className="space-y-4">
         {/* Search & Sort Controls */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -236,16 +258,19 @@ export default function OscarsPage() {
           <div className="relative flex-1 max-w-md">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Film, Regie oder Stichwort suchen..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/70 transition shadow-inner"
+              className="w-full min-h-[44px] sm:min-h-0 pl-10 pr-10 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/70 transition shadow-inner"
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-500 hover:text-white"
+                aria-label="Suche leeren"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-xs text-slate-400 hover:text-white"
               >
                 ✕
               </button>
@@ -319,7 +344,7 @@ export default function OscarsPage() {
         </div>
 
         {/* Decade Tabs */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none pt-1">
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none scroll-fade-x pt-1">
           {DECADE_TABS.map((tab) => {
             const isActive = selectedDecade === tab.key;
             return (
@@ -355,6 +380,7 @@ export default function OscarsPage() {
           )}
         </div>
       </div>
+      </MobileFilterBar>
 
       {/* Grid Results Header */}
       <div className="flex items-center justify-between text-xs text-slate-400 px-1">

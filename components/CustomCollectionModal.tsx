@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useMedia } from "./MediaContext";
 import type { AppCustomCollection, AppCustomCollectionMovie } from "@/lib/store";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 import {
   X,
   Plus,
@@ -332,16 +333,13 @@ export function CustomCollectionModal({
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel={editingCollection ? "Kollektion bearbeiten" : "Eigene Kollektion erstellen"}
+      maxWidthClass="max-w-3xl"
+      panelClassName="bg-slate-950 border-0 sm:border sm:border-slate-800 max-h-[92dvh]"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-3xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden"
-      >
         {/* Modal Header */}
         <div className="p-5 sm:p-6 border-b border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/40 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -362,14 +360,15 @@ export function CustomCollectionModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full bg-slate-800/70 hover:bg-slate-800 text-slate-400 hover:text-white transition"
+            aria-label="Schließen"
+            className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded-full bg-slate-800/70 hover:bg-slate-800 text-slate-400 hover:text-white transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Body */}
-        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <form onSubmit={handleSave} className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 space-y-6">
           {/* 1. Name, Emoji, Tagline & Description */}
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
@@ -689,7 +688,8 @@ export function CustomCollectionModal({
             <div className="relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Film oder Serie suchen, um sie zur Kollektion hinzuzufügen..."
@@ -901,7 +901,6 @@ export function CustomCollectionModal({
             </div>
           </div>
         </form>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

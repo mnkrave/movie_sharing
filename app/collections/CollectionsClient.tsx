@@ -876,15 +876,17 @@ export function CollectionsClient({ collections }: CollectionsClientProps) {
       </div>
 
       {/* Create / Edit Custom Collection Modal */}
-      <CustomCollectionModal
-        isOpen={isCreatorOpen}
-        onClose={() => {
-          setIsCreatorOpen(false);
-          setEditingCustomCol(null);
-        }}
-        editingCollection={editingCustomCol}
-        onSuccess={() => setSelectedCategory("friends")}
-      />
+      {isCreatorOpen && (
+        <CustomCollectionModal
+          isOpen={isCreatorOpen}
+          onClose={() => {
+            setIsCreatorOpen(false);
+            setEditingCustomCol(null);
+          }}
+          editingCollection={editingCustomCol}
+          onSuccess={() => setSelectedCategory("friends")}
+        />
+      )}
     </div>
   );
 }

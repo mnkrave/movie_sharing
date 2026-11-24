@@ -549,7 +549,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
                       genreIds: pick.genreIds,
                     })
                   }
-                  className="group cursor-pointer rounded-2xl bg-slate-950/85 border border-slate-800 hover:border-purple-500/50 overflow-hidden flex flex-col justify-between transition duration-300 hover:-translate-y-1 shadow-xl"
+                  className="group cursor-pointer rounded-2xl bg-slate-950/85 border border-slate-800 hover:border-purple-500/50 overflow-hidden flex flex-col justify-between transition duration-300 [@media(hover:hover)]:hover:-translate-y-1 shadow-xl"
                 >
                   <div className="p-4 flex gap-4">
                     {/* Poster Thumbnail */}

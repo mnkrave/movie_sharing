@@ -62,11 +62,12 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
           <div className="relative flex-1 max-w-md">
             <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
             <input
-              type="text"
+              type="search"
+              enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="In dieser Liste suchen (z. B. Pate, Batman, Pulp)..."
-              className="w-full bg-slate-950 border border-slate-800 rounded-xl py-2 pl-10 pr-8 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400"
+              className="w-full min-h-[44px] sm:min-h-0 bg-slate-950 border border-slate-800 rounded-xl py-2 pl-10 pr-9 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400"
             />
             {query && (
               <button
@@ -104,7 +105,7 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
         </div>
 
         {/* Genre Pill Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-1 border-t border-slate-800/60">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-1 border-t border-slate-800/60">
           <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1 flex-shrink-0">
             Genre:
           </span>
