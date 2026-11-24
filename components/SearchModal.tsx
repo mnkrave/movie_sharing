@@ -55,21 +55,34 @@ export function SearchModal({
       return;
     }
 
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setLoading(true);
       try {
-        const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`);
+        const res = await fetch(`/api/tmdb/search?q=${encodeURIComponent(query)}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Search failed (${res.status})`);
+        }
         const data = await res.json();
         setResults(data.results || []);
-        setPersons(data.persons || []);
+        setPersons((data.persons || []).slice(0, 4));
       } catch (err) {
-        console.error("Search error:", err);
+        if ((err as Error)?.name !== "AbortError") {
+          console.error("Search error:", err);
+        }
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
       }
     }, 280);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
   }, [query]);
 
   if (!isOpen) return null;

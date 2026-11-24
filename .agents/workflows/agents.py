@@ -118,9 +118,11 @@ Inspect the current changes in the workspace (`git status -s`, `git diff {base_r
 Check NextAuth session enforcement, Prisma IDOR/ownership checks, visibility scoping (`PRIVATE`/`FRIENDS`/`PUBLIC`), input length/type bounds, XSS/injection safety, and secrets exposure.
 Return your structured security review in German matching the schema."""
 
+    # Note: run_workflow's agent() only accepts tier names (`flash_lite`, `flash`, `pro`, `inherit`),
+    # not raw model IDs. Using `pro` for Security and `flash` for Anti-Bloat avoids the `inherit` plan-execute deadlock.
     tasks = [
-        ("efficiency", "Agent 1: Efficiency & Anti-Bloat Reviewer", eff_prompt, EFFICIENCY_SCHEMA),
-        ("security", "Agent 2: Security & Auth Auditor", sec_prompt, SECURITY_SCHEMA),
+        ("efficiency", "Agent 1: Efficiency & Anti-Bloat Reviewer", eff_prompt, EFFICIENCY_SCHEMA, "flash"),
+        ("security", "Agent 2: Security & Auth Auditor", sec_prompt, SECURITY_SCHEMA, "pro"),
     ]
 
     results = await parallel(
@@ -129,6 +131,7 @@ Return your structured security review in German matching the schema."""
             t[2],
             schema=t[3],
             role=t[1],
+            model=t[4],
         ),
     )
 
@@ -172,6 +175,7 @@ Return your summary matching the schema."""
         refactor_prompt,
         schema=REFACTOR_SCHEMA,
         role=f"Auto-Refactor Agent (Round {round_num})",
+        model="flash",
     )
     refactor_history.append(fix_res)
     log(f"Auto-Refactor completed: {fix_res['applied_changes']} (Typecheck passed: {fix_res['typecheck_passed']})")

@@ -1,9 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useId, useRef } from "react";
-
-// LIFO stack so nested modal sheets unwind cleanly with Android/iOS back gestures
-const openSheetStack: string[] = [];
+import React, { useEffect, useRef } from "react";
 
 const DESKTOP_MAX_WIDTH: Record<string, string> = {
   "max-w-sm": "sm:max-w-sm",
@@ -36,7 +33,6 @@ interface BottomSheetDialogProps {
  * - Mobile (< 640px): bottom sheet (or top sheet) with GPU swipe-to-dismiss & safe-area support
  * - Desktop (>= 640px): centered modal preserving existing visual appearance
  * - Native top-layer, focus containment, Esc & `closedby="any"` + Safari light-dismiss fallback
- * - Browser history integration so Android Back / iOS swipe-back closes the topmost modal
  */
 export function BottomSheetDialog({
   isOpen,
@@ -49,13 +45,10 @@ export function BottomSheetDialog({
   mobilePosition = "bottom",
   showHandle = mobilePosition === "bottom",
 }: BottomSheetDialogProps) {
-  const sheetId = useId();
   const dialogRef = useRef<HTMLDialogElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
 
-  const pushedHistoryRef = useRef(false);
-  const closedByPopstateRef = useRef(false);
   const pointerDownOutsideRef = useRef(false);
 
   // Swipe-to-dismiss tracking (mobile bottom sheet)
@@ -63,81 +56,38 @@ export function BottomSheetDialog({
   const dragStartTimeRef = useRef<number>(0);
   const dragDeltaYRef = useRef<number>(0);
 
-  const releaseSheetHistory = useCallback(() => {
-    const idx = openSheetStack.lastIndexOf(sheetId);
-    if (idx >= 0) openSheetStack.splice(idx, 1);
-
-    if (pushedHistoryRef.current && !closedByPopstateRef.current) {
-      pushedHistoryRef.current = false;
-      if (typeof window !== "undefined" && window.history.state?.__cineSheet === sheetId) {
-        window.history.back();
-      }
-    }
-  }, [sheetId]);
-
-  // Sync open/closed state with native showModal() + History stack
+  // Sync open/closed state with native showModal()
   useEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
 
     if (isOpen) {
-      closedByPopstateRef.current = false;
       if (!dialog.open) {
         try {
+          dialog.returnValue = "";
           dialog.showModal();
         } catch {
           // Already open in top layer
         }
       }
-
-      if (!openSheetStack.includes(sheetId)) {
-        openSheetStack.push(sheetId);
-      }
-
-      if (typeof window !== "undefined" && !pushedHistoryRef.current) {
-        try {
-          window.history.pushState(
-            { ...(window.history.state || {}), __cineSheet: sheetId },
-            ""
-          );
-          pushedHistoryRef.current = true;
-        } catch {
-          // Ignore restricted history contexts
-        }
-      }
-
-      const handlePopState = () => {
-        const isTopmost = openSheetStack[openSheetStack.length - 1] === sheetId;
-        if (!isTopmost) return;
-        if (window.history.state?.__cineSheet !== sheetId) {
-          closedByPopstateRef.current = true;
-          pushedHistoryRef.current = false;
-          if (dialog.open) {
-            dialog.close("popstate");
-          } else {
-            onCloseRef.current();
-          }
-        }
-      };
-
-      window.addEventListener("popstate", handlePopState);
       return () => {
-        window.removeEventListener("popstate", handlePopState);
-        releaseSheetHistory();
+        if (dialog.open) {
+          dialog.close("unmount");
+        }
       };
     } else if (dialog.open) {
       dialog.close("prop");
     }
-  }, [isOpen, sheetId, releaseSheetHistory]);
+  }, [isOpen]);
 
   const handleNativeClose = () => {
     const dialog = dialogRef.current;
+    const reason = dialog?.returnValue;
     if (dialog) {
       dialog.style.transform = "";
       dialog.style.transition = "";
     }
-    releaseSheetHistory();
-    if (isOpen) {
+    if (isOpen && reason !== "prop" && reason !== "unmount") {
       onCloseRef.current();
     }
   };
