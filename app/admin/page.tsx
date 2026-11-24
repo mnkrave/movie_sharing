@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useMedia } from "@/components/MediaContext";
 import {
@@ -18,8 +18,20 @@ import {
   Bell,
   Send,
   Play,
+  Search,
+  Star,
+  Film,
+  MessageSquare,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Eye,
 } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
+import type { AppUserWithStats } from "@/lib/store";
+
+const USER_COLLATOR = new Intl.Collator("de", { numeric: true, sensitivity: "base" });
 
 interface WhitelistEntry {
   id: string;
@@ -27,11 +39,24 @@ interface WhitelistEntry {
   createdAt: string;
 }
 
+type UserSortKey =
+  | "name"
+  | "watchedCount"
+  | "avgRating"
+  | "watchingCount"
+  | "watchlistCount"
+  | "recommendationsCount"
+  | "lastActivityAt";
+
 export default function AdminPage() {
   const { data: session, status } = useSession();
   const { confirmDialog, customCollections, approveCustomCollection, showToast } = useMedia();
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
+  const [users, setUsers] = useState<AppUserWithStats[]>([]);
+  const [userSearch, setUserSearch] = useState("");
+  const [userSortKey, setUserSortKey] = useState<UserSortKey>("watchedCount");
+  const [userSortDir, setUserSortDir] = useState<"ascending" | "descending">("descending");
+  const [sortAnnouncement, setSortAnnouncement] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
   const [lastInviteLink, setLastInviteLink] = useState<string | null>(null);
@@ -52,6 +77,59 @@ export default function AdminPage() {
   const isAdmin =
     session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
     (session?.user as any)?.role === "ADMIN";
+
+  const platformTotals = useMemo(() => {
+    let watched = 0;
+    let rated = 0;
+    let tips = 0;
+    for (const u of users) {
+      watched += u.watchedCount || 0;
+      rated += u.ratedCount || 0;
+      tips += u.recommendationsCount || 0;
+    }
+    return { watched, rated, tips };
+  }, [users]);
+
+  const sortedFilteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    const factor = userSortDir === "ascending" ? 1 : -1;
+    return users
+      .filter(
+        (u) =>
+          !q ||
+          u.name.toLowerCase().includes(q) ||
+          u.email.toLowerCase().includes(q)
+      )
+      .sort((a, b) => {
+        if (userSortKey === "name") {
+          return factor * USER_COLLATOR.compare(a.name, b.name);
+        }
+        if (userSortKey === "lastActivityAt") {
+          const tA = new Date(a.lastActivityAt || a.createdAt || 0).getTime();
+          const tB = new Date(b.lastActivityAt || b.createdAt || 0).getTime();
+          return factor * (tA - tB);
+        }
+        const vA = Number(a[userSortKey] ?? -1);
+        const vB = Number(b[userSortKey] ?? -1);
+        return factor * (vA - vB);
+      });
+  }, [users, userSearch, userSortKey, userSortDir]);
+
+  const handleSortUsers = (key: UserSortKey, label: string) => {
+    const nextDir: "ascending" | "descending" =
+      userSortKey === key
+        ? userSortDir === "ascending"
+          ? "descending"
+          : "ascending"
+        : key === "name"
+        ? "ascending"
+        : "descending";
+    setUserSortKey(key);
+    setUserSortDir(nextDir);
+    setSortAnnouncement(
+      `Sortiert nach ${label}, ${nextDir === "ascending" ? "aufsteigend" : "absteigend"}, ${sortedFilteredUsers.length} Nutzer`
+    );
+  };
 
   const fetchAdminData = async () => {
     try {
@@ -211,20 +289,228 @@ export default function AdminPage() {
     );
   }
 
+  const sortableColumns: Array<{ key: UserSortKey; label: string; align?: "left" | "center" }> = [
+    { key: "name", label: "Nutzer", align: "left" },
+    { key: "watchedCount", label: "Gesehen", align: "center" },
+    { key: "avgRating", label: "Ø ★", align: "center" },
+    { key: "watchingCount", label: "Aktiv", align: "center" },
+    { key: "watchlistCount", label: "Watchlist", align: "center" },
+    { key: "recommendationsCount", label: "Tipps", align: "center" },
+    { key: "lastActivityAt", label: "Aktivität", align: "center" },
+  ];
+
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-10">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-[#0e1424] border border-amber-500/30 shadow-xl">
-        <div className="p-3 sm:p-3.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/40 self-start sm:self-auto">
-          <Shield className="w-7 h-7 sm:w-8 sm:h-8" />
+      <div className="space-y-5 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-[#0e1424] border border-amber-500/30 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="p-3 sm:p-3.5 bg-amber-500/20 text-amber-400 rounded-2xl border border-amber-500/40 self-start sm:self-auto">
+            <Shield className="w-7 h-7 sm:w-8 sm:h-8" />
+          </div>
+          <div>
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
+              Admin-Dashboard & Nutzer-Übersicht
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Sieh dir alle Nutzerprofile, Bewertungen & Watchlists an, verwalte Einladungen und gib öffentliche Kollektionen frei.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            Admin-Dashboard & Freundes-Whitelist
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
-            Schalte die E-Mail-Adressen deiner Freunde frei, verwalte Einladungen und gib öffentliche Kollektionen frei.
-          </p>
+
+        {/* Platform KPI Summary */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+          {[
+            { label: "Nutzer", value: users.length, icon: Users, color: "text-indigo-400" },
+            { label: "Gesehen", value: platformTotals.watched, icon: Film, color: "text-emerald-400" },
+            { label: "Bewertungen", value: platformTotals.rated, icon: Star, color: "text-amber-400", fill: true },
+            { label: "Tipps", value: platformTotals.tips, icon: MessageSquare, color: "text-rose-400" },
+          ].map(({ label, value, icon: Icon, color, fill }) => (
+            <div
+              key={label}
+              className="p-3.5 rounded-2xl bg-slate-950/60 border border-slate-800/80 text-center space-y-0.5"
+            >
+              <div className={`flex items-center justify-center gap-1.5 ${color}`}>
+                <Icon className={`w-4 h-4 ${fill ? "fill-amber-400" : ""}`} />
+                <span className="text-xl font-black">{value}</span>
+              </div>
+              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Registered Users & Profiles Overview */}
+      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-indigo-500/25 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 id="admin-users-heading" className="text-lg font-bold text-white flex items-center gap-2">
+              <Users className="w-5 h-5 text-indigo-400" />
+              <span>Alle Nutzer & Profile ({users.length})</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Klicke auf einen Nutzer, um alle gesehenen Filme, Bewertungen, Merklisten, Tipps & Kollektionen einzusehen.
+            </p>
+          </div>
+
+          <div className="relative w-full sm:w-64">
+            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-2.5 pointer-events-none" />
+            <input
+              type="search"
+              value={userSearch}
+              onChange={(e) => setUserSearch(e.target.value)}
+              placeholder="Nutzer suchen..."
+              aria-label="Registrierte Nutzer filtern"
+              className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl py-2 pl-9 pr-8 text-xs text-white placeholder-slate-500 focus:outline-none"
+            />
+            {userSearch && (
+              <button
+                type="button"
+                onClick={() => setUserSearch("")}
+                aria-label="Suche leeren"
+                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        <p role="status" className="sr-only">
+          {sortAnnouncement}
+        </p>
+
+        <div
+          role="region"
+          aria-labelledby="admin-users-heading"
+          tabIndex={0}
+          className="responsive-table-wrap rounded-2xl border border-slate-800/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <table className="responsive-table w-full sm:min-w-[740px] text-left text-xs text-slate-300">
+            <caption className="sr-only">
+              Übersicht aller registrierten Nutzer mit Profil-Links und Statistiken
+            </caption>
+            <thead className="bg-slate-950/70 uppercase tracking-wider text-slate-500 border-b border-slate-800">
+              <tr>
+                {sortableColumns.map((col) => {
+                  const isSorted = userSortKey === col.key;
+                  const alignClass = col.align === "center" ? "justify-center" : "justify-start";
+                  return (
+                    <th
+                      key={col.key}
+                      scope="col"
+                      aria-sort={isSorted ? userSortDir : undefined}
+                      className="p-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleSortUsers(col.key, col.label)}
+                        className={`w-full min-h-[40px] py-3 px-3.5 flex items-center gap-1 ${alignClass} font-bold uppercase tracking-wider transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-400 cursor-pointer ${
+                          isSorted ? "text-amber-300" : "text-slate-400"
+                        }`}
+                      >
+                        <span>{col.label}</span>
+                        {isSorted ? (
+                          userSortDir === "ascending" ? (
+                            <ArrowUp className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+                          ) : (
+                            <ArrowDown className="w-3 h-3 flex-shrink-0" aria-hidden="true" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="w-3 h-3 opacity-40 flex-shrink-0" aria-hidden="true" />
+                        )}
+                      </button>
+                    </th>
+                  );
+                })}
+                <th scope="col" className="py-3 px-3.5 text-right font-bold text-slate-400">
+                  Profil
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-800/60">
+              {sortedFilteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-8 text-center text-slate-500">
+                    Keine passenden Nutzer gefunden.
+                  </td>
+                </tr>
+              ) : (
+                sortedFilteredUsers.map((u) => {
+                  const profileHref = `/admin/users/${encodeURIComponent(u.id)}`;
+                  const activityDate = u.lastActivityAt || u.createdAt;
+                  return (
+                    <tr key={u.id} className="hover:bg-slate-800/40 transition">
+                      <th scope="row" className="py-3 px-3.5 font-normal text-left">
+                        <Link
+                          href={profileHref}
+                          className="flex items-center gap-2.5 group min-w-0"
+                        >
+                          {u.image ? (
+                            <div className="relative w-8 h-8 rounded-xl overflow-hidden border border-slate-700 group-hover:border-amber-400/60 flex-shrink-0">
+                              <Image src={u.image} alt={u.name} fill sizes="32px" className="object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-indigo-500 to-amber-500 flex items-center justify-center text-black font-black text-xs flex-shrink-0">
+                              {u.name.slice(0, 1)}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-bold text-white group-hover:text-amber-300 transition truncate">
+                                {u.name}
+                              </span>
+                              {u.role === "ADMIN" && (
+                                <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px] font-bold">
+                                  ADMIN
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 truncate max-w-[200px]">
+                              {u.email}
+                            </p>
+                          </div>
+                        </Link>
+                      </th>
+                      <td data-label="Gesehen" className="py-3 px-3.5 text-center">
+                        <span className="font-bold text-emerald-400">{u.watchedCount}</span>
+                        {typeof u.ratedCount === "number" && (
+                          <span className="sm:block ml-1.5 sm:ml-0 text-[10px] text-slate-500">
+                            ({u.ratedCount} ★)
+                          </span>
+                        )}
+                      </td>
+                      <td data-label="Ø Bewertung" className="py-3 px-3.5 text-center font-bold text-amber-300">
+                        {u.avgRating ? `${u.avgRating} ★` : "–"}
+                      </td>
+                      <td data-label="Aktiv" className="py-3 px-3.5 text-center font-semibold text-cyan-400">
+                        {u.watchingCount || 0}
+                      </td>
+                      <td data-label="Watchlist" className="py-3 px-3.5 text-center font-semibold text-sky-400">
+                        {u.watchlistCount}
+                      </td>
+                      <td data-label="Tipps" className="py-3 px-3.5 text-center font-semibold text-rose-400">
+                        {u.recommendationsCount}
+                      </td>
+                      <td data-label="Aktivität" className="py-3 px-3.5 text-center text-slate-400 whitespace-nowrap">
+                        <time dateTime={activityDate}>
+                          {new Date(activityDate).toLocaleDateString("de-DE")}
+                        </time>
+                      </td>
+                      <td data-label="Profil" className="py-3 px-3.5 text-right whitespace-nowrap">
+                        <Link
+                          href={profileHref}
+                          className="inline-flex items-center gap-1.5 min-h-[38px] sm:min-h-0 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500 text-amber-300 hover:text-black border border-amber-500/35 font-bold text-[11px] transition"
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          <span>Ansehen</span>
+                        </Link>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
       </div>
 
@@ -567,62 +853,6 @@ export default function AdminPage() {
             )}
           </div>
         )}
-      </div>
-
-      {/* Registered Users Overview */}
-      <div className="p-5 sm:p-8 rounded-3xl bg-slate-900/70 border border-slate-800 space-y-4">
-        <h3 id="admin-users-heading" className="text-lg font-bold text-white flex items-center gap-2">
-          <Users className="w-5 h-5 text-indigo-400" />
-          <span>Registrierte Freunde ({users.length})</span>
-        </h3>
-
-        <div
-          tabIndex={0}
-          role="region"
-          aria-labelledby="admin-users-heading"
-          className="responsive-table-wrap"
-        >
-          <table className="responsive-table w-full text-left text-xs text-slate-300">
-            <thead className="bg-slate-950/60 uppercase tracking-wider text-slate-500 border-b border-slate-800">
-              <tr>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">E-Mail</th>
-                <th className="py-3 px-4">Rolle</th>
-                <th className="py-3 px-4 text-center">Gesehen</th>
-                <th className="py-3 px-4 text-center">Watchlist</th>
-                <th className="py-3 px-4 text-center">Tipps</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {users.map((u) => (
-                <tr key={u.id} className="hover:bg-slate-800/40">
-                  <td data-label="Name" className="py-3 px-4 font-bold text-white">{u.name}</td>
-                  <td data-label="E-Mail" className="py-3 px-4 text-slate-400 break-all">{u.email}</td>
-                  <td data-label="Rolle" className="py-3 px-4">
-                    <span
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                        u.role === "ADMIN"
-                          ? "bg-amber-500/20 text-amber-300"
-                          : "bg-slate-800 text-slate-400"
-                      }`}
-                    >
-                      {u.role}
-                    </span>
-                  </td>
-                  <td data-label="Gesehen" className="py-3 px-4 text-center font-semibold text-emerald-400">
-                    {u.watchedCount}
-                  </td>
-                  <td data-label="Watchlist" className="py-3 px-4 text-center font-semibold text-sky-400">
-                    {u.watchlistCount}
-                  </td>
-                  <td data-label="Tipps" className="py-3 px-4 text-center font-semibold text-rose-400">
-                    {u.recommendationsCount}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
       </div>
     </div>
   );

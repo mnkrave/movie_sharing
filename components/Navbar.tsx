@@ -272,7 +272,8 @@ export function Navbar() {
           )}
           {mainNavLinks.map((link) => {
             const Icon = link.icon;
-            const active = pathname === link.href;
+            const active =
+              pathname === link.href || pathname.startsWith(`${link.href}/`);
             const showBadge = link.href === "/friends" && pendingRequestsCount > 0;
 
             return (
@@ -514,7 +515,7 @@ export function Navbar() {
                   href="/admin"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
-                    pathname === "/admin"
+                    pathname === "/admin" || pathname.startsWith("/admin/")
                       ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
                       : "text-amber-300 hover:bg-amber-500/10"
                   }`}

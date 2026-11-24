@@ -280,6 +280,7 @@ dialog.sheet-dialog[open]::backdrop {
   .responsive-table thead,
   .responsive-table tbody,
   .responsive-table tr,
+  .responsive-table th,
   .responsive-table td {
     display: block;
     width: 100%;
@@ -300,6 +301,12 @@ dialog.sheet-dialog[open]::backdrop {
     border-radius: 1rem;
     background: rgba(2, 6, 23, 0.6);
     padding: 0.75rem;
+  }
+
+  .responsive-table tbody th {
+    padding: 0.25rem 0.25rem 0.625rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.75);
   }
 
   .responsive-table td {

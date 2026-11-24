@@ -521,6 +521,15 @@ export default function FriendsPage() {
                     </div>
 
                     <div className="flex items-center gap-2 flex-shrink-0">
+                      {isAdmin && (
+                        <Link
+                          href={`/admin/users/${encodeURIComponent(user.id)}`}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 text-xs font-bold border border-amber-500/30 transition"
+                        >
+                          <Shield className="w-3 h-3" />
+                          <span>Profil</span>
+                        </Link>
+                      )}
                       {user.relationship === "FRIENDS" ? (
                         <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-bold border border-emerald-500/30">
                           <Check className="w-3.5 h-3.5" />
