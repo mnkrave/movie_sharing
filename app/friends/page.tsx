@@ -21,6 +21,9 @@ import {
 } from "lucide-react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import { useMedia, FriendGroup } from "@/components/MediaContext";
+import { PullToRefresh } from "@/components/PullToRefresh";
+import { BottomSheetDialog } from "@/components/BottomSheetDialog";
+import { shareOrCopy } from "@/lib/share";
 import Link from "next/link";
 import Image from "next/image";
 
@@ -38,6 +41,7 @@ export default function FriendsPage() {
     declineFriendRequest,
     removeFriend,
     searchUsers,
+    refreshCommunity,
     showToast,
     confirmDialog,
   } = useMedia();
@@ -303,6 +307,12 @@ export default function FriendsPage() {
   const myFriends = communityData.friends || [];
 
   return (
+    <PullToRefresh
+      onRefresh={async () => {
+        await refreshCommunity();
+        showToast("Freunde aktualisiert!", { type: "success" });
+      }}
+    >
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-8">
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-indigo-950/50 via-slate-900 to-[#0e1424] border border-indigo-500/25 shadow-xl">
@@ -332,21 +342,25 @@ export default function FriendsPage() {
             <button
               type="button"
               onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(window.location.origin + "/register");
+                const outcome = await shareOrCopy({
+                  title: "CineCircle Einladung",
+                  text: "Komm in meinen CineCircle zum Filme & Serien teilen:",
+                  url: window.location.origin + "/register",
+                });
+                if (outcome === "copied") {
                   showToast("Einladungslink in die Zwischenablage kopiert!", {
                     type: "success",
                   });
-                } catch {
-                  showToast("Link konnte nicht automatisch kopiert werden.", {
+                } else if (outcome === "error") {
+                  showToast("Link konnte nicht automatisch geteilt werden.", {
                     type: "error",
                   });
                 }
               }}
-              className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
+              className="flex items-center justify-center gap-2 min-h-[44px] sm:min-h-0 px-5 py-2.5 rounded-2xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition cursor-pointer"
             >
               <UserPlus className="w-4 h-4" />
-              <span>Einladungslink kopieren</span>
+              <span>Einladungslink teilen</span>
             </button>
           )}
         </div>
@@ -860,14 +874,13 @@ export default function FriendsPage() {
 
       {/* Edit Group Modal */}
       {editingGroup && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-          onClick={handleCloseEdit}
+        <BottomSheetDialog
+          isOpen={Boolean(editingGroup)}
+          onClose={handleCloseEdit}
+          ariaLabel="Gruppe bearbeiten"
+          maxWidthClass="max-w-lg"
+          panelClassName="bg-slate-950 border border-slate-800 sm:rounded-3xl p-5 sm:p-6 pb-[calc(1.25rem+env(safe-area-inset-bottom))] sm:pb-6 shadow-2xl space-y-5 text-white max-h-[90dvh] overflow-y-auto overscroll-contain"
         >
-          <div
-            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto overscroll-contain bg-slate-950 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-2xl space-y-5 text-white"
-            onClick={(e) => e.stopPropagation()}
-          >
             {/* Modal Header */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-800/80">
               <div className="flex items-center gap-2.5">
@@ -882,7 +895,8 @@ export default function FriendsPage() {
               <button
                 type="button"
                 onClick={handleCloseEdit}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
+                aria-label="Schließen"
+                className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -1096,8 +1110,7 @@ export default function FriendsPage() {
                 </div>
               </div>
             </form>
-          </div>
-        </div>
+        </BottomSheetDialog>
       )}
 
       {/* Friends Cards (Only Accepted Friends) */}
@@ -1241,5 +1254,6 @@ export default function FriendsPage() {
         )}
       </div>
     </div>
+    </PullToRefresh>
   );
 }

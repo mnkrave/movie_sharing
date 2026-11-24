@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import type { AppRecommendation } from "@/lib/store";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 import {
   X,
   Flame,
@@ -44,16 +45,6 @@ export function MyRecommendationsModal({
   const [searchFilter, setSearchFilter] = useState("");
   const [tagFilter, setTagFilter] = useState<string>("ALL");
 
-  // Escape key listener
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
   // Extract all unique tags
   const allTags = useMemo(() => {
     const set = new Set<string>();
@@ -82,17 +73,13 @@ export function MyRecommendationsModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="my-recommendations-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabelledBy="my-recommendations-title"
+      maxWidthClass="max-w-4xl"
+      panelClassName="bg-slate-950 border-0 sm:border sm:border-slate-800 max-h-[92dvh]"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden animate-scaleUp"
-      >
         {/* Header */}
         <div className="relative p-5 sm:p-6 border-b border-slate-800/80 bg-gradient-to-r from-slate-900 via-slate-950 to-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3 pr-8 sm:pr-0">
@@ -124,7 +111,7 @@ export function MyRecommendationsModal({
                 onClose();
                 onOpenSearch();
               }}
-              className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-black text-xs transition flex items-center gap-1.5 shadow-md shadow-rose-500/20"
+              className="min-h-[44px] sm:min-h-0 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 text-black font-black text-xs transition flex items-center gap-1.5 shadow-md shadow-rose-500/20"
             >
               <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>Neuen Titel empfehlen</span>
@@ -134,7 +121,7 @@ export function MyRecommendationsModal({
               type="button"
               onClick={onClose}
               aria-label="Schließen"
-              className="p-2 rounded-full text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 transition"
+              className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded-full text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 transition"
             >
               <X className="w-5 h-5" />
             </button>
@@ -147,7 +134,8 @@ export function MyRecommendationsModal({
             <div className="relative flex-1 min-w-[200px]">
               <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
                 placeholder="Empfehlungen durchsuchen..."
@@ -389,7 +377,7 @@ export function MyRecommendationsModal({
                         <button
                           type="button"
                           onClick={() => onDelete(rec)}
-                          className="p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition"
+                          className="min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 sm:p-1 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 transition"
                           title="Empfehlung löschen"
                           aria-label="Empfehlung löschen"
                         >
@@ -403,7 +391,6 @@ export function MyRecommendationsModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

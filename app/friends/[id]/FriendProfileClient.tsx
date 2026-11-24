@@ -214,7 +214,7 @@ export function FriendProfileClient({
 
   // Fetch compact user list once for quick admin user switcher
   useEffect(() => {
-    if (!isAdmin || mode !== "admin") return;
+    if (!shouldLoadAdminProfile) return;
     let active = true;
     fetch("/api/admin/users")
       .then((res) => (res.ok ? res.json() : []))
@@ -229,7 +229,7 @@ export function FriendProfileClient({
     return () => {
       active = false;
     };
-  }, [isAdmin, mode]);
+  }, [shouldLoadAdminProfile]);
 
   const friend = adminProfile?.user ?? communityFriend ?? null;
   const isAdminView = Boolean(adminProfile);
@@ -1190,7 +1190,7 @@ export function FriendProfileClient({
         <div
           role="tablist"
           aria-label="Profil-Bereiche"
-          className="flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-slate-800 pb-4"
+          className="scroll-fade-x flex items-center gap-2 overflow-x-auto no-scrollbar border-b border-slate-800 pb-4"
         >
           {tabs.map((tab) => {
             const Icon = tab.icon;

@@ -4,8 +4,9 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { Film, Lock, Mail, User, AlertCircle, CheckCircle } from "lucide-react";
+import { Film, Lock, Mail, User, AlertCircle, CheckCircle, Eye, EyeOff } from "lucide-react";
 import { GoogleSignInButton } from "@/components/GoogleSignInButton";
+import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 
 function RegisterForm() {
   const router = useRouter();
@@ -14,6 +15,7 @@ function RegisterForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -46,6 +48,7 @@ function RegisterForm() {
       }
 
       setSuccess(true);
+      clearOfflineWatchlist();
       // Auto login
       setTimeout(async () => {
         await signIn("credentials", {
@@ -100,31 +103,46 @@ function RegisterForm() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">Dein Name</label>
+          <label htmlFor="register-name" className="block text-xs font-semibold text-slate-300 mb-1.5">
+            Dein Name
+          </label>
           <div className="relative">
-            <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <User className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              id="register-name"
+              name="name"
               type="text"
+              autoComplete="name"
+              enterKeyHint="next"
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="z. B. Max"
-              className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+              className="w-full min-h-[44px] sm:min-h-0 bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
             />
           </div>
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">E-Mail</label>
+          <label htmlFor="register-email" className="block text-xs font-semibold text-slate-300 mb-1.5">
+            E-Mail
+          </label>
           <div className="relative">
-            <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <Mail className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
+              id="register-email"
+              name="email"
               type="email"
+              inputMode="email"
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+              enterKeyHint="next"
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="deine@email.de"
-              className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+              className="w-full min-h-[44px] sm:min-h-0 bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
             />
           </div>
           <p className="text-[10px] text-slate-500 mt-1">
@@ -133,24 +151,38 @@ function RegisterForm() {
         </div>
 
         <div>
-          <label className="block text-xs font-semibold text-slate-300 mb-1.5">Passwort</label>
+          <label htmlFor="register-password" className="block text-xs font-semibold text-slate-300 mb-1.5">
+            Passwort
+          </label>
           <div className="relative">
-            <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <Lock className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
-              type="password"
+              id="register-password"
+              name="password"
+              type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
+              enterKeyHint="done"
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Mindestens 6 Zeichen"
-              className="w-full bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-3 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
+              className="w-full min-h-[44px] sm:min-h-0 bg-slate-950/80 border border-slate-800 rounded-xl py-2.5 pl-10 pr-11 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-amber-400"
             />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              aria-label={showPassword ? "Passwort verbergen" : "Passwort anzeigen"}
+              className="absolute right-1 top-1/2 -translate-y-1/2 min-w-[40px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-2 text-slate-400 hover:text-white rounded-lg flex items-center justify-center transition"
+            >
+              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
           </div>
         </div>
 
         <button
           type="submit"
           disabled={loading || success}
-          className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 disabled:opacity-50"
+          className="w-full min-h-[44px] sm:min-h-0 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition shadow-lg shadow-amber-500/20 disabled:opacity-50"
         >
           {loading ? "Wird erstellt..." : "Kostenlos registrieren"}
         </button>

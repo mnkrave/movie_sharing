@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { CHARACTER_AVATARS, CharacterAvatar } from "@/lib/avatars";
 import type { PersonSearchResult } from "@/lib/tmdb";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 import {
   X,
   Sparkles,
@@ -48,15 +49,6 @@ export function AvatarPickerModal({
   useEffect(() => {
     setSelectedAvatar(currentAvatar);
   }, [currentAvatar, isOpen]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
 
   // TMDB Person Live Search
   useEffect(() => {
@@ -136,37 +128,37 @@ export function AvatarPickerModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabel="Wähle dein Profilbild"
+      maxWidthClass="max-w-3xl"
+      panelClassName="bg-[#0b0f19] border-0 sm:border sm:border-slate-800 max-h-[90dvh]"
     >
-      <div
-        className="w-full max-w-3xl rounded-3xl bg-[#0b0f19] border border-slate-800 shadow-2xl flex flex-col max-h-[90dvh] overflow-hidden animate-in zoom-in-95 duration-200"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
-                <span>Wähle dein Profilbild</span>
-              </h2>
-              <p className="text-xs text-slate-400 mt-0.5">
-                Legendäre Charaktere aus Filmen & Serien oder freie Schauspielersuche
-              </p>
-            </div>
+      {/* Header */}
+      <div className="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+            <Sparkles className="w-5 h-5" />
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div>
+            <h2 className="text-lg sm:text-xl font-black text-white flex items-center gap-2">
+              <span>Wähle dein Profilbild</span>
+            </h2>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Legendäre Charaktere aus Filmen & Serien oder freie Schauspielersuche
+            </p>
+          </div>
         </div>
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Schließen"
+          className="min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
 
         {/* Current Avatar Banner & Tabs */}
         <div className="px-5 sm:px-6 py-4 bg-slate-950/60 border-b border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -214,7 +206,7 @@ export function AvatarPickerModal({
         </div>
 
         {/* Category Pills Navigation */}
-        <div className="px-5 sm:px-6 pt-3 pb-2 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+        <div className="px-5 sm:px-6 pt-3 pb-2 border-b border-slate-800 flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-fade-x">
           {[
             { id: "all", label: "Alle", icon: Film },
             { id: "series", label: "Serien", icon: Tv },
@@ -296,12 +288,12 @@ export function AvatarPickerModal({
               <div className="relative">
                 <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
-                  type="text"
+                  type="search"
+                  enterKeyHint="search"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Schauspieler oder Regisseur suchen (z. B. Tom Cruise, Ryan Gosling, Christoph Waltz)..."
                   className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-hidden focus:border-amber-500/60 transition"
-                  autoFocus
                 />
                 {searching && (
                   <Loader2 className="w-4 h-4 absolute right-3.5 top-1/2 -translate-y-1/2 text-amber-400 animate-spin" />
@@ -400,11 +392,11 @@ export function AvatarPickerModal({
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-5 border-t border-slate-800 bg-[#0a0d16] flex items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-5 border-t border-slate-800 bg-[#0a0d16] flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
+            className="min-h-[44px] sm:min-h-0 px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white transition"
           >
             Abbrechen
           </button>
@@ -413,7 +405,7 @@ export function AvatarPickerModal({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black font-black text-xs shadow-lg shadow-amber-500/25 transition disabled:opacity-50"
+              className="min-h-[44px] sm:min-h-0 flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black font-black text-xs shadow-lg shadow-amber-500/25 transition disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -429,7 +421,6 @@ export function AvatarPickerModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

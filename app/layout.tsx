@@ -8,6 +8,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
+  interactiveWidget: "resizes-content",
   themeColor: "#07090e",
 };
 
@@ -50,7 +51,7 @@ export default function RootLayout({
             <Navbar />
             <ServiceWorkerRegister />
             <main className="flex-1">{children}</main>
-            <footer className="border-t border-slate-900 bg-[#05070a] py-10 mt-20 text-center text-xs text-slate-500">
+            <footer className="border-t border-slate-900 bg-[#05070a] py-8 md:py-10 mt-10 md:mt-20 text-center text-xs text-slate-500">
               <div className="max-w-7xl mx-auto px-4 space-y-2">
                 <p className="font-semibold text-slate-400">
                   CineCircle – Entwickelt für Freunde & Film-Liebhaber

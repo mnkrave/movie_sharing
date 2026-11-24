@@ -1,6 +1,7 @@
 "use client";
 
 import { signIn } from "next-auth/react";
+import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 
 interface GoogleSignInButtonProps {
   label?: string;
@@ -15,7 +16,10 @@ export function GoogleSignInButton({
   return (
     <button
       type="button"
-      onClick={() => signIn("google", { callbackUrl: "/" })}
+      onClick={() => {
+        clearOfflineWatchlist();
+        signIn("google", { callbackUrl: "/" });
+      }}
       className="w-full flex items-center justify-center gap-3 py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs border border-slate-700 transition"
     >
       <svg className="w-4 h-4" viewBox="0 0 24 24">

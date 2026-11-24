@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bookmark, Compass, Flame, Search, Users } from "lucide-react";
 import { useMedia } from "./MediaContext";
+import { isDiscoverRoute } from "./Navbar";
 
 export function MobileBottomNav() {
   const pathname = usePathname();
@@ -15,15 +16,16 @@ export function MobileBottomNav() {
 
   const pendingRequestsCount = communityData?.friendRequests?.pendingReceived?.length || 0;
 
-  const isDiscoverActive = pathname === "/";
+  const isDiscoverActive = isDiscoverRoute(pathname);
   const isFeedActive = pathname?.startsWith("/feed");
+  const isSearchActive = pathname?.startsWith("/search");
   const isListActive = pathname?.startsWith("/my-list");
   const isFriendsActive = pathname?.startsWith("/friends");
 
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-800/80 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(0,0,0,0.45)] select-none"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-800/80 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-[0_-8px_30px_rgba(0,0,0,0.45)] select-none"
     >
       <div className="grid grid-cols-5 items-stretch max-w-lg mx-auto h-16 px-1">
         <Link
@@ -68,12 +70,23 @@ export function MobileBottomNav() {
           type="button"
           onClick={() => openSearch()}
           aria-label="Schnellsuche öffnen"
+          aria-current={isSearchActive ? "page" : undefined}
           className="flex flex-col items-center justify-center gap-1 rounded-xl text-slate-300 hover:text-amber-400 active:scale-95 transition-all"
         >
-          <span className="px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 shadow-sm">
+          <span
+            className={`px-3.5 py-1.5 rounded-full border shadow-sm transition-colors ${
+              isSearchActive
+                ? "bg-amber-500 text-black border-amber-400"
+                : "bg-amber-500/15 border-amber-500/30 text-amber-400"
+            }`}
+          >
             <Search className="w-5 h-5" />
           </span>
-          <span className="text-[11px] font-semibold leading-none tracking-tight text-amber-300/90">
+          <span
+            className={`text-[11px] font-semibold leading-none tracking-tight ${
+              isSearchActive ? "text-amber-400" : "text-amber-300/90"
+            }`}
+          >
             Suche
           </span>
         </button>

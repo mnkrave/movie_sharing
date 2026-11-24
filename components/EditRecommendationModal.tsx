@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import Image from "next/image";
 import { useMedia } from "./MediaContext";
 import type { AppRecommendation } from "@/lib/store";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 import {
   X,
   Star,
@@ -107,16 +108,6 @@ export function EditRecommendationModal({
     }
   }, [recommendation]);
 
-  // Escape key to close
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
-
   if (!isOpen || !recommendation) return null;
 
   const toggleTag = (tag: string) => {
@@ -143,7 +134,6 @@ export function EditRecommendationModal({
   };
 
   const handleSave = async () => {
-    if (!recommendation) return;
     try {
       setSaving(true);
 
@@ -188,7 +178,6 @@ export function EditRecommendationModal({
   };
 
   const handleDelete = async () => {
-    if (!recommendation) return;
     const confirmed = await confirmDialog({
       title: "Empfehlung löschen?",
       message: `Möchtest du deine Empfehlung für "${recommendation.title}" wirklich unwiderruflich aus dem Feed entfernen?`,
@@ -219,17 +208,13 @@ export function EditRecommendationModal({
     : null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="edit-rec-title"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md animate-fadeIn"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={isOpen}
+      onClose={onClose}
+      ariaLabelledBy="edit-rec-title"
+      maxWidthClass="max-w-xl"
+      panelClassName="bg-slate-950 border-0 sm:border sm:border-slate-800 max-h-[92dvh]"
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-xl max-h-[92vh] flex flex-col rounded-3xl bg-slate-950 border border-slate-800 shadow-2xl overflow-hidden animate-scaleUp"
-      >
         {/* Header with media banner */}
         <div className="relative p-5 sm:p-6 border-b border-slate-800/80 bg-gradient-to-b from-slate-900 to-slate-950 flex items-start gap-4">
           {posterUrl ? (
@@ -269,14 +254,14 @@ export function EditRecommendationModal({
             type="button"
             onClick={onClose}
             aria-label="Schließen"
-            className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 transition"
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center p-2 rounded-full text-slate-400 hover:text-white bg-slate-800/60 hover:bg-slate-800 transition"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Scrollable Form Content */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 space-y-6">
           {/* Rating Slider & Selector */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
@@ -470,23 +455,23 @@ export function EditRecommendationModal({
         </div>
 
         {/* Modal Footer with Actions */}
-        <div className="p-4 sm:p-5 border-t border-slate-800 bg-slate-950 flex items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-5 border-t border-slate-800 bg-slate-950 flex flex-wrap items-center justify-between gap-2.5 sm:gap-3">
           <button
             type="button"
             onClick={handleDelete}
             disabled={saving || deleting}
-            className="px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/25 transition flex items-center gap-1.5 disabled:opacity-50"
+            className="min-h-[44px] sm:min-h-0 px-3.5 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 border border-rose-500/25 transition flex items-center gap-1.5 disabled:opacity-50"
           >
             <Trash2 className="w-4 h-4" />
             <span className="hidden sm:inline">Empfehlung</span> Löschen
           </button>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
               onClick={onClose}
               disabled={saving || deleting}
-              className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 transition"
+              className="min-h-[44px] sm:min-h-0 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800 transition"
             >
               Abbrechen
             </button>
@@ -494,7 +479,7 @@ export function EditRecommendationModal({
               type="button"
               onClick={handleSave}
               disabled={saving || deleting}
-              className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black text-black bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-500/20 transition flex items-center gap-2 disabled:opacity-50"
+              className="min-h-[44px] sm:min-h-0 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-black text-black bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-500/20 transition flex items-center gap-2 disabled:opacity-50"
             >
               {saving ? (
                 <>
@@ -510,7 +495,6 @@ export function EditRecommendationModal({
             </button>
           </div>
         </div>
-      </div>
-    </div>
+    </BottomSheetDialog>
   );
 }

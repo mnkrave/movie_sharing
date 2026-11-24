@@ -18,6 +18,7 @@ import {
   Tv,
   ChevronLeft,
   ChevronRight,
+  Pause,
 } from "lucide-react";
 
 interface CarouselSlide {
@@ -43,10 +44,21 @@ export function HomeHero({
 
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [autoAdvanceDisabled, setAutoAdvanceDisabled] = useState(false);
   const [matchedMovies, setMatchedMovies] = useState<MediaItem[]>([]);
   const [matchedTv, setMatchedTv] = useState<MediaItem[]>([]);
   const [shuffleSeed, setShuffleSeed] = useState<number>(0);
-  const touchStartXRef = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  // Pause auto-advance on touch screens (prevents accidental mis-taps on mobile) & reduced-motion
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (coarse || reduced) {
+      setAutoAdvanceDisabled(true);
+    }
+  }, []);
 
   const myUserId = (session?.user as any)?.id;
 
@@ -274,16 +286,16 @@ export function HomeHero({
     return candidateSlides.filter((s): s is CarouselSlide => Boolean(s && s.item && s.item.id));
   }, [initialGenericMovies, initialGenericTv, heroItem, matchedMovies, matchedTv, shuffleSeed, watchedKeySet]);
 
-  // Auto-advance carousel every 7 seconds when not paused
+  // Auto-advance carousel every 7 seconds when not paused (disabled by default on touch & reduced-motion)
   useEffect(() => {
-    if (slides.length <= 1 || isPaused) return;
+    if (slides.length <= 1 || isPaused || autoAdvanceDisabled) return;
 
     const timer = setInterval(() => {
       setCurrentIndex((prev) => (prev + 1) % slides.length);
     }, 7000);
 
     return () => clearInterval(timer);
-  }, [slides.length, isPaused]);
+  }, [slides.length, isPaused, autoAdvanceDisabled]);
 
   if (slides.length === 0) return null;
 
@@ -331,32 +343,43 @@ export function HomeHero({
   };
 
   const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartXRef.current = e.touches[0].clientX;
+    touchStartRef.current = {
+      x: e.touches[0].clientX,
+      y: e.touches[0].clientY,
+    };
   };
 
   const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartXRef.current === null) return;
-    const diff = touchStartXRef.current - e.changedTouches[0].clientX;
-    if (diff > 50) {
-      handleNext();
-    } else if (diff < -50) {
-      handlePrev();
+    if (!touchStartRef.current) return;
+    const dx = touchStartRef.current.x - e.changedTouches[0].clientX;
+    const dy = touchStartRef.current.y - e.changedTouches[0].clientY;
+    // Only trigger slide switch for deliberate horizontal swipes, never diagonal vertical scrolls
+    if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+      if (dx > 0) handleNext();
+      else handlePrev();
     }
-    touchStartXRef.current = null;
+    touchStartRef.current = null;
   };
+
+  const activeSlideIdx = currentIndex % slides.length;
+  const prevSlideIdx = (activeSlideIdx - 1 + slides.length) % slides.length;
+  const nextSlideIdx = (activeSlideIdx + 1) % slides.length;
 
   return (
     <section
+      aria-roledescription="carousel"
+      aria-label="Empfohlene Highlights"
       onMouseEnter={() => setIsPaused(true)}
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="relative min-h-[520px] sm:min-h-[580px] w-full overflow-hidden bg-slate-950 border-b border-slate-800/80 group select-none"
+      className="relative min-h-[460px] sm:min-h-[580px] w-full overflow-hidden bg-slate-950 border-b border-slate-800/80 group select-none"
     >
-      {/* Background Backdrop Images with smooth cross-fade */}
+      {/* Background Backdrop Images: mount only active & adjacent slides to save mobile bandwidth */}
       {slides.map((s, idx) => {
-        const isActive = idx === (currentIndex % slides.length);
-        if (!s.item.backdropPath) return null;
+        const isActive = idx === activeSlideIdx;
+        const shouldMount = isActive || idx === prevSlideIdx || idx === nextSlideIdx;
+        if (!s.item.backdropPath || !shouldMount) return null;
         return (
           <div
             key={`${s.item.mediaType}_${s.item.id}_bg`}
@@ -368,7 +391,7 @@ export function HomeHero({
               src={`https://image.tmdb.org/t/p/w1280${s.item.backdropPath}`}
               alt={s.item.title}
               fill
-              priority={idx === 0}
+              priority={isActive && idx === 0}
               sizes="100vw"
               className="object-cover object-center sm:object-top"
             />
@@ -552,32 +575,33 @@ export function HomeHero({
 
       {/* Bottom Carousel Navigation Indicators (+ compact mobile arrows) */}
       {slides.length > 1 && (
-        <div className="absolute bottom-3 sm:bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-1 sm:gap-1.5 px-4">
+        <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-0.5 sm:gap-1.5 px-4">
           <button
             type="button"
             onClick={handlePrev}
             aria-label="Vorheriger Titel"
-            className="sm:hidden p-2 rounded-full bg-black/45 hover:bg-black/75 border border-white/10 text-white/80 hover:text-white transition mr-1"
+            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/50 hover:bg-black/75 border border-white/10 text-white/85 hover:text-white transition mr-1"
           >
             <ChevronLeft className="w-4 h-4" />
           </button>
 
           {slides.map((s, idx) => {
-            const isActive = idx === (currentIndex % slides.length);
+            const isActive = idx === activeSlideIdx;
             return (
               <button
                 key={idx}
                 type="button"
                 onClick={() => setCurrentIndex(idx)}
                 title={`${idx + 1}. ${s.item.title} (${s.item.mediaType === "tv" ? "Serie" : "Film"})`}
-                className="p-1.5 cursor-pointer flex items-center justify-center group/dot"
-                aria-label={`Slide ${idx + 1} - ${s.item.title}`}
+                aria-current={isActive ? "true" : undefined}
+                className="min-w-[26px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-1.5 cursor-pointer flex items-center justify-center group/dot"
+                aria-label={`Slide ${idx + 1} von ${slides.length} - ${s.item.title}`}
               >
                 <span
                   className={`block transition-all duration-300 rounded-full ${
                     isActive
                       ? "w-7 sm:w-8 h-2.5 bg-amber-400 shadow-md shadow-amber-400/50"
-                      : "w-2.5 h-2.5 bg-slate-600/90 group-hover/dot:bg-slate-400"
+                      : "w-2.5 h-2.5 bg-slate-500/90 group-hover/dot:bg-slate-400"
                   }`}
                 />
               </button>
@@ -588,9 +612,24 @@ export function HomeHero({
             type="button"
             onClick={handleNext}
             aria-label="Nächster Titel"
-            className="sm:hidden p-2 rounded-full bg-black/45 hover:bg-black/75 border border-white/10 text-white/80 hover:text-white transition ml-1"
+            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/50 hover:bg-black/75 border border-white/10 text-white/85 hover:text-white transition ml-1"
           >
             <ChevronRight className="w-4 h-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setAutoAdvanceDisabled((prev) => !prev)}
+            aria-label={
+              autoAdvanceDisabled ? "Automatischen Wechsel starten" : "Automatischen Wechsel pausieren"
+            }
+            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 transition ml-1"
+          >
+            {autoAdvanceDisabled ? (
+              <Play className="w-3.5 h-3.5 fill-current" />
+            ) : (
+              <Pause className="w-3.5 h-3.5" />
+            )}
           </button>
         </div>
       )}

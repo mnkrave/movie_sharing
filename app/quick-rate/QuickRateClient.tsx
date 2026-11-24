@@ -48,6 +48,8 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
     item: MediaItem;
   } | null>(null);
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
+  const [touchStartY, setTouchStartY] = useState<number | null>(null);
+  const [touchAxis, setTouchAxis] = useState<"x" | "y" | null>(null);
   const [touchDeltaX, setTouchDeltaX] = useState<number>(0);
   const [visibleGridCount, setVisibleGridCount] = useState(24);
 
@@ -219,27 +221,42 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
   // Touch handlers for Mobile Swipe Card (Swipe Left = Not watched / Skip, Swipe Right = Watchlist)
   const onTouchStart = (e: React.TouchEvent) => {
     setTouchStartX(e.touches[0].clientX);
+    setTouchStartY(e.touches[0].clientY);
+    setTouchAxis(null);
     setTouchDeltaX(0);
   };
 
   const onTouchMove = (e: React.TouchEvent) => {
-    if (touchStartX === null) return;
-    setTouchDeltaX(e.touches[0].clientX - touchStartX);
+    if (touchStartX === null || touchStartY === null) return;
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    let axis = touchAxis;
+    if (axis === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      axis = Math.abs(dx) > Math.abs(dy) * 1.2 ? "x" : "y";
+      setTouchAxis(axis);
+    }
+    if (axis === "x") {
+      setTouchDeltaX(dx);
+    }
   };
 
   const onTouchEnd = () => {
     if (touchStartX === null || !currentSwipeItem) return;
-    if (touchDeltaX < -95) {
-      handleSkipItem(currentSwipeItem);
-    } else if (touchDeltaX > 110) {
-      handleInstantWatchlist(currentSwipeItem);
+    if (touchAxis === "x") {
+      if (touchDeltaX < -95) {
+        handleSkipItem(currentSwipeItem);
+      } else if (touchDeltaX > 110) {
+        handleInstantWatchlist(currentSwipeItem);
+      }
     }
     setTouchStartX(null);
+    setTouchStartY(null);
+    setTouchAxis(null);
     setTouchDeltaX(0);
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6 pb-8 md:pb-20">
       {/* Header & 250 Goal Progress Card */}
       <div className="p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-[#0b101d] border border-amber-500/30 shadow-2xl space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -260,7 +277,7 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
           </div>
 
           {/* 250 Club Progress Box */}
-          <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 min-w-[260px] sm:min-w-[300px] space-y-2.5 self-start lg:self-center">
+          <div className="p-4 rounded-2xl bg-slate-950/90 border border-slate-800 w-full sm:w-auto sm:min-w-[300px] space-y-2.5 self-start lg:self-center">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-slate-300 flex items-center gap-1.5">
                 <Trophy className="w-4 h-4 text-amber-400" />
@@ -321,15 +338,16 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
           </div>
 
           {/* Search & Decade Filter */}
-          <div className="flex flex-1 items-center gap-2 min-w-[220px] max-w-md">
+          <div className="flex flex-col sm:flex-row flex-1 items-stretch sm:items-center gap-2 w-full sm:w-auto sm:min-w-[220px] max-w-md">
             <div className="relative flex-1">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
-                type="text"
+                type="search"
+                enterKeyHint="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Titel in der Liste filtern..."
-                className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl pl-8 pr-7 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
+                className="w-full min-h-[42px] sm:min-h-0 bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl pl-8 pr-8 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none"
               />
               {searchQuery && (
                 <button
@@ -413,7 +431,7 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
         </div>
 
         {/* Genre Quick Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none pt-1">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-1">
           <button
             type="button"
             onClick={() => setSelectedGenre("ALL")}
@@ -503,13 +521,16 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
                     onTouchStart={onTouchStart}
                     onTouchMove={onTouchMove}
                     onTouchEnd={onTouchEnd}
+                    onTouchCancel={onTouchEnd}
                     style={{
                       transform:
                         touchDeltaX !== 0
                           ? `translateX(${touchDeltaX}px) rotate(${touchDeltaX * 0.03}deg)`
                           : undefined,
                     }}
-                    className="relative rounded-3xl bg-[#0d1322] border border-slate-800 shadow-2xl overflow-hidden transition-transform duration-150 select-none"
+                    className={`relative rounded-3xl bg-[#0d1322] border border-slate-800 shadow-2xl overflow-hidden touch-pan-y select-none ${
+                      touchAxis === "x" ? "transition-none" : "transition-transform duration-200"
+                    }`}
                   >
                     {/* Swipe direction hint badges */}
                     {touchDeltaX < -45 && (
@@ -526,7 +547,7 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
                     {/* Poster Area - Tap opens full MediaModal (Details, Trailer, Recommend) */}
                     <div
                       onClick={() => handleOpenDetails(currentSwipeItem)}
-                      className="relative aspect-[2/3] max-h-[54vh] w-full bg-slate-950 cursor-pointer group mx-auto"
+                      className="relative aspect-[2/3] max-h-[52dvh] w-full bg-slate-950 cursor-pointer group mx-auto"
                     >
                       {currentSwipeItem.posterPath && (
                         <Image
@@ -559,10 +580,11 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
                             e.stopPropagation();
                             handleOpenDetails(currentSwipeItem);
                           }}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold border border-white/15 backdrop-blur-md transition cursor-pointer"
+                          className="flex items-center gap-1.5 min-h-[38px] sm:min-h-0 px-3 py-1.5 rounded-xl bg-black/75 hover:bg-black text-white text-xs font-bold border border-white/15 backdrop-blur-md transition cursor-pointer"
                         >
                           <Info className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Details / Trailer / Empfehlen</span>
+                          <span className="sm:hidden">Details</span>
+                          <span className="hidden sm:inline">Details / Trailer / Empfehlen</span>
                         </button>
                       </div>
 
@@ -631,7 +653,7 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
                             key={score}
                             type="button"
                             onClick={() => handleInstantRate(currentSwipeItem, score)}
-                            className={`py-2.5 rounded-xl font-black text-xs border transition active:scale-95 cursor-pointer flex items-center justify-center gap-0.5 ${
+                            className={`min-h-[44px] py-2.5 rounded-xl font-black text-xs border transition active:scale-95 cursor-pointer flex items-center justify-center gap-0.5 ${
                               score >= 9
                                 ? "bg-emerald-500/15 hover:bg-emerald-500 hover:text-black text-emerald-300 border-emerald-500/35"
                                 : score >= 7
@@ -650,28 +672,30 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
                         <button
                           type="button"
                           onClick={() => handleSkipItem(currentSwipeItem)}
-                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-500/40 text-xs font-bold transition cursor-pointer"
+                          className="min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-xl bg-slate-900 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-800 hover:border-rose-500/40 text-xs font-bold transition cursor-pointer"
                         >
-                          <X className="w-4 h-4 text-rose-400" />
-                          <span>Nicht gesehen</span>
+                          <X className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                          <span className="truncate sm:hidden">Überspr.</span>
+                          <span className="hidden sm:inline">Nicht gesehen</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleOpenDetails(currentSwipeItem)}
-                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold transition cursor-pointer"
+                          className="min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-800 text-xs font-bold transition cursor-pointer"
                         >
-                          <Info className="w-4 h-4 text-amber-400" />
-                          <span>Details & Trailer</span>
+                          <Info className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                          <span className="truncate sm:hidden">Details</span>
+                          <span className="hidden sm:inline">Details & Trailer</span>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => handleInstantWatchlist(currentSwipeItem)}
-                          className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-slate-800 hover:border-sky-500/40 text-xs font-bold transition cursor-pointer"
+                          className="min-h-[44px] flex items-center justify-center gap-1.5 py-2.5 px-2 sm:px-3 rounded-xl bg-slate-900 hover:bg-sky-500/20 text-slate-300 hover:text-sky-300 border border-slate-800 hover:border-sky-500/40 text-xs font-bold transition cursor-pointer"
                         >
-                          <Plus className="w-4 h-4 text-sky-400" />
-                          <span>Watchlist</span>
+                          <Plus className="w-4 h-4 text-sky-400 flex-shrink-0" />
+                          <span className="truncate">Watchlist</span>
                         </button>
                       </div>
                     </div>
@@ -743,8 +767,8 @@ export function QuickRateClient({ initialItems }: QuickRateClientProps) {
                         </button>
                       </div>
 
-                      {/* Desktop Hover Overlay: 1-10 Quick Rating + Watchlist + Details/Trailer */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex flex-col justify-end p-3 z-10">
+                      {/* Desktop Hover Overlay: 1-10 Quick Rating + Watchlist + Details/Trailer (hover-only to prevent iOS double-tap) */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/90 to-slate-950/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 hidden [@media(hover:hover)]:flex flex-col justify-end p-3 z-10">
                         <div className="space-y-2" onClick={(e) => e.stopPropagation()}>
                           <p className="text-[11px] font-bold text-amber-300 text-center">
                             Schnell bewerten (1–10 ★):

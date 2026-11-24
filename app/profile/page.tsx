@@ -618,7 +618,7 @@ function ProfileContent() {
                   {myName.slice(0, 1).toUpperCase()}
                 </div>
               )}
-              <div className="absolute inset-0 bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition flex items-center justify-center text-white backdrop-blur-xs">
+              <div className="absolute inset-0 bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition hidden [@media(hover:hover)]:flex items-center justify-center text-white backdrop-blur-xs">
                 <Camera className="w-6 h-6 text-amber-400" />
               </div>
               <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition">
@@ -757,7 +757,7 @@ function ProfileContent() {
 
 
       {/* 4 Dedicated Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto no-scrollbar">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto no-scrollbar scroll-fade-x">
         {/* Tab 1: Statistiken */}
         <button
           type="button"
@@ -1561,30 +1561,36 @@ function ProfileContent() {
       )}
 
       {/* MODAL 1: Watchtime Details & Top 10/15 Contributor & Genre Aufschlüsselung */}
-      <WatchtimeDetailsModal
-        isOpen={showWatchtimeModal}
-        onClose={() => setShowWatchtimeModal(false)}
-        watchedItems={watchedItems}
-        metaMap={metaMap}
-      />
+      {showWatchtimeModal && (
+        <WatchtimeDetailsModal
+          isOpen={showWatchtimeModal}
+          onClose={() => setShowWatchtimeModal(false)}
+          watchedItems={watchedItems}
+          metaMap={metaMap}
+        />
+      )}
 
       {/* MODAL 2: Meine Empfehlungen (Übersicht aller verfassten Empfehlungen) */}
-      <MyRecommendationsModal
-        isOpen={showRecommendationsModal}
-        onClose={() => setShowRecommendationsModal(false)}
-        recommendations={myRecommendations}
-        onEdit={(rec) => setEditingRecommendation(rec)}
-        onDelete={(rec) => handleDeleteRec(rec)}
-        onOpenMedia={openMediaModal}
-        onOpenSearch={openSearch}
-      />
+      {showRecommendationsModal && (
+        <MyRecommendationsModal
+          isOpen={showRecommendationsModal}
+          onClose={() => setShowRecommendationsModal(false)}
+          recommendations={myRecommendations}
+          onEdit={(rec) => setEditingRecommendation(rec)}
+          onDelete={(rec) => handleDeleteRec(rec)}
+          onOpenMedia={openMediaModal}
+          onOpenSearch={openSearch}
+        />
+      )}
 
       {/* MODAL 3: Empfehlung bearbeiten */}
-      <EditRecommendationModal
-        isOpen={Boolean(editingRecommendation)}
-        recommendation={editingRecommendation}
-        onClose={() => setEditingRecommendation(null)}
-      />
+      {editingRecommendation && (
+        <EditRecommendationModal
+          isOpen={true}
+          recommendation={editingRecommendation}
+          onClose={() => setEditingRecommendation(null)}
+        />
+      )}
 
     </div>
   );

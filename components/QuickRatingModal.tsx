@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Star, X, Film, Tv, Trash2 } from "lucide-react";
 import { resolveSelectedSeasons } from "@/lib/seasons";
 import { TvStatusToggle, TvSeasonSelector } from "@/components/TvSeasonControls";
+import { BottomSheetDialog } from "./BottomSheetDialog";
 
 export interface RatingTarget {
   tmdbId: number;
@@ -86,15 +87,6 @@ export function QuickRatingModal({
     }
   }, [target]);
 
-  useEffect(() => {
-    if (!target) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !document.querySelector("dialog[open]")) onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [target, onClose]);
-
   if (!target) return null;
 
   const current = target.currentRating || 8;
@@ -135,21 +127,22 @@ export function QuickRatingModal({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200"
-      onClick={onClose}
+    <BottomSheetDialog
+      isOpen={true}
+      onClose={onClose}
+      ariaLabel={`${target.title} bewerten`}
+      maxWidthClass="max-w-sm"
+      panelClassName="bg-[#0b101d] border-0 sm:border sm:border-slate-800 max-h-[90dvh]"
     >
-      <div
-        className="bg-[#0b101d] border border-slate-800 rounded-3xl w-full max-w-sm max-h-[90dvh] overflow-y-auto overscroll-contain p-6 shadow-2xl relative text-center"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition"
-          aria-label="Schließen"
-        >
-          <X className="w-4 h-4" />
-        </button>
+        <div className="overflow-y-auto overscroll-contain p-5 sm:p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6 relative text-center">
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-400 hover:text-white p-2 sm:p-1.5 rounded-lg hover:bg-slate-800 transition"
+            aria-label="Schließen"
+          >
+            <X className="w-4 h-4" />
+          </button>
 
         {/* Thumbnail & Title */}
         <div className="flex items-center gap-3.5 text-left mb-3">
@@ -228,7 +221,7 @@ export function QuickRatingModal({
                 onMouseEnter={() => setHoveredNumber(num)}
                 onMouseLeave={() => setHoveredNumber(null)}
                 onClick={() => handleSave(num)}
-                className={`py-2.5 rounded-xl text-sm font-black transition transform active:scale-95 ${
+                className={`min-h-[44px] sm:min-h-0 py-2.5 rounded-xl text-sm font-black transition transform active:scale-95 ${
                   num === 10
                     ? "bg-gradient-to-tr from-amber-500 to-emerald-400 text-black hover:scale-105 shadow-md shadow-emerald-500/20"
                     : num >= 8
@@ -260,7 +253,7 @@ export function QuickRatingModal({
             <button
               type="button"
               onClick={onRemoveWatched}
-              className="w-full py-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 rounded-xl transition flex items-center justify-center gap-1.5 font-medium"
+              className="w-full min-h-[44px] sm:min-h-0 py-2 sm:py-1.5 text-rose-400 hover:text-rose-300 hover:bg-rose-950/20 rounded-xl transition flex items-center justify-center gap-1.5 font-medium"
             >
               <Trash2 className="w-3.5 h-3.5" />
               <span>
@@ -271,8 +264,8 @@ export function QuickRatingModal({
             </button>
           )}
         </div>
-      </div>
-    </div>
+        </div>
+    </BottomSheetDialog>
   );
 }
 

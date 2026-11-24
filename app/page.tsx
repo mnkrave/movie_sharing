@@ -26,7 +26,7 @@ export default async function HomePage() {
   const fallbackTv = [...trendingTv, ...topTv.slice(0, 15)];
 
   return (
-    <div className="space-y-12 pb-20">
+    <div className="space-y-8 sm:space-y-12 pb-6 md:pb-20">
       {/* Hero Showcase Carousel: Dynamic rotated selection + personalized matches */}
       <HomeHero
         initialGenericMovies={fallbackMovies}

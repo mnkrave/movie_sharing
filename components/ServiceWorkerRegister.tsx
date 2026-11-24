@@ -8,32 +8,42 @@ export function ServiceWorkerRegister() {
   const wasOfflineRef = useRef(false);
 
   useEffect(() => {
-    // 1. Register Service Worker in browser
-    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("/sw.js")
-          .then((reg) => {
-            // Check for updates
-            reg.addEventListener("updatefound", () => {
-              const installingWorker = reg.installing;
-              if (installingWorker) {
-                installingWorker.addEventListener("statechange", () => {
-                  if (
-                    installingWorker.state === "installed" &&
-                    navigator.serviceWorker.controller
-                  ) {
-                    // New version available
-                    console.log("CineCircle Service Worker aktualisiert.");
-                  }
+    // 1. Register Service Worker reliably even if Next.js hydrates after window "load"
+    const registerSw = () => {
+      navigator.serviceWorker
+        .register("/sw.js")
+        .then((reg) => {
+          reg.addEventListener("updatefound", () => {
+            const installingWorker = reg.installing;
+            if (!installingWorker) return;
+            installingWorker.addEventListener("statechange", () => {
+              if (
+                installingWorker.state === "installed" &&
+                navigator.serviceWorker.controller
+              ) {
+                showToast("Neue Version von CineCircle verfügbar.", {
+                  type: "info",
+                  actionLabel: "Aktualisieren",
+                  onAction: () => window.location.reload(),
+                  durationMs: 8000,
                 });
               }
             });
-          })
-          .catch((err) => {
-            console.warn("Service Worker Registration fehlgeschlagen:", err);
           });
-      });
+        })
+        .catch((err) => {
+          console.warn("Service Worker Registration fehlgeschlagen:", err);
+        });
+    };
+
+    let boundLoad = false;
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      if (document.readyState === "complete") {
+        registerSw();
+      } else {
+        boundLoad = true;
+        window.addEventListener("load", registerSw);
+      }
     }
 
     // 2. Online / Offline connection listeners
@@ -49,7 +59,7 @@ export function ServiceWorkerRegister() {
 
     const handleOffline = () => {
       wasOfflineRef.current = true;
-      showToast("Keine Internetverbindung. Gespeicherte Inhalte bleiben sichtbar.", {
+      showToast("Keine Internetverbindung. Deine gespeicherte Merkliste bleibt sichtbar.", {
         type: "info",
       });
     };
@@ -58,6 +68,7 @@ export function ServiceWorkerRegister() {
     window.addEventListener("offline", handleOffline);
 
     return () => {
+      if (boundLoad) window.removeEventListener("load", registerSw);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
