@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, Suspense } from "react";
+import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
@@ -120,6 +120,10 @@ function ExtendedSearchContent() {
 
   const [results, setResults] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [matchingPersons, setMatchingPersons] = useState<PersonSearchResult[]>([]);
   const [selectedActorPerson, setSelectedActorPerson] = useState<PersonSearchResult | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -186,38 +190,85 @@ function ExtendedSearchContent() {
   }, [searchParams]);
 
   // Fetch function
-  const fetchResults = useCallback(async () => {
-    setLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (mediaType !== "all") params.set("mediaType", mediaType);
-      if (genreId !== null) params.set("genreId", String(genreId));
-      if (director.trim()) params.set("director", director.trim());
-      if (actor.trim()) params.set("actor", actor.trim());
-      if (country !== "ALL") params.set("country", country);
-      if (minRating > 0) params.set("minRating", String(minRating));
-      if (era !== "all") params.set("era", era);
-      if (sortBy) params.set("sortBy", sortBy);
-      if (query.trim()) params.set("query", query.trim());
+  const fetchResults = useCallback(
+    async (targetPage = 1, append = false) => {
+      if (!append) {
+        abortControllerRef.current?.abort();
+        setLoading(true);
+        setLoadingMore(false);
+      } else {
+        setLoadingMore(true);
+      }
 
-      const res = await fetch(`/api/tmdb/discover?${params.toString()}`);
-      const data = await res.json();
-      setResults(data.results || []);
-    } catch (err) {
-      console.error("Extended discover error:", err);
-    } finally {
-      setLoading(false);
-    }
-  }, [mediaType, genreId, director, actor, country, minRating, era, sortBy, query]);
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      try {
+        const params = new URLSearchParams();
+        if (mediaType !== "all") params.set("mediaType", mediaType);
+        if (genreId !== null) params.set("genreId", String(genreId));
+        if (director.trim()) params.set("director", director.trim());
+        if (actor.trim()) params.set("actor", actor.trim());
+        if (country !== "ALL") params.set("country", country);
+        if (minRating > 0) params.set("minRating", String(minRating));
+        if (era !== "all") params.set("era", era);
+        if (sortBy) params.set("sortBy", sortBy);
+        if (query.trim()) params.set("query", query.trim());
+        params.set("page", String(targetPage));
+
+        const res = await fetch(`/api/tmdb/discover?${params.toString()}`, {
+          signal: controller.signal,
+        });
+        if (!res.ok) {
+          throw new Error(`Discover failed (${res.status})`);
+        }
+        const data = await res.json();
+        const incoming: MediaItem[] = data.results || [];
+
+        if (append) {
+          setResults((prev) => {
+            const seen = new Set(prev.map((item) => `${item.mediaType}-${item.id}`));
+            const unique = incoming.filter(
+              (item) => !seen.has(`${item.mediaType}-${item.id}`)
+            );
+            return [...prev, ...unique];
+          });
+        } else {
+          setResults(incoming);
+        }
+        setPage(targetPage);
+        setHasMore(Boolean(data.hasMore));
+      } catch (err) {
+        if ((err as Error)?.name !== "AbortError") {
+          console.error("Extended discover error:", err);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }
+    },
+    [mediaType, genreId, director, actor, country, minRating, era, sortBy, query]
+  );
 
   // Debounced auto-fetch
   useEffect(() => {
     const timer = setTimeout(() => {
-      fetchResults();
+      fetchResults(1, false);
     }, 300);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      abortControllerRef.current?.abort();
+    };
   }, [fetchResults]);
+
+  const handleLoadMore = () => {
+    if (!loading && !loadingMore && hasMore) {
+      fetchResults(page + 1, true);
+    }
+  };
 
   const advancedFilterCount =
     (genreId !== null ? 1 : 0) +
@@ -797,10 +848,41 @@ function ExtendedSearchContent() {
             <p className="text-sm font-medium">Filtere Filme und Serien aus der TMDB-Datenbank...</p>
           </div>
         ) : results.length > 0 ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
-            {results.map((item) => (
-              <MediaCard key={`${item.mediaType}-${item.id}`} item={item} />
-            ))}
+          <div className="space-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+              {results.map((item) => (
+                <MediaCard key={`${item.mediaType}-${item.id}`} item={item} />
+              ))}
+            </div>
+
+            {hasMore ? (
+              <div className="flex justify-center pt-2">
+                <button
+                  type="button"
+                  onClick={handleLoadMore}
+                  disabled={loadingMore || loading}
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 border border-amber-500/40 text-amber-300 font-bold text-sm transition shadow-lg disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {loadingMore ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Lade weitere Titel...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="w-4 h-4 text-amber-400" />
+                      <span>Mehr laden</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            ) : (
+              !loading && (
+                <p className="text-center text-xs text-slate-500 pt-2">
+                  Alle verfügbaren Ergebnisse angezeigt
+                </p>
+              )
+            )}
           </div>
         ) : (
           <div className="py-24 text-center rounded-2xl bg-[#0c111e] border border-slate-800 p-8 space-y-4">

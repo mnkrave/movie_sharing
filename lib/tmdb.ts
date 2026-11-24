@@ -562,17 +562,25 @@ export async function getMostWatchedOnboardingMedia(
   }
 }
 
-export async function searchMultiMedia(query: string): Promise<MediaItem[]> {
+function mapSearchMultiResults(rawResults: any[] = []): MediaItem[] {
+  return rawResults
+    .filter(
+      (r) =>
+        (r.media_type === "movie" || r.media_type === "tv") &&
+        (r.poster_path || r.backdrop_path)
+    )
+    .map((item) => mapRawItem(item));
+}
+
+export async function searchMultiMedia(query: string, page = 1): Promise<MediaItem[]> {
   if (!query.trim()) return [];
   try {
     const data = await tmdbFetch<{ results: any[] }>("/search/multi", {
       query: query.trim(),
       include_adult: "false",
+      page: String(page),
     });
-    return (data.results || [])
-      .filter((r) => (r.media_type === "movie" || r.media_type === "tv") && (r.poster_path || r.backdrop_path))
-      .slice(0, 24)
-      .map((item) => mapRawItem(item));
+    return mapSearchMultiResults(data.results).slice(0, 24);
   } catch (err) {
     console.error("Search error:", err);
     return [];
@@ -589,23 +597,42 @@ export interface DiscoverFilters {
   era?: string | null;
   sortBy?: "popularity.desc" | "vote_average.desc" | "primary_release_date.desc";
   query?: string | null;
+  page?: number;
 }
 
-export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem[]> {
+export interface DiscoverMediaResult {
+  results: MediaItem[];
+  page: number;
+  totalPages: number;
+  hasMore: boolean;
+}
+
+export async function discoverMedia(filters: DiscoverFilters): Promise<DiscoverMediaResult> {
   const mediaType = filters.mediaType || "all";
   const sortBy = filters.sortBy || "popularity.desc";
+  const page = Math.min(500, Math.max(1, Math.floor(filters.page || 1)));
 
-  // If title/keyword text query is provided, use search and apply extra filters
+  // If title/keyword text query is provided, use search/multi and apply extra filters
   if (filters.query?.trim()) {
-    const rawSearchResults = await searchMultiMedia(filters.query.trim());
-    return rawSearchResults.filter((item) => {
-      if (mediaType !== "all" && item.mediaType !== mediaType) return false;
-      if (filters.genreId && item.genreIds && !item.genreIds.includes(filters.genreId))
-        return false;
-      if (filters.minRating && item.voteAverage < filters.minRating) return false;
-      if (filters.era) {
-        const year = parseInt(item.releaseYear, 10);
-        if (year) {
+    try {
+      const data = await tmdbFetch<{ results: any[]; total_pages?: number }>("/search/multi", {
+        query: filters.query.trim(),
+        include_adult: "false",
+        page: String(page),
+      });
+      const rawSearchResults = mapSearchMultiResults(data.results);
+      const filtered = rawSearchResults.filter((item) => {
+        if (mediaType !== "all" && item.mediaType !== mediaType) return false;
+        if (filters.genreId && item.genreIds) {
+          const expectedIds = mapGenreIdsForMediaType([filters.genreId], item.mediaType);
+          if (expectedIds.length === 0 || !item.genreIds.some((id) => expectedIds.includes(id))) {
+            return false;
+          }
+        }
+        if (filters.minRating && item.voteAverage < filters.minRating) return false;
+        if (filters.era) {
+          const year = parseInt(item.releaseYear, 10);
+          if (!year) return false;
           if (filters.era === "new" && (year < 2024 || year > 2026)) return false;
           if (filters.era === "2020s" && (year < 2020 || year > 2029)) return false;
           if (filters.era === "2010s" && (year < 2010 || year > 2019)) return false;
@@ -613,9 +640,19 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
           if (filters.era === "1990s" && (year < 1990 || year > 1999)) return false;
           if (filters.era === "classics" && year > 1989) return false;
         }
-      }
-      return true;
-    });
+        return true;
+      });
+      const totalPages = Math.min(500, Math.max(1, data.total_pages || 1));
+      return {
+        results: filtered,
+        page,
+        totalPages,
+        hasMore: page < totalPages,
+      };
+    } catch (err) {
+      console.error("Search discover error:", err);
+      return { results: [], page, totalPages: 1, hasMore: false };
+    }
   }
 
   // Resolve person IDs if director or actor provided
@@ -643,25 +680,9 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
     } catch {}
   }
 
-  const MOVIE_TO_TV_GENRE: Record<number, number> = {
-    28: 10759, // Action -> Action & Adventure
-    12: 10759, // Abenteuer -> Action & Adventure
-    878: 10765, // Sci-Fi -> Sci-Fi & Fantasy
-    14: 10765, // Fantasy -> Sci-Fi & Fantasy
-    35: 35,
-    80: 80,
-    18: 18,
-    16: 16,
-    99: 99,
-    9648: 9648,
-    10751: 10751,
-    10752: 10768,
-    36: 10768,
-    37: 37,
-  };
-
   const buildParams = (type: "movie" | "tv"): Record<string, string> => {
     const p: Record<string, string> = {
+      page: String(page),
       sort_by:
         sortBy === "primary_release_date.desc" && type === "tv"
           ? "first_air_date.desc"
@@ -669,8 +690,9 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
     };
 
     if (filters.genreId) {
-      const gId = type === "tv" ? (MOVIE_TO_TV_GENRE[filters.genreId] || filters.genreId) : filters.genreId;
-      p["with_genres"] = String(gId);
+      const mappedGenres = mapGenreIdsForMediaType([filters.genreId], type);
+      p["with_genres"] =
+        mappedGenres.length > 0 ? mappedGenres.join("|") : String(filters.genreId);
     }
     if (directorId) {
       if (type === "movie") p["with_crew"] = String(directorId);
@@ -686,13 +708,18 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
     if (filters.minRating && filters.minRating > 0) {
       p["vote_average.gte"] = String(filters.minRating);
       p["vote_count.gte"] = filters.minRating >= 8 ? "100" : "30";
+    } else if (sortBy === "vote_average.desc") {
+      p["vote_count.gte"] =
+        directorId || actorId || (filters.country && filters.country !== "ALL")
+          ? "50"
+          : "200";
     }
 
-    if (filters.era) {
-      const isMovie = type === "movie";
-      const startKey = isMovie ? "primary_release_date.gte" : "first_air_date.gte";
-      const endKey = isMovie ? "primary_release_date.lte" : "first_air_date.lte";
+    const isMovie = type === "movie";
+    const startKey = isMovie ? "primary_release_date.gte" : "first_air_date.gte";
+    const endKey = isMovie ? "primary_release_date.lte" : "first_air_date.lte";
 
+    if (filters.era) {
       if (filters.era === "new") {
         p[startKey] = "2024-01-01";
         p[endKey] = "2026-12-31";
@@ -711,6 +738,8 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
       } else if (filters.era === "classics") {
         p[endKey] = "1989-12-31";
       }
+    } else if (sortBy === "primary_release_date.desc") {
+      p[endKey] = new Date().toISOString().slice(0, 10);
     }
 
     return p;
@@ -718,39 +747,73 @@ export async function discoverMedia(filters: DiscoverFilters): Promise<MediaItem
 
   try {
     let items: MediaItem[] = [];
+    let totalPages = 1;
 
     if (mediaType === "movie") {
-      const res = await tmdbFetch<{ results: any[] }>("/discover/movie", buildParams("movie"));
-      items = (res.results || []).map((r) => mapRawItem(r, "movie"));
+      const res = await tmdbFetch<{ results: any[]; total_pages?: number }>(
+        "/discover/movie",
+        buildParams("movie")
+      );
+      items = (res.results || [])
+        .map((r) => mapRawItem(r, "movie"))
+        .filter((item) => Boolean(item.posterPath));
+      totalPages = Math.min(500, Math.max(1, res.total_pages || 1));
     } else if (mediaType === "tv") {
-      const res = await tmdbFetch<{ results: any[] }>("/discover/tv", buildParams("tv"));
-      items = (res.results || []).map((r) => mapRawItem(r, "tv"));
+      const res = await tmdbFetch<{ results: any[]; total_pages?: number }>(
+        "/discover/tv",
+        buildParams("tv")
+      );
+      items = (res.results || [])
+        .map((r) => mapRawItem(r, "tv"))
+        .filter((item) => Boolean(item.posterPath));
+      totalPages = Math.min(500, Math.max(1, res.total_pages || 1));
     } else {
+      const skipTvForGenre =
+        Boolean(filters.genreId) &&
+        mapGenreIdsForMediaType([filters.genreId!], "tv").length === 0;
       const [mRes, tRes] = await Promise.all([
-        tmdbFetch<{ results: any[] }>("/discover/movie", buildParams("movie")),
-        actorId || directorId
-          ? Promise.resolve({ results: [] })
-          : tmdbFetch<{ results: any[] }>("/discover/tv", buildParams("tv")),
+        tmdbFetch<{ results: any[]; total_pages?: number }>(
+          "/discover/movie",
+          buildParams("movie")
+        ),
+        actorId || directorId || skipTvForGenre
+          ? Promise.resolve({ results: [] as any[], total_pages: 0 })
+          : tmdbFetch<{ results: any[]; total_pages?: number }>(
+              "/discover/tv",
+              buildParams("tv")
+            ),
       ]);
       const movieItems = (mRes.results || []).map((r) => mapRawItem(r, "movie"));
       const tvItems = (tRes.results || []).map((r) => mapRawItem(r, "tv"));
-      const combined = [...movieItems, ...tvItems];
+      const combined = [...movieItems, ...tvItems].filter((item) =>
+        Boolean(item.posterPath)
+      );
 
       if (sortBy === "vote_average.desc") {
         items = combined.sort((a, b) => b.voteAverage - a.voteAverage);
       } else if (sortBy === "primary_release_date.desc") {
-        items = combined.sort(
-          (a, b) => (parseInt(b.releaseYear, 10) || 0) - (parseInt(a.releaseYear, 10) || 0)
+        items = combined.sort((a, b) =>
+          (b.releaseDate || "").localeCompare(a.releaseDate || "")
         );
       } else {
-        items = combined;
+        items = combined.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
       }
+
+      totalPages = Math.min(
+        500,
+        Math.max(1, mRes.total_pages || 1, tRes.total_pages || 0)
+      );
     }
 
-    return items.slice(0, 36);
+    return {
+      results: items,
+      page,
+      totalPages,
+      hasMore: page < totalPages && items.length > 0,
+    };
   } catch (err) {
     console.error("Error discovering media:", err);
-    return [];
+    return { results: [], page, totalPages: 1, hasMore: false };
   }
 }
 
