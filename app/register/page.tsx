@@ -200,7 +200,7 @@ function RegisterForm() {
 
 export default function RegisterPage() {
   return (
-    <div className="min-h-[80dvh] flex items-center justify-center px-4 py-8 sm:py-12">
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)] flex items-center justify-center px-4 py-8 sm:py-12">
       <Suspense fallback={<div className="text-white text-xs">Laden...</div>}>
         <RegisterForm />
       </Suspense>

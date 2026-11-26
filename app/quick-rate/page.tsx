@@ -8,8 +8,10 @@ export default async function QuickRatePage() {
   const initialItems = await getMostWatchedOnboardingMedia(10, 4);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
-      <QuickRateClient initialItems={initialItems} />
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
+        <QuickRateClient initialItems={initialItems} />
+      </div>
     </div>
   );
 }

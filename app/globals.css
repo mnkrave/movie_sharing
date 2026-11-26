@@ -1,18 +1,102 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #07090e;
-  --bg-secondary: #0f1420;
-  --bg-card: rgba(18, 24, 38, 0.78);
-  --accent-gold: #f59e0b;
+  /* Base Light Color Tokens */
+  --bg-primary: #f8fafc;
+  --bg-card: #ffffff;
+  --bg-muted: #eef2f6;
+  --bg-secondary: #f1f5f9;
+  --bg-input: #ffffff;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --accent: #f59e0b;
+  --accent-hover: #d97706;
+  --accent-text: #b45309;
+  --accent-soft: rgba(245, 158, 11, 0.12);
+  --accent-foreground: #09090b;
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #94a3b8;
+
+  --accent-gold: var(--accent);
   --accent-crimson: #e11d48;
+  --target-size: 24px;
+
+  color-scheme: light dark;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+
+:root:has(> head > meta[name="color-scheme"][content="light"]) {
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not(:has(> head > meta[name="color-scheme"][content="light"])) {
+    --bg-primary: #070a11;
+    --bg-card: #0d121d;
+    --bg-muted: #141b29;
+    --bg-secondary: #111827;
+    --bg-input: #0b101a;
+    --border-subtle: rgba(148, 163, 184, 0.16);
+    --border-strong: rgba(148, 163, 184, 0.28);
+    --text-primary: #f8fafc;
+    --text-secondary: #94a3b8;
+    --text-muted: #64748b;
+    --accent: #f59e0b;
+    --accent-hover: #fbbf24;
+    --accent-text: #f59e0b;
+    --accent-soft: rgba(245, 158, 11, 0.14);
+    --accent-foreground: #09090b;
+    --scrollbar-track: #070a11;
+    --scrollbar-thumb: #334155;
+  }
+}
+
+:root:has(> head > meta[name="color-scheme"][content="dark"]) {
+  color-scheme: dark;
+  --bg-primary: #070a11;
+  --bg-card: #0d121d;
+  --bg-muted: #141b29;
+  --bg-secondary: #111827;
+  --bg-input: #0b101a;
+  --border-subtle: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.28);
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent: #f59e0b;
+  --accent-hover: #fbbf24;
+  --accent-text: #f59e0b;
+  --accent-soft: rgba(245, 158, 11, 0.14);
+  --accent-foreground: #09090b;
+  --scrollbar-track: #070a11;
+  --scrollbar-thumb: #334155;
+}
+
+@theme inline {
+  --color-background: var(--bg-primary);
+  --color-foreground: var(--text-primary);
+  --color-card: var(--bg-card);
+  --color-muted: var(--bg-muted);
+  --color-muted-foreground: var(--text-secondary);
+  --color-secondary: var(--bg-secondary);
+  --color-secondary-foreground: var(--text-primary);
+  --color-border: var(--border-subtle);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--bg-input);
+  --color-primary: var(--accent);
+  --color-primary-hover: var(--accent-hover);
+  --color-primary-foreground: var(--accent-foreground);
+  --color-primary-text: var(--accent-text);
+  --color-primary-soft: var(--accent-soft);
 }
 
 @layer base {
   html {
     background-color: var(--bg-primary);
+    accent-color: var(--accent);
   }
 
   /* Mobile-only scroll safety: keep focused controls clear of bottom bar & avoid double pull-to-refresh */
@@ -152,6 +236,7 @@
 /* Native Top-Layer Modal & Bottom-Sheet Dialog in @layer components so Tailwind sm:max-w-* utilities win cleanly */
 @layer components {
   dialog.sheet-dialog {
+    color-scheme: dark;
     padding: 0;
     border: 0;
     background: transparent;
@@ -337,21 +422,26 @@
   }
 }
 
-/* Custom subtle scrollbars */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* Untouched secondary routes stay dark with readable contrast even in Light Mode */
+.legacy-dark-surface {
+  background-color: #07090e;
+  color: #f8fafc;
+  color-scheme: dark;
 }
 
-::-webkit-scrollbar-track {
-  background: #07090e;
-}
+/* Legacy scrollbar fallback for browsers without standard scrollbar-color */
+@supports not (scrollbar-color: auto) {
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
-}
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #334155;
+  ::-webkit-scrollbar-thumb {
+    background: var(--scrollbar-thumb);
+    border-radius: 9999px;
+  }
 }

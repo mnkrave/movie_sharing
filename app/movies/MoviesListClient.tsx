@@ -56,23 +56,24 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
   return (
     <div className="space-y-6">
       {/* Controls: Search, Decade & Genre Filter */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3.5">
+      <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border space-y-3.5">
         <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
           {/* Search inside list */}
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3" />
             <input
               type="search"
               enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="In dieser Liste suchen (z. B. Pate, Batman, Pulp)..."
-              className="w-full min-h-[44px] sm:min-h-0 bg-slate-950 border border-slate-800 rounded-xl py-2 pl-10 pr-9 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-sky-400"
+              className="w-full min-h-[44px] sm:min-h-0 bg-input border border-border rounded-xl py-2 pl-10 pr-9 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             />
             {query && (
               <button
+                type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
@@ -91,11 +92,12 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
             ].map((tab) => (
               <button
                 key={tab.key}
+                type="button"
                 onClick={() => setSelectedDecade(tab.key)}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
                   selectedDecade === tab.key
-                    ? "bg-sky-500 text-black shadow-md shadow-sky-500/20 font-bold"
-                    : "bg-slate-800/80 text-slate-400 hover:text-white hover:bg-slate-700/80"
+                    ? "bg-primary text-primary-foreground shadow-sm font-bold"
+                    : "bg-muted text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {tab.label}
@@ -105,18 +107,19 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
         </div>
 
         {/* Genre Pill Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-1 border-t border-slate-800/60">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1 flex-shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-2 border-t border-border">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 flex-shrink-0">
             Genre:
           </span>
           {MOVIE_GENRES.map((g) => (
             <button
               key={String(g.id)}
+              type="button"
               onClick={() => setSelectedGenre(g.id as any)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer ${
                 selectedGenre === g.id
-                  ? "bg-sky-500/20 text-sky-300 border border-sky-500/40 font-bold"
-                  : "bg-slate-950/60 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                  ? "bg-primary-soft text-primary-text border border-primary/35 font-bold"
+                  : "bg-muted/70 text-muted-foreground border border-border hover:text-foreground"
               }`}
             >
               {g.label}
@@ -126,23 +129,24 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
       </div>
 
       {/* Counter */}
-      <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
         <span>
           Zeige {displayedMovies.length} von {filteredMovies.length} Filmen
           {selectedGenre !== "ALL" && (
-            <span className="ml-1.5 text-sky-400 font-semibold">
+            <span className="ml-1.5 text-primary-text font-semibold">
               ({MOVIE_GENRES.find((g) => g.id === selectedGenre)?.label})
             </span>
           )}
         </span>
         {(query || selectedGenre !== "ALL" || selectedDecade !== "ALL") && (
           <button
+            type="button"
             onClick={() => {
               setQuery("");
               setSelectedGenre("ALL");
               setSelectedDecade("ALL");
             }}
-            className="text-sky-400 hover:underline font-semibold"
+            className="text-primary-text hover:underline font-semibold cursor-pointer"
           >
             Filter zurücksetzen
           </button>
@@ -157,15 +161,16 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
           ))}
         </div>
       ) : (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/30 border border-slate-800 text-slate-400 space-y-4">
+        <div className="p-12 text-center rounded-2xl bg-card border border-border text-muted-foreground space-y-4">
           <p>Keine Filme gefunden, die zu deinen Such- oder Filterkriterien passen.</p>
           <button
+            type="button"
             onClick={() => {
               setQuery("");
               setSelectedGenre("ALL");
               setSelectedDecade("ALL");
             }}
-            className="px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-black text-xs font-bold transition shadow"
+            className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold transition shadow-sm cursor-pointer"
           >
             Alle Filter zurücksetzen
           </button>
@@ -178,7 +183,7 @@ export function MoviesListClient({ initialMovies }: MoviesListClientProps) {
           <button
             type="button"
             onClick={() => setVisibleCount((prev) => prev + 30)}
-            className="px-8 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 transition shadow-lg hover:border-sky-400"
+            className="px-8 py-3 rounded-xl bg-card hover:bg-muted text-foreground font-bold text-xs border border-border hover:border-primary/40 transition shadow-sm cursor-pointer"
           >
             Weitere Filme laden (+30)
           </button>

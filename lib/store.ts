@@ -4,8 +4,9 @@ import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { fetchDeStreamingProviders } from "./tmdb";
 import { SUPER_ADMIN_EMAIL, isValidEmailAddress } from "./constants";
+import { isSamePerson } from "./auth-match";
 
-export { SUPER_ADMIN_EMAIL, isValidEmailAddress };
+export { SUPER_ADMIN_EMAIL, isValidEmailAddress, isSamePerson };
 
 export const INVITE_LIMITS = {
   maxPer24h: 3,
@@ -178,24 +179,6 @@ export interface AppCustomCollection {
   comments: AppCustomCollectionComment[];
   createdAt: string;
   updatedAt: string;
-}
-
-export function isSamePerson(nameA?: string | null, nameB?: string | null): boolean {
-  if (!nameA || !nameB) return false;
-  const a = nameA.toLowerCase().trim().replace(/^@/, "");
-  const b = nameB.toLowerCase().trim().replace(/^@/, "");
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const aParts = a.split(/\s+/);
-  const bParts = b.split(/\s+/);
-  if (
-    aParts[0].length >= 3 &&
-    aParts[0] === bParts[0] &&
-    (aParts.length === 1 || bParts.length === 1)
-  ) {
-    return true;
-  }
-  return false;
 }
 
 export interface AppFriendship {
@@ -2444,8 +2427,23 @@ export async function removeFriendship(userId: string, targetUserId: string): Pr
 }
 
 export async function searchUsersForFriendship(currentUserId: string, query: string) {
-  const cleanQ = query.trim().toLowerCase();
+  const cleanQ = (typeof query === "string" ? query : "")
+    .slice(0, 100)
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase();
   if (!cleanQ || cleanQ.length < 2) return [];
+
+  const countMutualWatched = (
+    myKeys: Set<string>,
+    otherRows: Array<{ mediaType: string; tmdbId: number }>
+  ) => {
+    let count = 0;
+    for (const row of otherRows) {
+      if (myKeys.has(`${row.mediaType}_${row.tmdbId}`)) count++;
+    }
+    return count;
+  };
 
   if (await isPostgresAvailable()) {
     try {
@@ -2459,17 +2457,54 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
             { email: { contains: cleanQ, mode: "insensitive" } },
           ],
         },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
         take: 10,
       });
 
-      const friendships = await prisma.friendship.findMany({
-        where: {
-          OR: [
-            { userId: currentUserId, friendId: { in: users.map((u) => u.id) } },
-            { friendId: currentUserId, userId: { in: users.map((u) => u.id) } },
-          ],
-        },
-      });
+      const userIds = users.map((u) => u.id);
+      const friendships =
+        userIds.length > 0
+          ? await prisma.friendship.findMany({
+              where: {
+                OR: [
+                  { userId: currentUserId, friendId: { in: userIds } },
+                  { friendId: currentUserId, userId: { in: userIds } },
+                ],
+              },
+            })
+          : [];
+
+      const acceptedFriendIds = friendships
+        .filter((f) => f.status === "ACCEPTED")
+        .map((f) => (f.userId === currentUserId ? f.friendId : f.userId));
+
+      const watchedRows =
+        acceptedFriendIds.length > 0
+          ? await prisma.mediaStatus.findMany({
+              where: {
+                status: "WATCHED",
+                userId: { in: [currentUserId, ...acceptedFriendIds] },
+              },
+              select: { userId: true, mediaType: true, tmdbId: true },
+            })
+          : [];
+
+      const myWatchedKeys = new Set<string>();
+      const friendWatchedMap = new Map<string, Array<{ mediaType: string; tmdbId: number }>>();
+      for (const w of watchedRows) {
+        if (w.userId === currentUserId) {
+          myWatchedKeys.add(`${w.mediaType}_${w.tmdbId}`);
+        } else {
+          const arr = friendWatchedMap.get(w.userId) || [];
+          arr.push({ mediaType: w.mediaType, tmdbId: w.tmdbId });
+          friendWatchedMap.set(w.userId, arr);
+        }
+      }
 
       return users.map((u) => {
         const fs = friendships.find(
@@ -2501,6 +2536,10 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
           image: u.image,
           relationship,
           requestId,
+          mutualWatchedCount:
+            relationship === "FRIENDS"
+              ? countMutualWatched(myWatchedKeys, friendWatchedMap.get(u.id) || [])
+              : undefined,
         };
       });
     } catch {
@@ -2519,6 +2558,12 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
     .slice(0, 10);
 
   const friendships = db.friendships || [];
+  const allStatuses = db.mediaStatuses || [];
+  const myWatchedKeys = new Set(
+    allStatuses
+      .filter((s) => s.userId === currentUserId && s.status === "WATCHED")
+      .map((s) => `${s.mediaType}_${s.tmdbId}`)
+  );
 
   return matchedUsers.map((u) => {
     const fs = friendships.find(
@@ -2543,6 +2588,14 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
       }
     }
 
+    const mutualWatchedCount =
+      relationship === "FRIENDS"
+        ? countMutualWatched(
+            myWatchedKeys,
+            allStatuses.filter((s) => s.userId === u.id && s.status === "WATCHED")
+          )
+        : undefined;
+
     return {
       id: u.id,
       name: u.name,
@@ -2550,6 +2603,7 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
       image: u.image,
       relationship,
       requestId,
+      mutualWatchedCount,
     };
   });
 }

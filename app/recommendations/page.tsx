@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { AiMovieAdvisor } from "@/components/AiMovieAdvisor";
 import { AlgorithmRecommendations } from "@/components/AlgorithmRecommendations";
-import { Sparkles, Zap, Bot, Sliders } from "lucide-react";
+import { Sparkles, SlidersHorizontal } from "lucide-react";
 
 function RecommendationsContent() {
   const searchParams = useSearchParams();
@@ -36,68 +36,61 @@ function RecommendationsContent() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
-      {/* Page Header */}
-      <div className="text-center max-w-3xl mx-auto space-y-3">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-bold tracking-wide">
-          <Sparkles className="w-3.5 h-3.5" />
-          <span>Smarte Film- & Serien-Empfehlungen</span>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+      {/* Open Editorial Header */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-2 max-w-2xl">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-text">
+            Für deinen nächsten Abend
+          </p>
+          <h1 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">
+            Empfehlungen
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+            Beschreib deinen Abend im KI-Berater oder nutze deinen persönlichen Algorithmus abgestimmt auf Geschmack und Abos.
+          </p>
         </div>
-        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-          Deine persönlichen Empfehlungen
-        </h1>
-        <p className="text-sm sm:text-base text-slate-400">
-          Entdecke neue Meisterwerke – wähle zwischen interaktiver KI-Beratung für dich und deine Freunde oder dem automatischen Algorithmus abgestimmt auf deine Abos & deinen Filmgeschmack.
-        </p>
 
-        {/* Central Switcher between KI and Algorithmus */}
-        <div className="pt-3 flex justify-center">
-          <div className="p-1 sm:p-1.5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl inline-flex items-center gap-1 sm:gap-1.5 w-full max-w-md">
-            <button
-              type="button"
-              onClick={() => handleSelectMode("ai")}
-              className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-                mode === "ai"
-                  ? "bg-gradient-to-r from-amber-500 via-amber-400 to-rose-500 text-black shadow-lg shadow-amber-500/20 font-black"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-              }`}
-            >
-              <Bot className="w-4 h-4 flex-shrink-0" />
-              <span className="truncate">KI-Filmberater</span>
-              <span
-                className={`hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 ${
-                  mode === "ai" ? "bg-black/20 text-black" : "bg-purple-500/20 text-purple-300"
-                }`}
-              >
-                Gemini
-              </span>
-            </button>
+        {/* Clean Segmented Tabs */}
+        <div
+          role="tablist"
+          aria-label="Empfehlungs-Modus"
+          className="inline-flex items-center gap-1 p-1 rounded-xl bg-muted border border-border self-start md:self-auto"
+        >
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "ai"}
+            onClick={() => handleSelectMode("ai")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition cursor-pointer ${
+              mode === "ai"
+                ? "bg-card text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground border border-transparent"
+            }`}
+          >
+            <Sparkles className="w-4 h-4 text-primary-text" aria-hidden="true" />
+            <span>KI-Berater</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => handleSelectMode("algorithm")}
-              className={`flex-1 min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 py-2.5 px-2.5 sm:px-4 rounded-xl font-bold text-xs sm:text-sm transition-all ${
-                mode === "algorithm"
-                  ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20 font-black"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/60"
-              }`}
-            >
-              <Zap className="w-4 h-4 flex-shrink-0" />
-              <span className="truncate">Algorithmus</span>
-              <span
-                className={`hidden sm:inline-block text-[10px] px-2 py-0.5 rounded-full font-black flex-shrink-0 ${
-                  mode === "algorithm" ? "bg-black/20 text-black" : "bg-emerald-500/20 text-emerald-300"
-                }`}
-              >
-                Matches
-              </span>
-            </button>
-          </div>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={mode === "algorithm"}
+            onClick={() => handleSelectMode("algorithm")}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition cursor-pointer ${
+              mode === "algorithm"
+                ? "bg-card text-foreground shadow-sm border border-border"
+                : "text-muted-foreground hover:text-foreground border border-transparent"
+            }`}
+          >
+            <SlidersHorizontal className="w-4 h-4 text-primary-text" aria-hidden="true" />
+            <span>Algorithmus</span>
+          </button>
         </div>
       </div>
 
       {/* Main Content Area */}
-      <div className="animate-in fade-in duration-300">
+      <div className="animate-in fade-in duration-200">
         {mode === "ai" ? (
           <AiMovieAdvisor initialPrompt={promptParam || undefined} />
         ) : (
@@ -112,8 +105,8 @@ export default function RecommendationsPage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-slate-400 animate-pulse">
-          Lade Empfehlungen...
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-muted-foreground animate-pulse">
+          Lade Empfehlungen…
         </div>
       }
     >

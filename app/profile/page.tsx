@@ -1,27 +1,20 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "@/components/MediaContext";
-import {
-  POPULAR_SUBSCRIPTIONS,
-  ALL_GENRES_MAP,
-  OFFICIAL_MOVIE_GENRES,
-  OFFICIAL_TV_GENRES,
-} from "@/lib/tmdb";
+import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
+import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import { COLLECTIONS_DATA } from "@/lib/collections";
-import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
-import type {
-  RecommendedMediaItem,
-  TasteSummary,
-} from "@/app/api/tmdb/recommendations/route";
-import { AiMovieAdvisor } from "@/components/AiMovieAdvisor";
-import { AlgorithmRecommendations } from "@/components/AlgorithmRecommendations";
 import { WatchtimeDetailsModal } from "@/components/WatchtimeDetailsModal";
 import { EditRecommendationModal } from "@/components/EditRecommendationModal";
 import { MyRecommendationsModal } from "@/components/MyRecommendationsModal";
 import { StreamingHistoryImporter } from "@/components/StreamingHistoryImporter";
+import { ThemeSelector } from "@/components/ThemeToggle";
+import { SubscriptionToggleList, SwitchRow } from "@/components/SubscriptionToggleList";
+import { useBatchMediaMeta } from "@/lib/useBatchMediaMeta";
+import { useWatchlistAlerts } from "@/lib/useWatchlistAlerts";
 import type { AppRecommendation } from "@/lib/store";
 import { formatWatchedSeasons, getItemRuntimeMinutes } from "@/lib/seasons";
 import {
@@ -30,65 +23,28 @@ import {
   Film,
   Tv,
   Clock,
-  Award,
-  Sparkles,
   Bookmark,
   BarChart3,
-  TrendingUp,
   Layers,
   Clapperboard,
   Calendar,
-  Settings,
+  Settings2,
   ChevronRight,
-  Plus,
-  Check,
-  Flame,
   Trophy,
-  Wand2,
-  RefreshCw,
   Filter,
-  Tag,
   Camera,
-  Edit3,
-  Trash2,
-  ExternalLink,
-  MessageSquare,
   Search,
   X,
   ArrowUpDown,
+  ArrowRight,
+  Shield,
+  LogOut,
+  Bell,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 
-function getEmojiForGenreName(name: string, id?: number): string {
-  if (id && ALL_GENRES_MAP[id]) return ALL_GENRES_MAP[id].emoji;
-  const lower = name.toLowerCase();
-  const match = [...OFFICIAL_MOVIE_GENRES, ...OFFICIAL_TV_GENRES].find(
-    (g) => g.name.toLowerCase() === lower
-  );
-  if (match) return match.emoji;
-  if (lower.includes("sci-fi") || lower.includes("science")) return "🚀";
-  if (lower.includes("action")) return "💥";
-  if (lower.includes("komödie") || lower.includes("comedy")) return "😂";
-  if (lower.includes("krimi") || lower.includes("crime")) return "🕵️";
-  if (lower.includes("drama")) return "🎭";
-  if (lower.includes("horror")) return "🩸";
-  if (lower.includes("thriller")) return "😱";
-  if (lower.includes("animation")) return "✨";
-  if (lower.includes("abenteuer") || lower.includes("adventure")) return "🗺️";
-  if (lower.includes("fantasy")) return "🧙‍♂️";
-  if (lower.includes("doku")) return "🎥";
-  if (lower.includes("liebe") || lower.includes("romance")) return "❤️";
-  if (lower.includes("historie")) return "📜";
-  if (lower.includes("krieg") || lower.includes("war")) return "🪖";
-  if (lower.includes("western")) return "🤠";
-  if (lower.includes("musik")) return "🎵";
-  if (lower.includes("mystery")) return "🔍";
-  if (lower.includes("familie") || lower.includes("family")) return "👨‍👩‍👧‍👦";
-  return "🎬";
-}
-
-type ProfileTab = "stats" | "hall-of-fame" | "ai" | "matches";
+type ProfileTab = "overview" | "hall-of-fame" | "stats" | "streaming" | "settings";
 
 type HofRatingFilter =
   | "ALL"
@@ -121,15 +77,19 @@ const HOF_EXACT_RATINGS: Array<{ score: number; value: HofRatingFilter; label: s
   { score: 1, value: "1", label: "Flop" },
 ];
 
+const OVERVIEW_SUB_KEYS = ["netflix", "prime", "disney", "apple", "wow"];
+
 function ProfileContent() {
   const { data: session } = useSession();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const {
     communityData,
     userSubscriptions,
+    setUserSubscriptions,
     openSubscriptions,
     openMediaModal,
     openRatingModal,
-    updateMediaStatus,
     openSearch,
     openAvatarPicker,
     currentUserAvatar,
@@ -138,62 +98,75 @@ function ProfileContent() {
     showToast,
   } = useMedia();
 
-  const [metaMap, setMetaMap] = useState<Record<string, BatchMediaMeta>>({});
-  const [loadingMeta, setLoadingMeta] = useState(false);
   const [favFilter, setFavFilter] = useState<"ALL" | "movie" | "tv">("ALL");
   const [hofSearch, setHofSearch] = useState("");
   const [hofRatingFilter, setHofRatingFilter] = useState<HofRatingFilter>("ALL");
   const [hofGenreFilter, setHofGenreFilter] = useState<string>("ALL");
-  const [hofDecadeFilter, setHofDecadeFilter] = useState<"ALL" | "2020s" | "2010s" | "2000s" | "1990s" | "classic">("ALL");
-  const [hofSortBy, setHofSortBy] = useState<"rating_desc" | "rating_asc" | "date_desc" | "year_desc" | "year_asc" | "title_asc">("rating_desc");
+  const [hofDecadeFilter, setHofDecadeFilter] = useState<
+    "ALL" | "2020s" | "2010s" | "2000s" | "1990s" | "classic"
+  >("ALL");
+  const [hofSortBy, setHofSortBy] = useState<
+    "rating_desc" | "rating_asc" | "date_desc" | "year_desc" | "year_asc" | "title_asc"
+  >("rating_desc");
   const [showWatchtimeModal, setShowWatchtimeModal] = useState(false);
   const [showRecommendationsModal, setShowRecommendationsModal] = useState(false);
   const [editingRecommendation, setEditingRecommendation] = useState<AppRecommendation | null>(null);
+  const [genreSortMode, setGenreSortMode] = useState<"count" | "rating">("count");
 
-  const searchParams = useSearchParams();
-  const urlTab = searchParams.get("tab") as ProfileTab | null;
+  // Notification toggle state (Settings tab)
+  const { watchlistAlerts, savingAlerts, toggleWatchlistAlerts } = useWatchlistAlerts({
+    enabled: Boolean(session?.user),
+  });
+
+  const urlTab = searchParams.get("tab");
   const urlPrompt = searchParams.get("prompt");
 
+  // Redirect legacy /profile?tab=ai or matches to /recommendations
   useEffect(() => {
-    if (searchParams.get("tab") === "recommendations") {
+    if (urlTab === "ai" || urlPrompt) {
+      const params = new URLSearchParams();
+      params.set("tab", "ai");
+      if (urlPrompt) params.set("prompt", urlPrompt);
+      router.replace(`/recommendations?${params.toString()}`);
+    } else if (urlTab === "matches") {
+      router.replace("/recommendations?tab=algorithm");
+    } else if (urlTab === "recommendations") {
       setShowRecommendationsModal(true);
     }
-  }, [searchParams]);
+  }, [urlTab, urlPrompt, router]);
 
   const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
     if (
-      urlTab === "ai" ||
-      urlTab === "matches" ||
+      urlTab === "overview" ||
       urlTab === "hall-of-fame" ||
-      urlTab === "stats"
+      urlTab === "stats" ||
+      urlTab === "streaming" ||
+      urlTab === "settings"
     ) {
       return urlTab;
     }
-    if (urlPrompt) {
-      return "ai";
-    }
-    return "stats"; // Tab 1 default
+    return "overview";
   });
 
   useEffect(() => {
     if (
-      urlTab === "ai" ||
-      urlTab === "matches" ||
+      urlTab === "overview" ||
       urlTab === "hall-of-fame" ||
-      urlTab === "stats"
+      urlTab === "stats" ||
+      urlTab === "streaming" ||
+      urlTab === "settings"
     ) {
       setActiveTab(urlTab);
-    } else if (urlPrompt) {
-      setActiveTab("ai");
     }
-  }, [urlTab, urlPrompt]);
-  const [genreSortMode, setGenreSortMode] = useState<"count" | "rating">("count");
+  }, [urlTab]);
 
   const myUserId = (session?.user as any)?.id || "user_lukas";
   const myName = session?.user?.name || "Kino-Fan";
   const myEmail = session?.user?.email || "";
+  const isAdmin =
+    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    (session?.user as any)?.role === "ADMIN";
 
-  // Filter user's media statuses
   const myStatuses = useMemo(() => {
     return communityData.mediaStatuses.filter(
       (m) => m.userId === myUserId || (session?.user?.name && m.userName === session.user.name)
@@ -216,33 +189,9 @@ function ProfileContent() {
     );
   }, [communityData.recommendations, myUserId, session?.user?.name]);
 
-  // Fetch rich TMDB metadata (genres, runtime, director, cast, global rating) for watched items
-  useEffect(() => {
-    if (watchedItems.length === 0) return;
+  // Fetch rich TMDB metadata for watched items
+  const { metaMap, loadingMeta } = useBatchMediaMeta(watchedItems);
 
-    const missing = watchedItems
-      .filter((m) => !metaMap[`${m.mediaType}_${m.tmdbId}`])
-      .map((m) => ({ id: m.tmdbId, type: m.mediaType }));
-
-    if (missing.length === 0) return;
-
-    setLoadingMeta(true);
-    fetch("/api/tmdb/batch-genres", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: missing }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.meta) {
-          setMetaMap((prev) => ({ ...prev, ...data.meta }));
-        }
-      })
-      .catch((err) => console.error("Profile metadata error:", err))
-      .finally(() => setLoadingMeta(false));
-  }, [watchedItems, metaMap]);
-
-  // Basic KPIs
   const watchedMoviesCount = watchedItems.filter((m) => m.mediaType === "movie").length;
   const watchedTvCount = watchedItems.filter((m) => m.mediaType === "tv").length;
 
@@ -257,7 +206,6 @@ function ProfileContent() {
     return Math.round((sum / ratedItems.length) * 10) / 10;
   }, [ratedItems]);
 
-  // Global TMDB comparison
   const tmdbDiff = useMemo(() => {
     let count = 0;
     let diffSum = 0;
@@ -272,7 +220,6 @@ function ProfileContent() {
     return Math.round((diffSum / count) * 10) / 10;
   }, [ratedItems, metaMap]);
 
-  // Total Watchtime
   const totalMinutes = useMemo(() => {
     return watchedItems.reduce((acc, item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
@@ -283,21 +230,24 @@ function ProfileContent() {
   const totalHours = Math.round(totalMinutes / 60);
   const totalDays = (totalHours / 24).toFixed(1);
 
-  // Genre Statistics (Count + Average User Rating)
+  const recentRatings = useMemo(() => {
+    return [...watchedItems]
+      .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime())
+      .slice(0, 5);
+  }, [watchedItems]);
+
   const genreStats = useMemo(() => {
     const map: Record<
       string,
-      { name: string; emoji: string; count: number; ratingSum: number; ratedCount: number }
+      { name: string; count: number; ratingSum: number; ratedCount: number }
     > = {};
 
     watchedItems.forEach((item) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const genres = meta?.genres || [];
-      genres.forEach((g) => {
+      (meta?.genres || []).forEach((g) => {
         if (!map[g.name]) {
           map[g.name] = {
             name: g.name,
-            emoji: getEmojiForGenreName(g.name, g.id),
             count: 0,
             ratingSum: 0,
             ratedCount: 0,
@@ -328,7 +278,6 @@ function ProfileContent() {
     [genreStats]
   );
 
-  // Top Directors & Actors
   const topDirectors = useMemo(() => {
     const counts: Record<string, { name: string; count: number; ratingSum: number; rated: number }> =
       {};
@@ -365,19 +314,9 @@ function ProfileContent() {
       .slice(0, 8);
   }, [watchedItems, metaMap]);
 
-  // Rating Distribution Histogram (1 to 10)
   const ratingHistogram = useMemo(() => {
     const buckets: Record<number, number> = {
-      10: 0,
-      9: 0,
-      8: 0,
-      7: 0,
-      6: 0,
-      5: 0,
-      4: 0,
-      3: 0,
-      2: 0,
-      1: 0,
+      10: 0, 9: 0, 8: 0, 7: 0, 6: 0, 5: 0, 4: 0, 3: 0, 2: 0, 1: 0,
     };
     ratedItems.forEach((item) => {
       const r = Math.min(10, Math.max(1, Math.round(item.rating || 8)));
@@ -391,7 +330,6 @@ function ProfileContent() {
     }));
   }, [ratedItems]);
 
-  // Decade Breakdown
   const decadeStats = useMemo(() => {
     const map: Record<string, { label: string; count: number; ratingSum: number; rated: number }> = {
       "2020s": { label: "2020er", count: 0, ratingSum: 0, rated: 0 },
@@ -428,9 +366,13 @@ function ProfileContent() {
     }));
   }, [watchedItems, metaMap]);
 
-  // Available genres across watched items for Hall of Fame filtering
+  const topDecadeLabel = useMemo(() => {
+    const sorted = [...decadeStats].sort((a, b) => b.count - a.count);
+    return sorted[0]?.count > 0 ? sorted[0].label : "–";
+  }, [decadeStats]);
+
   const availableHofGenres = useMemo(() => {
-    const counts: Record<string, { name: string; emoji: string; count: number }> = {};
+    const counts: Record<string, { name: string; count: number }> = {};
     watchedItems.forEach((item) => {
       if (favFilter !== "ALL" && item.mediaType !== favFilter) return;
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
@@ -438,7 +380,6 @@ function ProfileContent() {
         if (!counts[g.name]) {
           counts[g.name] = {
             name: g.name,
-            emoji: getEmojiForGenreName(g.name, g.id),
             count: 0,
           };
         }
@@ -448,18 +389,14 @@ function ProfileContent() {
     return Object.values(counts).sort((a, b) => b.count - a.count);
   }, [watchedItems, metaMap, favFilter]);
 
-  // All Watched & Rated Movies & Series (Hall of Fame - complete list with filters)
   const favoriteItems = useMemo(() => {
     const query = hofSearch.trim().toLowerCase();
 
     return [...watchedItems]
       .filter((item) => {
         const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-
-        // 1. Media type filter (ALL / movie / tv)
         if (favFilter !== "ALL" && item.mediaType !== favFilter) return false;
 
-        // 2. Rating filter
         const r = item.rating ? Math.min(10, Math.max(1, Math.round(item.rating))) : 0;
         if (hofRatingFilter === "UNRATED" && r !== 0) return false;
         if (hofRatingFilter === "9_PLUS" && r < 9) return false;
@@ -471,13 +408,11 @@ function ProfileContent() {
           return false;
         }
 
-        // 3. Genre filter
         if (hofGenreFilter !== "ALL") {
           const itemGenres = (meta?.genres || []).map((g) => g.name);
           if (!itemGenres.includes(hofGenreFilter)) return false;
         }
 
-        // 4. Decade filter
         if (hofDecadeFilter !== "ALL") {
           const yearStr = item.releaseYear || meta?.releaseYear || "";
           const year = parseInt(yearStr, 10);
@@ -489,7 +424,6 @@ function ProfileContent() {
           if (hofDecadeFilter === "classic" && year >= 1990) return false;
         }
 
-        // 5. Text search filter (Title, Director, Cast)
         if (query) {
           const titleMatch = item.title.toLowerCase().includes(query);
           const dirMatch = (meta?.director || "").toLowerCase().includes(query);
@@ -509,27 +443,12 @@ function ProfileContent() {
         const dA = new Date(a.updatedAt || 0).getTime();
         const dB = new Date(b.updatedAt || 0).getTime();
 
-        if (hofSortBy === "rating_asc") {
-          if (rA !== rB) return rA - rB;
-          return dB - dA;
-        }
-        if (hofSortBy === "date_desc") {
-          return dB - dA;
-        }
-        if (hofSortBy === "year_desc") {
-          if (yB !== yA) return yB - yA;
-          return rB - rA;
-        }
-        if (hofSortBy === "year_asc") {
-          if (yA !== yB) return yA - yB;
-          return rB - rA;
-        }
-        if (hofSortBy === "title_asc") {
-          return a.title.localeCompare(b.title);
-        }
-        // Default: rating_desc
-        if (rB !== rA) return rB - rA;
-        return dB - dA;
+        if (hofSortBy === "rating_asc") return rA !== rB ? rA - rB : dB - dA;
+        if (hofSortBy === "date_desc") return dB - dA;
+        if (hofSortBy === "year_desc") return yB !== yA ? yB - yA : rB - rA;
+        if (hofSortBy === "year_asc") return yA !== yB ? yA - yB : rB - rA;
+        if (hofSortBy === "title_asc") return a.title.localeCompare(b.title);
+        return rB !== rA ? rB - rA : dB - dA;
       });
   }, [
     watchedItems,
@@ -542,7 +461,6 @@ function ProfileContent() {
     hofSortBy,
   ]);
 
-  // Collection Progress Highlights
   const collectionProgress = useMemo(() => {
     const watchedIds = new Set(watchedItems.map((m) => m.tmdbId));
     return COLLECTIONS_DATA.map((col) => {
@@ -555,742 +473,501 @@ function ProfileContent() {
         seen,
         total,
         pct,
-        posterPath: col.posterPath,
       };
     })
       .sort((a, b) => b.pct - a.pct || b.seen - a.seen)
       .slice(0, 6);
   }, [watchedItems]);
 
-  // Critic Persona Label
   const criticPersona = useMemo(() => {
     const topGenre = genreStats[0];
-    const genreTitle = topGenre ? `${topGenre.emoji} ${topGenre.name}-Enthusiast` : "🎬 Allrounder";
+    const genreTitle = topGenre ? `${topGenre.name}-Fan` : "Film-Entdecker";
 
     let ratingStyle = "Ausgewogener Kritiker";
     if (avgRating >= 8.7) ratingStyle = "Euphorischer Genießer";
     else if (avgRating >= 7.8) ratingStyle = "Kinoliebhaber";
     else if (avgRating > 0 && avgRating < 6.8) ratingStyle = "Strenger Kritiker";
 
-    return `${genreTitle} • ${ratingStyle}`;
+    return `${genreTitle} · ${ratingStyle}`;
   }, [genreStats, avgRating]);
 
-  const activeSubObjects = useMemo(() => {
-    return POPULAR_SUBSCRIPTIONS.filter((s) => userSubscriptions.includes(s.key));
-  }, [userSubscriptions]);
+  const toggleSubscription = (key: string) => {
+    if (userSubscriptions.includes(key)) {
+      setUserSubscriptions(userSubscriptions.filter((s) => s !== key));
+    } else {
+      setUserSubscriptions([...userSubscriptions, key]);
+    }
+  };
 
   const handleDeleteRec = async (rec: AppRecommendation) => {
     const confirmed = await confirmDialog({
       title: "Empfehlung löschen?",
-      message: `Möchtest du deine Empfehlung für „${rec.title}“ wirklich löschen? Sie wird für alle Freunde aus dem Feed entfernt.`,
+      message: `Möchtest du deine Empfehlung für „${rec.title}“ wirklich löschen?`,
       confirmLabel: "Löschen",
       dangerous: true,
     });
     if (confirmed) {
       await deleteRecommendation(rec.id);
-      showToast("Empfehlung erfolgreich gelöscht", { type: "info" });
+      showToast("Empfehlung gelöscht", { type: "info" });
     }
   };
 
-  return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-10">
-      {/* 1. Profile Hero & CineDNA Header */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-amber-950/30 via-slate-900 to-[#0b101e] border border-amber-500/30 p-6 sm:p-8 shadow-2xl">
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
-            <div
-              className="relative group cursor-pointer flex-shrink-0"
-              onClick={openAvatarPicker}
-              title="Profilbild ändern"
-            >
-              {currentUserAvatar ? (
-                <div className="w-20 h-20 rounded-3xl overflow-hidden relative border-2 border-amber-500/60 shadow-xl shadow-amber-500/20">
-                  <Image
-                    src={currentUserAvatar}
-                    alt={myName}
-                    fill
-                    sizes="80px"
-                    className="object-cover group-hover:scale-105 transition duration-300"
-                  />
-                </div>
-              ) : (
-                <div className="w-20 h-20 rounded-3xl bg-gradient-to-tr from-amber-500 via-amber-400 to-rose-500 flex items-center justify-center text-black font-black text-3xl shadow-xl shadow-amber-500/20 group-hover:scale-105 transition duration-300">
-                  {myName.slice(0, 1).toUpperCase()}
-                </div>
-              )}
-              <div className="absolute inset-0 bg-black/50 rounded-3xl opacity-0 group-hover:opacity-100 transition hidden [@media(hover:hover)]:flex items-center justify-center text-white backdrop-blur-xs">
-                <Camera className="w-6 h-6 text-amber-400" />
-              </div>
-              <div className="absolute -bottom-1 -right-1 p-1.5 rounded-full bg-amber-500 hover:bg-amber-400 text-black shadow-lg transition">
-                <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold">
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Deine Kino-DNA & Statistiken</span>
-              </div>
-              <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-                {myName}
-              </h1>
-              <div className="flex flex-wrap items-center gap-3">
-                <p className="text-xs sm:text-sm text-slate-300 font-medium">{criticPersona}</p>
-                <button
-                  type="button"
-                  onClick={openAvatarPicker}
-                  className="text-xs font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1 transition"
-                >
-                  <Camera className="w-3 h-3" />
-                  <span>Profilbild anpassen</span>
-                </button>
-              </div>
-              {myEmail && <p className="text-xs text-slate-500">{myEmail}</p>}
-            </div>
-          </div>
+  const clubPct = Math.min(100, Math.round((watchedItems.length / 250) * 100));
+  const clubRemaining = Math.max(0, 250 - watchedItems.length);
 
-          {/* Active Subscriptions Pill Box */}
-          <div className="w-full lg:w-auto p-4 rounded-2xl bg-slate-950/70 border border-slate-800/90 space-y-2.5">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                Deine Streaming-Abos ({activeSubObjects.length})
-              </span>
-              <button
-                type="button"
-                onClick={openSubscriptions}
-                className="flex items-center gap-1 text-xs font-bold text-amber-400 hover:text-amber-300 transition"
-              >
-                <Settings className="w-3.5 h-3.5" />
-                <span>Anpassen</span>
-              </button>
-            </div>
-            <div className="flex flex-wrap gap-1.5 max-w-md">
-              {activeSubObjects.length > 0 ? (
-                activeSubObjects.map((sub) => (
-                  <span
-                    key={sub.key}
-                    className="px-2.5 py-1 rounded-lg text-xs font-bold text-white border border-slate-700/80 bg-slate-900 flex items-center gap-1.5"
-                  >
-                    <span
-                      className="w-2 h-2 rounded-full"
-                      style={{ backgroundColor: sub.color }}
-                    />
-                    {sub.label}
-                  </span>
-                ))
-              ) : (
-                <span className="text-xs text-slate-500">Noch keine Abos ausgewählt</span>
-              )}
-            </div>
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-8">
+      {/* 1. Open Editorial Profile Header (Flowstep Profil) */}
+      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
+        <div className="flex items-center gap-5">
+          <button
+            type="button"
+            onClick={openAvatarPicker}
+            title="Profilbild ändern"
+            aria-label="Profilbild ändern"
+            className="relative group cursor-pointer flex-shrink-0 rounded-full"
+          >
+            {currentUserAvatar ? (
+              <div className="w-20 h-20 rounded-full overflow-hidden relative border-2 border-primary/50 shadow-sm">
+                <Image
+                  src={currentUserAvatar}
+                  alt={myName}
+                  fill
+                  sizes="80px"
+                  className="object-cover"
+                />
+              </div>
+            ) : (
+              <div className="w-20 h-20 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-black text-2xl shadow-sm">
+                {myName.slice(0, 2).toUpperCase()}
+              </div>
+            )}
+            <span className="absolute -bottom-0.5 -right-0.5 p-1.5 rounded-full bg-card border border-border text-foreground shadow-sm">
+              <Camera className="w-3.5 h-3.5" aria-hidden="true" />
+            </span>
+          </button>
+
+          <div className="min-w-0 space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight truncate">
+              {myName}
+            </h1>
+            {myEmail && <p className="text-xs sm:text-sm text-muted-foreground truncate">{myEmail}</p>}
+            <p className="text-xs text-muted-foreground font-medium">{criticPersona}</p>
           </div>
         </div>
 
-        {/* 4 Key Stat Cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-8">
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Gesehene Titel</span>
-              <Film className="w-4 h-4 text-emerald-400" />
-            </div>
-            <p className="text-2xl sm:text-3xl font-black text-white">{watchedItems.length}</p>
-            <p className="text-[11px] text-slate-400">
-              <span className="text-amber-400 font-semibold">{watchedMoviesCount}</span> Filme •{" "}
-              <span className="text-cyan-400 font-semibold">{watchedTvCount}</span> Serien
-            </p>
-          </div>
-
-          <div className="p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 space-y-1">
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span>Deine Ø Bewertung</span>
-              <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
-            </div>
-            <p className="text-2xl sm:text-3xl font-black text-amber-400">
-              {avgRating > 0 ? `${avgRating} / 10` : "–"}
-            </p>
-            <p className="text-[11px] text-slate-400">
-              {tmdbDiff !== null ? (
-                <span>
-                  {tmdbDiff >= 0 ? `+${tmdbDiff}` : tmdbDiff} ★ vs. TMDB-Weltschnitt
-                </span>
-              ) : (
-                <span>Aus {ratedItems.length} Bewertungen</span>
-              )}
-            </p>
-          </div>
-
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setShowWatchtimeModal(true)}
-            className="group text-left p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-sky-500/50 hover:bg-slate-900/90 active:scale-[0.98] transition-all shadow-sm space-y-1 relative cursor-pointer"
+            onClick={openAvatarPicker}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card hover:bg-muted border border-border text-xs font-semibold text-foreground transition cursor-pointer"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span className="group-hover:text-sky-300 font-semibold transition">Kino-Lebenszeit</span>
-              <Clock className="w-4 h-4 text-sky-400 group-hover:scale-110 transition" />
-            </div>
-            <p className="text-2xl sm:text-3xl font-black text-white group-hover:text-sky-200 transition">
-              {totalHours} Std.
-            </p>
-            <p className="text-[11px] text-slate-400 truncate">
-              Ca. <span className="text-sky-400 font-semibold">{totalDays} Tage</span> Non-Stop
-            </p>
+            <Camera className="w-3.5 h-3.5 text-primary-text" aria-hidden="true" />
+            <span>Profilbild</span>
           </button>
-
           <button
             type="button"
-            onClick={() => setShowRecommendationsModal(true)}
-            className="group text-left p-4 rounded-2xl bg-slate-950/60 border border-slate-800/80 hover:border-rose-500/50 hover:bg-slate-900/90 active:scale-[0.98] transition-all shadow-sm space-y-1 relative cursor-pointer"
+            onClick={openSubscriptions}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card hover:bg-muted border border-border text-xs font-semibold text-foreground transition cursor-pointer"
           >
-            <div className="flex items-center justify-between text-slate-400 text-xs">
-              <span className="group-hover:text-rose-300 font-semibold transition">Watchlist & Feed</span>
-              <Bookmark className="w-4 h-4 text-rose-400 group-hover:scale-110 transition" />
-            </div>
-            <p className="text-2xl sm:text-3xl font-black text-white group-hover:text-rose-200 transition">
-              {watchlistItems.length}
-            </p>
-            <p className="text-[11px] text-slate-400 truncate">
-              Watchlist •{" "}
-              <span className="text-rose-400 font-semibold">{myRecommendations.length}</span>{" "}
-              Empfehlungen
-            </p>
+            <Tv className="w-3.5 h-3.5 text-primary-text" aria-hidden="true" />
+            <span>Abos ({userSubscriptions.length})</span>
           </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("settings")}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card hover:bg-muted border border-border text-xs font-semibold text-foreground transition cursor-pointer"
+          >
+            <Settings2 className="w-3.5 h-3.5 text-primary-text" aria-hidden="true" />
+            <span>Einstellungen</span>
+          </button>
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-card hover:bg-muted border border-border text-xs font-semibold text-primary-text transition"
+            >
+              <Shield className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Admin</span>
+            </Link>
+          )}
         </div>
       </div>
 
-
-      {/* 4 Dedicated Tabs Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-3 overflow-x-auto no-scrollbar scroll-fade-x">
-        {/* Tab 1: Statistiken */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("stats")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
-            activeTab === "stats"
-              ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-              : "bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
-          }`}
-        >
-          <BarChart3 className="w-4 h-4" />
-          <span>1. Statistiken</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              activeTab === "stats" ? "bg-black/20 text-black" : "bg-slate-800 text-slate-400"
-            }`}
-          >
-            Kino-DNA
-          </span>
-        </button>
-
-        {/* Tab 2: Hall of Fame */}
+      {/* 2. 4 Clickable Stat Tiles (Preserving Exact Clickable Functionality!) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <button
           type="button"
           onClick={() => setActiveTab("hall-of-fame")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
-            activeTab === "hall-of-fame"
-              ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-              : "bg-slate-900/80 text-slate-400 hover:text-white hover:bg-slate-800 border border-slate-800"
-          }`}
+          className="group text-left p-4 rounded-2xl bg-card border border-border hover:border-primary/50 active:scale-[0.99] transition space-y-1 cursor-pointer shadow-xs"
         >
-          <Trophy className="w-4 h-4" />
-          <span>2. Hall of Fame</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              activeTab === "hall-of-fame" ? "bg-black/20 text-black" : "bg-slate-800 text-slate-400"
-            }`}
-          >
-            {watchedItems.length}
-          </span>
+          <div className="flex items-center justify-between text-muted-foreground text-xs">
+            <span className="font-medium group-hover:text-foreground transition">Gesehene Titel</span>
+            <Film className="w-4 h-4 text-emerald-500" aria-hidden="true" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-foreground">{watchedItems.length}</p>
+          <p className="text-[11px] text-muted-foreground">
+            {watchedMoviesCount} Filme · {watchedTvCount} Serien
+          </p>
         </button>
 
-        {/* Tab 3: KI-Empfehlungen (Recommendation) */}
         <button
           type="button"
-          onClick={() => setActiveTab("ai")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
-            activeTab === "ai"
-              ? "bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-500 text-black shadow-lg shadow-purple-500/20 font-black"
-              : "bg-slate-900/80 text-purple-300 hover:text-white hover:bg-slate-800 border border-purple-500/30"
-          }`}
+          onClick={() => setActiveTab("stats")}
+          className="group text-left p-4 rounded-2xl bg-card border border-border hover:border-primary/50 active:scale-[0.99] transition space-y-1 cursor-pointer shadow-xs"
         >
-          <Sparkles className="w-4 h-4" />
-          <span>3. KI-Empfehlungen</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              activeTab === "ai"
-                ? "bg-black/20 text-black"
-                : "bg-purple-500/20 text-purple-300 border border-purple-500/30"
-            }`}
-          >
-            Gemini Flash
-          </span>
+          <div className="flex items-center justify-between text-muted-foreground text-xs">
+            <span className="font-medium group-hover:text-foreground transition">Ø Bewertung</span>
+            <Star className="w-4 h-4 text-primary fill-primary" aria-hidden="true" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-primary-text">
+            {avgRating > 0 ? `${avgRating} / 10` : "–"}
+          </p>
+          <p className="text-[11px] text-muted-foreground truncate">
+            {tmdbDiff !== null
+              ? `${tmdbDiff >= 0 ? `+${tmdbDiff}` : tmdbDiff} ★ vs. TMDB`
+              : `Aus ${ratedItems.length} Bewertungen`}
+          </p>
         </button>
 
-        {/* Tab 4: Standard-Matches */}
         <button
           type="button"
-          onClick={() => setActiveTab("matches")}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap ${
-            activeTab === "matches"
-              ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-              : "bg-slate-900/80 text-emerald-400 hover:text-white hover:bg-slate-800 border border-emerald-500/30"
-          }`}
+          onClick={() => setShowWatchtimeModal(true)}
+          className="group text-left p-4 rounded-2xl bg-card border border-border hover:border-primary/50 active:scale-[0.99] transition space-y-1 cursor-pointer shadow-xs"
         >
-          <Wand2 className="w-4 h-4" />
-          <span>4. Standard-Matches</span>
-          <span
-            className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
-              activeTab === "matches"
-                ? "bg-black/20 text-black"
-                : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
-            }`}
-          >
-            Abo-Matches
-          </span>
+          <div className="flex items-center justify-between text-muted-foreground text-xs">
+            <span className="font-medium group-hover:text-foreground transition">Kino-Lebenszeit</span>
+            <Clock className="w-4 h-4 text-sky-500" aria-hidden="true" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-foreground">{totalHours} Std.</p>
+          <p className="text-[11px] text-muted-foreground truncate">
+            Ca. {totalDays} Tage Non-Stop
+          </p>
         </button>
 
-        {/* Tab 5: Filme bewerten & Netflix Import */}
-        <Link
-          href="/quick-rate"
-          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl font-bold text-xs sm:text-sm transition-all whitespace-nowrap bg-slate-900/80 text-rose-300 hover:text-white hover:bg-slate-800 border border-rose-500/30"
+        <button
+          type="button"
+          onClick={() => setShowRecommendationsModal(true)}
+          className="group text-left p-4 rounded-2xl bg-card border border-border hover:border-primary/50 active:scale-[0.99] transition space-y-1 cursor-pointer shadow-xs"
         >
-          <Star className="w-4 h-4 text-rose-400 fill-rose-400" />
-          <span>5. Filme bewerten & Netflix-Import</span>
-          {watchedItems.length < 250 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/30">
-              {watchedItems.length}/250
-            </span>
-          )}
-        </Link>
+          <div className="flex items-center justify-between text-muted-foreground text-xs">
+            <span className="font-medium group-hover:text-foreground transition">Watchlist & Feed</span>
+            <Bookmark className="w-4 h-4 text-rose-500" aria-hidden="true" />
+          </div>
+          <p className="text-2xl sm:text-3xl font-black text-foreground">{watchlistItems.length}</p>
+          <p className="text-[11px] text-muted-foreground truncate">
+            Watchlist · {myRecommendations.length} Empfehlungen
+          </p>
+        </button>
       </div>
 
-      {/* TAB 1: 📊 STATISTIKEN (Kino-DNA, Genres, Histogramm, Universen) */}
-      {activeTab === "stats" && (
-        <div className="space-y-10 animate-in fade-in duration-300">
-          {watchedItems.length === 0 ? (
-            <div className="p-12 rounded-3xl bg-slate-900/50 border border-slate-800 text-center space-y-4">
-              <Trophy className="w-12 h-12 text-amber-400 mx-auto opacity-80" />
-              <h2 className="text-xl font-bold text-white">
-                Deine Kino-Statistiken warten auf deine ersten Bewertungen!
-              </h2>
-              <p className="text-sm text-slate-400 max-w-lg mx-auto">
-                Markiere ein paar Filme oder Serien mit „Gesehen?“ und vergib eine Bewertung von 1–10.
-                Sofort berechnet CineCircle deine Lieblings-Genres, Top-Regisseure und deine Hall of Fame.
-              </p>
-              <div className="flex justify-center gap-3 pt-2">
+      {/* 3. Segmented Tabs Navigation (Flowstep) */}
+      <div
+        role="tablist"
+        aria-label="Profil-Bereiche"
+        className="flex items-center gap-1 p-1 rounded-xl bg-muted border border-border overflow-x-auto no-scrollbar"
+      >
+        {[
+          { id: "overview" as const, label: "Übersicht" },
+          { id: "hall-of-fame" as const, label: `Gesehen (${watchedItems.length})` },
+          { id: "stats" as const, label: "Statistiken" },
+          { id: "streaming" as const, label: "Streaming-Abos" },
+          { id: "settings" as const, label: "Einstellungen" },
+        ].map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => setActiveTab(tab.id)}
+              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition cursor-pointer ${
+                active
+                  ? "bg-card text-foreground shadow-sm border border-border"
+                  : "text-muted-foreground hover:text-foreground border border-transparent"
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* TAB 1: ÜBERSICHT (Flowstep 2-Column Layout with Live Data) */}
+      {activeTab === "overview" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-in fade-in duration-200">
+          {/* Left Column: Dein Geschmack + Letzte Bewertungen */}
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-foreground">Dein Geschmack</h2>
                 <button
                   type="button"
-                  onClick={openSearch}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition"
+                  onClick={() => setActiveTab("stats")}
+                  className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
                 >
-                  Filme & Serien suchen
+                  Alle Statistiken →
                 </button>
-                <Link
-                  href="/movies"
-                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs transition"
-                >
-                  Top 250 Filme durchstöbern
-                </Link>
               </div>
-            </div>
-          ) : (
-            <>
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Left 7 cols: Lieblings-Genres */}
-            <div className="lg:col-span-7 p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-lg font-black text-white flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-amber-400" />
-                    <span>Deine Lieblings-Kategorien & Genres</span>
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Welche Genres du am häufigsten schaust & am höchsten bewertest
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950 border border-slate-800 self-start">
-                  <button
-                    onClick={() => setGenreSortMode("count")}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                      genreSortMode === "count"
-                        ? "bg-amber-500 text-black"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Meistgesehen
-                  </button>
-                  <button
-                    onClick={() => setGenreSortMode("rating")}
-                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-                      genreSortMode === "rating"
-                        ? "bg-amber-500 text-black"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Beste Ø Note
-                  </button>
-                </div>
-              </div>
-
-              {loadingMeta && genreStats.length === 0 ? (
-                <div className="py-12 text-center text-xs text-slate-400 animate-pulse">
-                  Analysiere Genres deiner gesehenen Filme & Serien...
-                </div>
-              ) : genreStats.length > 0 ? (
-                <div className="space-y-3">
-                  {genreStats.slice(0, 10).map((g, idx) => {
-                    const widthPct =
-                      genreSortMode === "count"
-                        ? Math.round((g.count / maxGenreCount) * 100)
-                        : Math.round((g.avgRating / 10) * 100);
-
-                    return (
-                      <div key={g.name} className="space-y-1.5">
-                        <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2 font-bold text-white">
-                            <span className="text-slate-500 font-mono w-4">{idx + 1}.</span>
-                            <span className="text-base">{g.emoji}</span>
-                            <span>{g.name}</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className="text-slate-400">
-                              <strong className="text-white">{g.count}</strong>{" "}
-                              {g.count === 1 ? "Titel" : "Titel"}
-                            </span>
-                            {g.avgRating > 0 && (
-                              <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/30 text-amber-300 font-bold">
-                                Ø {g.avgRating} ★
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="w-full h-2.5 rounded-full bg-slate-950 overflow-hidden p-0.5 border border-slate-800/80">
-                          <div
-                            className="h-full rounded-full bg-gradient-to-r from-amber-500 to-rose-500 transition-all duration-500"
-                            style={{ width: `${Math.max(widthPct, 8)}%` }}
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500">Noch keine Genre-Daten vorhanden.</p>
-              )}
-            </div>
-
-            {/* Right 5 cols: Bewertungs-Histogramm (1-10) & Jahrzehnte */}
-            <div className="lg:col-span-5 space-y-6">
-              {/* Rating Histogram */}
-              <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <div>
-                  <h3 className="text-lg font-black text-white flex items-center gap-2">
-                    <Star className="w-5 h-5 text-emerald-400 fill-emerald-400" />
-                    <span>Bewertungs-Verteilung (1–10 ★)</span>
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Wie oft du welche Punktezahl vergeben hast
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  {ratingHistogram.map((row) => (
-                    <div key={row.score} className="flex items-center gap-3 text-xs">
-                      <span className="w-10 font-bold text-slate-300 flex items-center gap-1">
-                        <span>{row.score}</span>
-                        <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                      </span>
-                      <div className="flex-1 h-2.5 rounded-full bg-slate-950 overflow-hidden border border-slate-800/70">
-                        <div
-                          className={`h-full rounded-full transition-all duration-500 ${
-                            row.score >= 9
-                              ? "bg-emerald-400"
-                              : row.score >= 7
-                              ? "bg-amber-400"
-                              : "bg-slate-500"
-                          }`}
-                          style={{ width: `${row.count > 0 ? Math.max(row.percent, 6) : 0}%` }}
-                        />
-                      </div>
-                      <span className="w-8 text-right font-mono text-slate-400">{row.count}x</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Decade Breakdown */}
-              <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-                <div>
-                  <h3 className="text-lg font-black text-white flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-sky-400" />
-                    <span>Kino-Zeitreise nach Jahrzehnten</span>
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Aus welchen Ären deine geschauten Titel stammen
-                  </p>
-                </div>
-
-                <div className="space-y-2.5">
-                  {decadeStats.map((d) => (
-                    <div key={d.key} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-slate-200">{d.label}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-slate-400">{d.count} Titel</span>
-                          {d.avg && (
-                            <span className="text-sky-400 font-bold text-[11px]">Ø {d.avg}★</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-slate-950 overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-sky-500 transition-all duration-500"
-                          style={{ width: `${d.count > 0 ? Math.max(d.percent, 6) : 0}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* 4. Top Regisseure, Schauspieler & Universen-Fortschritt */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Top Directors */}
-            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-              <div>
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <Clapperboard className="w-5 h-5 text-purple-400" />
-                  <span>Meistgesehene Regisseure</span>
-                </h3>
-                <p className="text-xs text-slate-400">Regisseure & Showrunner in deiner Liste</p>
-              </div>
-              {topDirectors.length > 0 ? (
-                <div className="space-y-2.5">
-                  {topDirectors.map((dir, i) => (
-                    <div
-                      key={dir.name}
-                      className="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-5 h-5 rounded-md bg-purple-500/20 text-purple-300 font-bold flex items-center justify-center text-[11px]">
-                          {i + 1}
-                        </span>
-                        <span className="font-bold text-white">{dir.name}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400">{dir.count}x</span>
-                        {dir.avg && (
-                          <span className="text-amber-400 font-bold">Ø {dir.avg}★</span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-slate-500">Wird geladen...</p>
-              )}
-            </div>
-
-            {/* Top Stars / Cast */}
-            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-              <div>
-                <h3 className="text-base font-black text-white flex items-center gap-2">
-                  <User className="w-5 h-5 text-rose-400" />
-                  <span>Häufigste Stars & Cast</span>
-                </h3>
-                <p className="text-xs text-slate-400">Schauspieler in deinen gesehenen Titeln</p>
-              </div>
-              {topActors.length > 0 ? (
+              {genreStats.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
-                  {topActors.map((actor) => (
+                  {genreStats.slice(0, 6).map((g) => (
                     <span
-                      key={actor.name}
-                      className="px-3 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-xs text-slate-200 font-medium flex items-center gap-2"
+                      key={g.name}
+                      className="px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-semibold text-foreground"
                     >
-                      <span>{actor.name}</span>
-                      <span className="px-1.5 py-0.2 rounded bg-rose-500/20 text-rose-300 font-bold text-[10px]">
-                        {actor.count}x
-                      </span>
+                      {g.name}
                     </span>
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-slate-500">Wird geladen...</p>
+                <p className="text-xs text-muted-foreground">
+                  Bewerte ein paar Filme oder Serien, um dein Geschmacksprofil zu sehen.
+                </p>
               )}
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                Dein häufigstes Jahrzehnt:{" "}
+                <span className="font-bold text-foreground">{topDecadeLabel}</span>
+              </p>
             </div>
 
-            {/* Franchise & Collection Progress */}
-            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-base font-black text-white flex items-center gap-2">
-                    <Layers className="w-5 h-5 text-amber-400" />
-                    <span>Universen-Fortschritt</span>
-                  </h3>
-                  <p className="text-xs text-slate-400">Deine Top-Reihen im Überblick</p>
-                </div>
-                <Link
-                  href="/collections"
-                  className="text-xs text-amber-400 hover:underline font-semibold flex items-center"
+            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-foreground">Letzte Bewertungen</h2>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab("hall-of-fame")}
+                  className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
                 >
-                  Alle <ChevronRight className="w-3.5 h-3.5" />
-                </Link>
+                  Alle gesehenen Titel →
+                </button>
               </div>
 
-              <div className="space-y-3">
-                {collectionProgress.slice(0, 4).map((col) => (
-                  <Link
-                    key={col.id}
-                    href={`/collections/${col.id}`}
-                    className="block p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 hover:border-amber-500/40 transition space-y-1.5"
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="font-bold text-white truncate max-w-[180px]">{col.name}</span>
-                      <span className="text-amber-400 font-bold">
-                        {col.seen}/{col.total} ({col.pct}%)
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-slate-900 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-amber-500 to-emerald-400"
-                        style={{ width: `${col.pct}%` }}
-                      />
-                    </div>
-                  </Link>
-                ))}
-              </div>
+              {recentRatings.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-2">
+                  Noch keine Bewertungen vorhanden.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {recentRatings.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() =>
+                        openMediaModal({
+                          id: item.tmdbId,
+                          mediaType: item.mediaType,
+                          title: item.title,
+                          posterPath: item.posterPath,
+                        })
+                      }
+                      className="w-full flex items-center gap-3 text-left p-2 -mx-2 rounded-xl hover:bg-muted/70 transition cursor-pointer"
+                    >
+                      <div className="relative w-11 h-16 rounded-md overflow-hidden bg-muted border border-border flex-shrink-0">
+                        {item.posterPath ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w185${item.posterPath}`}
+                            alt={item.title}
+                            fill
+                            sizes="44px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            <Film className="w-4 h-4" />
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-foreground truncate">
+                          {item.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {item.releaseYear || (item.mediaType === "tv" ? "Serie" : "Film")}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1 text-sm font-bold text-foreground flex-shrink-0">
+                        <Star className="w-4 h-4 fill-primary text-primary" aria-hidden="true" />
+                        <span>{item.rating ?? "✓"}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-            </>
-          )}
+          {/* Right Column: 250-Club + Streaming-Abos + Meine Watchlist */}
+          <div className="space-y-6">
+            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+              <h2 className="text-base font-bold text-foreground">250-Club</h2>
+              <div className="flex items-center justify-between text-sm">
+                <p className="font-semibold text-foreground">
+                  {watchedItems.length} von 250 Titeln bewertet
+                </p>
+                <span className="text-muted-foreground font-mono text-xs">{clubPct}%</span>
+              </div>
+              <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border">
+                <div
+                  className="h-full bg-primary rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(2, clubPct)}%` }}
+                />
+              </div>
+              <p className="text-xs sm:text-sm text-muted-foreground">
+                {clubRemaining > 0
+                  ? `Noch ${clubRemaining} Titel bis zum 250-Club-Meilenstein`
+                  : "Meilenstein von 250 Titeln erreicht!"}
+              </p>
+              <Link
+                href="/quick-rate"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold transition shadow-xs"
+              >
+                <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Weiter bewerten</span>
+              </Link>
+            </div>
+
+            <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-base font-bold text-foreground">Streaming-Abos</h2>
+                <button
+                  type="button"
+                  onClick={openSubscriptions}
+                  className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
+                >
+                  Alle verwalten
+                </button>
+              </div>
+              <SubscriptionToggleList
+                subscriptions={POPULAR_SUBSCRIPTIONS.filter((s) =>
+                  OVERVIEW_SUB_KEYS.includes(s.key)
+                )}
+                selectedKeys={userSubscriptions}
+                onToggle={toggleSubscription}
+              />
+            </div>
+
+            <div className="p-5 rounded-2xl bg-card border border-border flex items-center justify-between gap-4 shadow-xs">
+              <div>
+                <h2 className="text-sm font-bold text-foreground">Meine Watchlist</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {watchlistItems.length} Titel vorgemerkt
+                </p>
+              </div>
+              <Link
+                href="/my-list"
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background hover:bg-muted border border-border text-xs font-semibold text-foreground transition"
+              >
+                <span>Liste öffnen</span>
+                <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
+              </Link>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* TAB 2: 🏆 HALL OF FAME (Alle gesehenen & bewerteten Filme & Serien mit Filtern) */}
+      {/* TAB 2: GESEHEN (Hall of Fame + CSV Importer) */}
       {activeTab === "hall-of-fame" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="space-y-6 animate-in fade-in duration-200">
           {watchedItems.length === 0 ? (
-            <div className="p-12 rounded-3xl bg-slate-900/50 border border-slate-800 text-center space-y-4">
-              <Trophy className="w-12 h-12 text-amber-400 mx-auto opacity-80" />
-              <h2 className="text-xl font-bold text-white">
-                Noch keine Meisterwerke in deiner Hall of Fame
+            <div className="p-12 rounded-2xl bg-card border border-border text-center space-y-4">
+              <Trophy className="w-10 h-10 text-primary-text mx-auto" />
+              <h2 className="text-lg font-bold text-foreground">
+                Noch keine Titel in deiner Gesehen-Liste
               </h2>
-              <p className="text-sm text-slate-400 max-w-lg mx-auto">
-                Bewerte deine Lieblingsfilme und -serien mit 1 bis 10 Sternen, um deine persönliche Bestenliste aufzubauen.
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-md mx-auto">
+                Bewerte deine Lieblingsfilme und -serien mit 1 bis 10 Sternen, um deine Bestenliste aufzubauen.
               </p>
-              <div className="flex justify-center gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={openSearch}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition"
-                >
-                  Filme & Serien suchen
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={openSearch}
+                className="px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs transition cursor-pointer"
+              >
+                Filme & Serien suchen
+              </button>
             </div>
           ) : (
             <section className="space-y-5">
-              {/* Netflix / IMDb / Letterboxd CSV Importer directly on Profile Hall of Fame */}
-              <StreamingHistoryImporter />
+              <div className="legacy-dark-surface rounded-3xl overflow-hidden">
+                <StreamingHistoryImporter />
+              </div>
 
-              {/* Top Row: Title + Format Switcher (Alle / Filme / Serien) */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2.5">
-                    <h2 className="text-xl sm:text-2xl font-black text-white flex items-center gap-2.5">
-                      <Trophy className="w-6 h-6 text-amber-400" />
-                      <span>Deine komplette Hall of Fame</span>
+                    <h2 className="text-xl font-black text-foreground flex items-center gap-2">
+                      <Trophy className="w-5 h-5 text-primary-text" />
+                      <span>Gesehene Titel & Hall of Fame</span>
                     </h2>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                      {favoriteItems.length} von {watchedItems.length} Titeln
+                    <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary-soft text-primary-text">
+                      {favoriteItems.length} von {watchedItems.length}
                     </span>
                     <Link
                       href="/quick-rate"
-                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-500 hover:bg-amber-400 text-black shadow-sm transition"
+                      className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-primary text-primary-foreground"
                     >
-                      <Star className="w-3 h-3 fill-black" />
+                      <Star className="w-3 h-3 fill-current" />
                       <span>Schnell-Bewerten</span>
                     </Link>
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Alle deine gesehenen & bewerteten Filme und Serien – filterbar nach Bewertung, Genre, Jahrzehnt & Suche
-                  </p>
                 </div>
 
-                {/* Filter All / Movies / TV */}
-                <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-900 border border-slate-800 self-start">
-                  <button
-                    type="button"
-                    onClick={() => setFavFilter("ALL")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      favFilter === "ALL"
-                        ? "bg-amber-500 text-black"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    Alle ({watchedItems.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFavFilter("movie")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      favFilter === "movie"
-                        ? "bg-amber-500 text-black"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    🎬 Filme ({watchedMoviesCount})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setFavFilter("tv")}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
-                      favFilter === "tv"
-                        ? "bg-cyan-400 text-black"
-                        : "text-slate-400 hover:text-white"
-                    }`}
-                  >
-                    📺 Serien ({watchedTvCount})
-                  </button>
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-muted border border-border self-start">
+                  {(
+                    [
+                      { key: "ALL", label: `Alle (${watchedItems.length})` },
+                      { key: "movie", label: `Filme (${watchedMoviesCount})` },
+                      { key: "tv", label: `Serien (${watchedTvCount})` },
+                    ] as const
+                  ).map((f) => (
+                    <button
+                      key={f.key}
+                      type="button"
+                      onClick={() => setFavFilter(f.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                        favFilter === f.key
+                          ? "bg-card text-foreground shadow-xs border border-border"
+                          : "text-muted-foreground hover:text-foreground border border-transparent"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
                 </div>
               </div>
 
-              {/* Filter Panel: Search, Sort, Rating, Decade & Genres */}
-              <div className="p-4 sm:p-5 rounded-3xl bg-slate-900/60 border border-slate-800/90 space-y-4 shadow-xl">
-                {/* Row 1: Search Input + Rating Filter + Decade Filter + Sort Dropdown */}
+              {/* Filter Panel */}
+              <div className="p-4 rounded-2xl bg-card border border-border space-y-3 shadow-xs">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3">
-                  {/* Text Search (Title, Director, Actor) */}
                   <div className="relative sm:col-span-2 lg:col-span-4">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2" />
                     <input
                       type="text"
                       value={hofSearch}
                       onChange={(e) => setHofSearch(e.target.value)}
-                      placeholder="Titel, Regisseur oder Schauspieler suchen..."
-                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition"
+                      placeholder="Titel, Regie oder Cast suchen..."
+                      className="w-full bg-input border border-border focus:border-primary rounded-xl pl-9 pr-8 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
                     />
                     {hofSearch && (
                       <button
                         type="button"
                         onClick={() => setHofSearch("")}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
                   </div>
 
-                  {/* Rating Quick Filter */}
                   <div className="lg:col-span-3 flex items-center gap-2">
-                    <Star className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                    <Star className="w-3.5 h-3.5 text-primary-text flex-shrink-0" />
                     <select
                       value={hofRatingFilter}
                       onChange={(e) => setHofRatingFilter(e.target.value as HofRatingFilter)}
-                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                      className="w-full bg-input border border-border focus:border-primary rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none"
                     >
                       <option value="ALL">Alle Bewertungen (1–10 ★)</option>
-                      <optgroup label="Einzelne Sterne (Exakt 1★ bis 10★)">
+                      <optgroup label="Einzelne Sterne">
                         {HOF_EXACT_RATINGS.map((opt) => (
                           <option key={opt.value} value={opt.value}>
                             {opt.score} ★ ({opt.label})
@@ -1298,22 +975,21 @@ function ProfileContent() {
                         ))}
                         <option value="UNRATED">Ohne Bewertung</option>
                       </optgroup>
-                      <optgroup label="Bewertungs-Bereiche">
-                        <option value="9_PLUS">9–10 ★ (Absolute Favoriten)</option>
-                        <option value="8_PLUS">8–10 ★ (Sehr gut & besser)</option>
-                        <option value="7_PLUS">7–10 ★ (Sehenswert)</option>
-                        <option value="LOW">Unter 7 ★ (Kritisch bewertet)</option>
+                      <optgroup label="Bereiche">
+                        <option value="9_PLUS">9–10 ★</option>
+                        <option value="8_PLUS">8–10 ★</option>
+                        <option value="7_PLUS">7–10 ★</option>
+                        <option value="LOW">Unter 7 ★</option>
                       </optgroup>
                     </select>
                   </div>
 
-                  {/* Decade Filter */}
                   <div className="lg:col-span-2 flex items-center gap-2">
-                    <Calendar className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                    <Calendar className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                     <select
                       value={hofDecadeFilter}
                       onChange={(e) => setHofDecadeFilter(e.target.value as any)}
-                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                      className="w-full bg-input border border-border focus:border-primary rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none"
                     >
                       <option value="ALL">Alle Jahrzehnte</option>
                       <option value="2020s">2020er</option>
@@ -1324,44 +1000,37 @@ function ProfileContent() {
                     </select>
                   </div>
 
-                  {/* Sort Order */}
                   <div className="lg:col-span-3 flex items-center gap-2">
-                    <ArrowUpDown className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                    <ArrowUpDown className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
                     <select
                       value={hofSortBy}
                       onChange={(e) => setHofSortBy(e.target.value as any)}
-                      className="w-full bg-slate-950/90 border border-slate-800 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none"
+                      className="w-full bg-input border border-border focus:border-primary rounded-xl px-3 py-2 text-xs text-foreground focus:outline-none"
                     >
-                      <option value="rating_desc">Beste Bewertung (10★ ➔ 1★)</option>
-                      <option value="rating_asc">Niedrigste Bewertung (1★ ➔ 10★)</option>
-                      <option value="date_desc">Zuletzt gesehen / bewertet</option>
-                      <option value="year_desc">Erscheinungsjahr (Neu ➔ Alt)</option>
-                      <option value="year_asc">Erscheinungsjahr (Alt ➔ Neu)</option>
+                      <option value="rating_desc">Beste Bewertung</option>
+                      <option value="rating_asc">Niedrigste Bewertung</option>
+                      <option value="date_desc">Zuletzt bewertet</option>
+                      <option value="year_desc">Jahr (Neu → Alt)</option>
+                      <option value="year_asc">Jahr (Alt → Neu)</option>
                       <option value="title_asc">Titel (A–Z)</option>
                     </select>
                   </div>
                 </div>
 
-                {/* Row 2: Genre Pills */}
                 {availableHofGenres.length > 0 && (
-                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-1 border-t border-slate-800/80">
-                    <div className="flex items-center gap-1 text-xs font-bold text-slate-400 pr-2 flex-shrink-0">
-                      <Filter className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Genres:</span>
-                    </div>
-
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none pt-2 border-t border-border">
+                    <Filter className="w-3.5 h-3.5 text-primary-text flex-shrink-0 mr-1" />
                     <button
                       type="button"
                       onClick={() => setHofGenreFilter("ALL")}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap cursor-pointer ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap cursor-pointer ${
                         hofGenreFilter === "ALL"
-                          ? "bg-amber-500 text-black shadow-sm"
-                          : "bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-muted text-muted-foreground hover:text-foreground"
                       }`}
                     >
                       Alle Genres
                     </button>
-
                     {availableHofGenres.map((g) => (
                       <button
                         key={g.name}
@@ -1369,59 +1038,22 @@ function ProfileContent() {
                         onClick={() =>
                           setHofGenreFilter((prev) => (prev === g.name ? "ALL" : g.name))
                         }
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap cursor-pointer ${
+                        className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer border ${
                           hofGenreFilter === g.name
-                            ? "bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold"
-                            : "bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                            ? "bg-primary-soft text-primary-text border-primary/40 font-semibold"
+                            : "bg-background border-border text-muted-foreground hover:text-foreground"
                         }`}
                       >
-                        <span>{g.emoji}</span>
-                        <span>{g.name}</span>
-                        <span className="text-[10px] font-mono text-slate-500">({g.count})</span>
+                        {g.name} ({g.count})
                       </button>
                     ))}
-                  </div>
-                )}
-
-                {/* Active filter reset notice if any filter is active */}
-                {(favFilter !== "ALL" ||
-                  hofSearch.trim() !== "" ||
-                  hofRatingFilter !== "ALL" ||
-                  hofGenreFilter !== "ALL" ||
-                  hofDecadeFilter !== "ALL") && (
-                  <div className="flex items-center justify-between pt-1 text-xs text-slate-400">
-                    <span>
-                      Zeige <strong className="text-white">{favoriteItems.length}</strong>{" "}
-                      {favoriteItems.length === 1 ? "Ergebnis" : "Ergebnisse"} für deine aktuellen Filter
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFavFilter("ALL");
-                        setHofSearch("");
-                        setHofRatingFilter("ALL");
-                        setHofGenreFilter("ALL");
-                        setHofDecadeFilter("ALL");
-                        setHofSortBy("rating_desc");
-                      }}
-                      className="text-amber-400 hover:text-amber-300 font-bold flex items-center gap-1 cursor-pointer"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      <span>Alle Filter zurücksetzen</span>
-                    </button>
                   </div>
                 )}
               </div>
 
               {favoriteItems.length === 0 ? (
-                <div className="p-12 rounded-3xl bg-slate-900/40 border border-dashed border-slate-800 text-center space-y-3">
-                  <Filter className="w-10 h-10 text-slate-600 mx-auto" />
-                  <h3 className="text-base font-bold text-white">
-                    Keine Titel für diese Filterkombination gefunden
-                  </h3>
-                  <p className="text-xs text-slate-400 max-w-md mx-auto">
-                    Passe deine Suchbegriffe, die Bewertung oder das ausgewählte Genre an.
-                  </p>
+                <div className="p-10 rounded-2xl bg-card border border-border text-center space-y-3">
+                  <p className="text-sm font-bold text-foreground">Keine Treffer für diese Filter</p>
                   <button
                     type="button"
                     onClick={() => {
@@ -1431,7 +1063,7 @@ function ProfileContent() {
                       setHofGenreFilter("ALL");
                       setHofDecadeFilter("ALL");
                     }}
-                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold cursor-pointer"
                   >
                     Filter zurücksetzen
                   </button>
@@ -1440,8 +1072,6 @@ function ProfileContent() {
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                   {favoriteItems.map((item, idx) => {
                     const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-                    const topGenres = (meta?.genres || []).slice(0, 2);
-
                     return (
                       <div
                         key={item.id}
@@ -1453,9 +1083,9 @@ function ProfileContent() {
                             posterPath: item.posterPath,
                           })
                         }
-                        className="group cursor-pointer rounded-2xl bg-slate-900/70 border border-slate-800/90 hover:border-amber-500/50 overflow-hidden flex flex-col transition duration-300 hover:-translate-y-1 shadow-lg"
+                        className="group cursor-pointer rounded-2xl bg-card border border-border hover:border-primary/50 overflow-hidden flex flex-col transition shadow-xs"
                       >
-                        <div className="relative aspect-[2/3] w-full bg-slate-950">
+                        <div className="relative aspect-[2/3] w-full bg-muted">
                           {item.posterPath ? (
                             <Image
                               src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
@@ -1465,17 +1095,15 @@ function ProfileContent() {
                               className="object-cover group-hover:scale-105 transition duration-500"
                             />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-600">
+                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                               <Film className="w-8 h-8" />
                             </div>
                           )}
 
-                          {/* Rank Badge */}
-                          <div className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-amber-500/40 text-amber-400 font-black text-xs">
+                          <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/80 text-white font-bold text-[11px]">
                             #{idx + 1}
                           </div>
 
-                          {/* Personal Rating Badge (Click to edit rating) */}
                           <button
                             type="button"
                             onClick={(e) => {
@@ -1492,49 +1120,30 @@ function ProfileContent() {
                                 totalSeasons: item.totalSeasons,
                               });
                             }}
-                            title="Deine Bewertung ändern"
-                            className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500 text-black font-black text-xs shadow-lg hover:bg-emerald-400 transition"
+                            title="Bewertung ändern"
+                            className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[11px] shadow cursor-pointer"
                           >
-                            <Star className="w-3 h-3 fill-black" />
-                            <span>{item.rating || "✓"}/10</span>
+                            <Star className="w-3 h-3 fill-slate-950" />
+                            <span>{item.rating || "✓"}</span>
                           </button>
 
-                          {/* TV series partial seasons badge */}
                           {item.mediaType === "tv" &&
                             item.watchedSeasons &&
                             item.totalSeasons &&
                             item.watchedSeasons.length < item.totalSeasons && (
-                              <div className="absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md bg-purple-600/90 text-white font-bold text-[10px] shadow backdrop-blur-sm">
-                                <span>{formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}</span>
+                              <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white font-semibold text-[10px]">
+                                {formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}
                               </div>
                             )}
                         </div>
 
-                        <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                          <div>
-                            <p className="text-xs font-bold text-white line-clamp-1 group-hover:text-amber-400 transition">
-                              {item.title}
-                            </p>
-                            <div className="flex items-center justify-between text-[11px] text-slate-400 mt-0.5">
-                              <span>{item.releaseYear || meta?.releaseYear || ""}</span>
-                              {meta?.tmdbVoteAverage ? (
-                                <span className="text-slate-500">TMDB {meta.tmdbVoteAverage}★</span>
-                              ) : null}
-                            </div>
-                          </div>
-
-                          {topGenres.length > 0 && (
-                            <div className="flex flex-wrap gap-1 pt-1">
-                              {topGenres.map((g) => (
-                                <span
-                                  key={g.id}
-                                  className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300 truncate max-w-full"
-                                >
-                                  {getEmojiForGenreName(g.name, g.id)} {g.name}
-                                </span>
-                              ))}
-                            </div>
-                          )}
+                        <div className="p-3 space-y-1">
+                          <p className="text-xs font-bold text-foreground line-clamp-1 group-hover:text-primary-text transition">
+                            {item.title}
+                          </p>
+                          <p className="text-[11px] text-muted-foreground">
+                            {item.releaseYear || meta?.releaseYear || ""}
+                          </p>
                         </div>
                       </div>
                     );
@@ -1546,21 +1155,339 @@ function ProfileContent() {
         </div>
       )}
 
-      {/* TAB 3: 🤖 KI-EMPFEHLUNGEN (Recommendation mit Oben KI-Fenster & Vorschlägen) */}
-      {activeTab === "ai" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <AiMovieAdvisor initialPrompt={urlPrompt || undefined} />
+      {/* TAB 3: STATISTIKEN */}
+      {activeTab === "stats" && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {watchedItems.length === 0 ? (
+            <div className="p-12 rounded-2xl bg-card border border-border text-center space-y-4">
+              <BarChart3 className="w-10 h-10 text-primary-text mx-auto" />
+              <h2 className="text-lg font-bold text-foreground">
+                Deine Kino-Statistiken warten auf deine ersten Bewertungen
+              </h2>
+              <button
+                type="button"
+                onClick={openSearch}
+                className="px-5 py-2.5 rounded-xl bg-primary text-primary-foreground font-bold text-xs cursor-pointer"
+              >
+                Filme & Serien suchen
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-7 p-6 rounded-2xl bg-card border border-border space-y-5 shadow-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                        <BarChart3 className="w-4 h-4 text-primary-text" />
+                        <span>Lieblings-Genres</span>
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Häufigkeit und Durchschnittsnote
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-1 p-1 rounded-lg bg-muted border border-border self-start">
+                      <button
+                        type="button"
+                        onClick={() => setGenreSortMode("count")}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer ${
+                          genreSortMode === "count"
+                            ? "bg-card text-foreground shadow-xs"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        Meistgesehen
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGenreSortMode("rating")}
+                        className={`px-2.5 py-1 rounded-md text-[11px] font-semibold cursor-pointer ${
+                          genreSortMode === "rating"
+                            ? "bg-card text-foreground shadow-xs"
+                            : "text-muted-foreground"
+                        }`}
+                      >
+                        Beste Note
+                      </button>
+                    </div>
+                  </div>
+
+                  {loadingMeta && genreStats.length === 0 ? (
+                    <div className="py-10 text-center text-xs text-muted-foreground animate-pulse">
+                      Analysiere Genres…
+                    </div>
+                  ) : genreStats.length > 0 ? (
+                    <div className="space-y-3">
+                      {genreStats.slice(0, 10).map((g, idx) => {
+                        const widthPct =
+                          genreSortMode === "count"
+                            ? Math.round((g.count / maxGenreCount) * 100)
+                            : Math.round((g.avgRating / 10) * 100);
+
+                        return (
+                          <div key={g.name} className="space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="font-semibold text-foreground">
+                                {idx + 1}. {g.name}
+                              </span>
+                              <span className="text-muted-foreground">
+                                <strong className="text-foreground">{g.count}</strong> Titel
+                                {g.avgRating > 0 && ` · Ø ${g.avgRating} ★`}
+                              </span>
+                            </div>
+                            <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-primary transition-all duration-500"
+                                style={{ width: `${Math.max(widthPct, 6)}%` }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Noch keine Genre-Daten.</p>
+                  )}
+                </div>
+
+                <div className="lg:col-span-5 space-y-6">
+                  <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+                    <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                      <Star className="w-4 h-4 text-primary fill-primary" />
+                      <span>Bewertungs-Verteilung</span>
+                    </h3>
+                    <div className="space-y-2">
+                      {ratingHistogram.map((row) => (
+                        <div key={row.score} className="flex items-center gap-3 text-xs">
+                          <span className="w-8 font-semibold text-foreground">{row.score}★</span>
+                          <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all duration-500"
+                              style={{ width: `${row.count > 0 ? Math.max(row.percent, 6) : 0}%` }}
+                            />
+                          </div>
+                          <span className="w-8 text-right font-mono text-muted-foreground">
+                            {row.count}x
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="p-6 rounded-2xl bg-card border border-border space-y-4 shadow-xs">
+                    <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                      <Calendar className="w-4 h-4 text-primary-text" />
+                      <span>Nach Jahrzehnten</span>
+                    </h3>
+                    <div className="space-y-2.5">
+                      {decadeStats.map((d) => (
+                        <div key={d.key} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-foreground">{d.label}</span>
+                            <span className="text-muted-foreground">
+                              {d.count} Titel{d.avg ? ` · Ø ${d.avg}★` : ""}
+                            </span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-primary transition-all duration-500"
+                              style={{ width: `${d.count > 0 ? Math.max(d.percent, 6) : 0}%` }}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-xs">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <Clapperboard className="w-4 h-4 text-primary-text" />
+                    <span>Meistgesehene Regisseure</span>
+                  </h3>
+                  {topDirectors.length > 0 ? (
+                    <div className="space-y-2">
+                      {topDirectors.map((dir, i) => (
+                        <div
+                          key={dir.name}
+                          className="flex items-center justify-between p-2 rounded-xl bg-muted/60 text-xs"
+                        >
+                          <span className="font-semibold text-foreground">
+                            {i + 1}. {dir.name}
+                          </span>
+                          <span className="text-muted-foreground">
+                            {dir.count}x{dir.avg ? ` · Ø ${dir.avg}★` : ""}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Wird geladen…</p>
+                  )}
+                </div>
+
+                <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-xs">
+                  <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                    <User className="w-4 h-4 text-primary-text" />
+                    <span>Häufigste Stars</span>
+                  </h3>
+                  {topActors.length > 0 ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {topActors.map((actor) => (
+                        <span
+                          key={actor.name}
+                          className="px-2.5 py-1 rounded-lg bg-muted border border-border text-xs text-foreground font-medium"
+                        >
+                          {actor.name} · {actor.count}x
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Wird geladen…</p>
+                  )}
+                </div>
+
+                <div className="p-6 rounded-2xl bg-card border border-border space-y-3 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-primary-text" />
+                      <span>Kollektionen</span>
+                    </h3>
+                    <Link
+                      href="/collections"
+                      className="text-xs text-primary-text hover:underline font-semibold"
+                    >
+                      Alle →
+                    </Link>
+                  </div>
+                  <div className="space-y-2.5">
+                    {collectionProgress.slice(0, 4).map((col) => (
+                      <Link
+                        key={col.id}
+                        href={`/collections/${col.id}`}
+                        className="block p-2 rounded-xl bg-muted/60 hover:bg-muted transition space-y-1"
+                      >
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="font-semibold text-foreground truncate max-w-[180px]">
+                            {col.name}
+                          </span>
+                          <span className="text-primary-text font-bold">
+                            {col.seen}/{col.total} ({col.pct}%)
+                          </span>
+                        </div>
+                        <div className="w-full h-1.5 rounded-full bg-background overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-primary"
+                            style={{ width: `${col.pct}%` }}
+                          />
+                        </div>
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
 
-      {/* TAB 4: ⚡ STANDARD-MATCHES (Stufe 1 Hybrid-Algorithmus basierend auf Abos & Geschmack) */}
-      {activeTab === "matches" && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <AlgorithmRecommendations />
+      {/* TAB 4: STREAMING-ABOS */}
+      {activeTab === "streaming" && (
+        <div className="max-w-2xl p-6 rounded-2xl bg-card border border-border space-y-5 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h2 className="text-base font-bold text-foreground">Deine Streaming-Abos</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Markiere deine aktiven Anbieter für Empfehlungen und den Feed.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={openSubscriptions}
+              className="px-3 py-1.5 rounded-lg bg-muted hover:bg-muted/80 border border-border text-xs font-semibold text-foreground cursor-pointer"
+            >
+              Filter & Details
+            </button>
+          </div>
+
+          <SubscriptionToggleList
+            subscriptions={POPULAR_SUBSCRIPTIONS}
+            selectedKeys={userSubscriptions}
+            onToggle={toggleSubscription}
+            containerClassName="divide-y divide-border"
+            rowClassName="py-3"
+          />
         </div>
       )}
 
-      {/* MODAL 1: Watchtime Details & Top 10/15 Contributor & Genre Aufschlüsselung */}
+      {/* TAB 5: EINSTELLUNGEN */}
+      {activeTab === "settings" && (
+        <div className="max-w-2xl space-y-6 animate-in fade-in duration-200">
+          <div className="p-6 rounded-2xl bg-card border border-border divide-y divide-border shadow-xs">
+            <div className="pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-bold text-foreground">Darstellung</p>
+                <p className="text-xs text-muted-foreground">
+                  Systemstandard folgen oder zwischen Hell und Dunkel wechseln
+                </p>
+              </div>
+              <ThemeSelector />
+            </div>
+
+            <SwitchRow
+              checked={watchlistAlerts}
+              onToggle={toggleWatchlistAlerts}
+              disabled={savingAlerts}
+              ariaLabel="Watchlist-E-Mail-Alarm umschalten"
+              className="py-4 gap-4"
+              label={
+                <span className="font-bold flex items-center gap-1.5">
+                  <Bell className="w-4 h-4 text-primary-text" aria-hidden="true" />
+                  <span>Watchlist-E-Mail-Alarm</span>
+                </span>
+              }
+              description="Benachrichtigen, sobald ein gemerkter Titel in deinen Abos startet"
+            />
+
+            <div className="pt-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={openAvatarPicker}
+                  className="px-3.5 py-2 rounded-xl bg-muted hover:bg-muted/80 border border-border text-xs font-semibold text-foreground cursor-pointer"
+                >
+                  Profilbild ändern
+                </button>
+                <Link
+                  href="/my-list"
+                  className="px-3.5 py-2 rounded-xl bg-muted hover:bg-muted/80 border border-border text-xs font-semibold text-foreground"
+                >
+                  Meine Watchlist
+                </Link>
+              </div>
+
+              {session?.user && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearOfflineWatchlist();
+                    signOut({ callbackUrl: "/" });
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs font-bold text-rose-600 dark:text-rose-300 cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>Abmelden</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Existing Modals Preserved */}
       {showWatchtimeModal && (
         <WatchtimeDetailsModal
           isOpen={showWatchtimeModal}
@@ -1570,7 +1497,6 @@ function ProfileContent() {
         />
       )}
 
-      {/* MODAL 2: Meine Empfehlungen (Übersicht aller verfassten Empfehlungen) */}
       {showRecommendationsModal && (
         <MyRecommendationsModal
           isOpen={showRecommendationsModal}
@@ -1583,7 +1509,6 @@ function ProfileContent() {
         />
       )}
 
-      {/* MODAL 3: Empfehlung bearbeiten */}
       {editingRecommendation && (
         <EditRecommendationModal
           isOpen={true}
@@ -1591,7 +1516,6 @@ function ProfileContent() {
           onClose={() => setEditingRecommendation(null)}
         />
       )}
-
     </div>
   );
 }
@@ -1600,8 +1524,8 @@ export default function ProfilePage() {
   return (
     <Suspense
       fallback={
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-slate-400 animate-pulse">
-          Lade Profil...
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center text-muted-foreground animate-pulse">
+          Lade Profil…
         </div>
       }
     >

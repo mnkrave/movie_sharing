@@ -96,7 +96,10 @@ export async function POST(req: Request) {
     let actionMessage: string | undefined = undefined;
 
     if (action === "search_users") {
-      const users = await searchUsersForFriendship(userId, body.query || "");
+      const users = await searchUsersForFriendship(
+        userId,
+        typeof body.query === "string" ? body.query : ""
+      );
       return NextResponse.json({ users });
     }
 

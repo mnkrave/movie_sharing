@@ -37,7 +37,7 @@ export function InviteStatusBadge({
   if (isRegistered) {
     const Icon = registeredIcon === "user" ? UserCheck : Check;
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-[10px] font-bold">
         <Icon className="w-3 h-3" aria-hidden="true" />
         <span>Registriert</span>
       </span>
@@ -46,14 +46,14 @@ export function InviteStatusBadge({
 
   if (isExpired) {
     return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-800 border border-slate-700 text-slate-400 text-[10px] font-bold">
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted border border-border text-muted-foreground text-[10px] font-bold">
         <span>Abgelaufen</span>
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/15 border border-amber-500/35 text-amber-300 text-[10px] font-bold">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-soft border border-primary/35 text-primary-text text-[10px] font-bold">
       <Clock className="w-3 h-3" aria-hidden="true" />
       <span>
         Offen
@@ -64,9 +64,9 @@ export function InviteStatusBadge({
 }
 
 const APPROVAL_STYLES: Record<DisplayApprovalStatus, string> = {
-  APPROVED: "bg-emerald-500/15 border-emerald-500/30 text-emerald-300",
-  REJECTED: "bg-rose-500/15 border-rose-500/30 text-rose-300",
-  PENDING: "bg-amber-500/15 border-amber-500/35 text-amber-300",
+  APPROVED: "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300",
+  REJECTED: "bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-300",
+  PENDING: "bg-primary-soft border-primary/35 text-primary-text",
 };
 
 const APPROVAL_LABELS: Record<"user" | "admin", Record<DisplayApprovalStatus, string>> = {

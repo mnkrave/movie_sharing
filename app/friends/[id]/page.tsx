@@ -17,5 +17,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function FriendProfilePage({ params }: PageProps) {
   const { id } = await params;
-  return <FriendProfileClient friendIdParam={id} />;
+  return (
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
+      <FriendProfileClient friendIdParam={id} />
+    </div>
+  );
 }

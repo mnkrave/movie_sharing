@@ -912,15 +912,17 @@ function ExtendedSearchContent() {
 
 export default function ExtendedSearchPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-slate-400 gap-3">
-          <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-          <span>Extended Search wird geladen...</span>
-        </div>
-      }
-    >
-      <ExtendedSearchContent />
-    </Suspense>
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-slate-400 gap-3">
+            <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+            <span>Extended Search wird geladen...</span>
+          </div>
+        }
+      >
+        <ExtendedSearchContent />
+      </Suspense>
+    </div>
   );
 }

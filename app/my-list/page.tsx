@@ -209,6 +209,7 @@ export default function MyListPage() {
     .join(" · ");
 
   return (
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
     <PullToRefresh onRefresh={handlePullRefresh}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 space-y-6 md:space-y-8">
       {isOfflineSnapshot && (
@@ -719,5 +720,6 @@ export default function MyListPage() {
       )}
       </div>
     </PullToRefresh>
+    </div>
   );
 }

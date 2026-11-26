@@ -167,65 +167,60 @@ export default function OscarsPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
-      {/* Header Banner */}
-      <div className="p-6 sm:p-10 rounded-3xl bg-gradient-to-br from-amber-950/50 via-slate-900/90 to-[#0c101c] border border-amber-500/30 relative overflow-hidden shadow-2xl">
-        <div className="absolute -top-24 -right-24 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-          <div className="max-w-2xl space-y-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs font-bold border border-amber-500/40 uppercase tracking-wider">
-              <Trophy className="w-4 h-4 text-amber-400" />
-              Academy Awards – Bester Film (1929 – 2025)
+      {/* Open Editorial Header + Progress Card */}
+      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+        <div className="max-w-2xl space-y-2">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-text flex items-center gap-1.5">
+            <Trophy className="w-3.5 h-3.5" aria-hidden="true" />
+            <span>Academy Awards · Bester Film (1929 – 2025)</span>
+          </p>
+          <h1 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">
+            Alle 97 Oscar-Gewinner
+          </h1>
+          <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+            Jedes Meisterwerk, das je als „Bester Film“ prämiert wurde. Verfolge deinen Fortschritt und finde per Klick heraus, wo du sie direkt streamen kannst.
+          </p>
+        </div>
+
+        <div className="w-full lg:w-80 p-5 rounded-2xl bg-card border border-border space-y-3 shrink-0 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-base">{milestoneBadge.emoji}</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-primary-text">
+                {milestoneBadge.label}
+              </span>
             </div>
-            <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-              Alle 97 Oscar-Gewinner
-            </h1>
-            <p className="text-sm sm:text-base text-slate-300 leading-relaxed">
-              Jedes Meisterwerk, das je als „Bester Film“ prämiert wurde. Verfolge deinen
-              Fortschritt, filtere nach Jahrzehnten und finde per Klick heraus, wo du sie direkt
-              streamen kannst!
-            </p>
+            <span className="text-sm font-black text-foreground">{completionPercent}%</span>
           </div>
 
-          {/* Progress Tracker Card */}
-          <div className="w-full lg:w-80 p-5 rounded-2xl bg-black/40 border border-amber-500/30 backdrop-blur-md space-y-3 shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-lg">{milestoneBadge.emoji}</span>
-                <span className={`text-xs font-bold uppercase tracking-wider ${milestoneBadge.color}`}>
-                  {milestoneBadge.label}
-                </span>
-              </div>
-              <span className="text-sm font-black text-white">{completionPercent}%</span>
-            </div>
+          <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border">
+            <div
+              className="h-full bg-primary rounded-full transition-all duration-700 ease-out"
+              style={{ width: `${Math.max(completionPercent, 2)}%` }}
+            />
+          </div>
 
-            <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700">
-              <div
-                className="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-amber-300 rounded-full transition-all duration-700 ease-out shadow-sm shadow-amber-400/50"
-                style={{ width: `${Math.max(completionPercent, 2)}%` }}
-              />
-            </div>
-
-            <div className="flex items-center justify-between text-xs text-slate-400 pt-0.5">
-              <span>
-                <strong className="text-amber-300 font-semibold">{watchedCount}</strong> von{" "}
-                {totalWinners} Filmen gesehen
+          <div className="flex items-center justify-between text-xs text-muted-foreground pt-0.5">
+            <span>
+              <strong className="text-foreground font-semibold">{watchedCount}</strong> von{" "}
+              {totalWinners} Filmen gesehen
+            </span>
+            {watchlistCount > 0 && (
+              <span className="text-[11px] text-muted-foreground">
+                <span className="text-primary-text font-semibold">{watchlistCount}</span> auf Liste
               </span>
-              {watchlistCount > 0 && (
-                <span className="text-[11px] text-slate-400">
-                  <span className="text-blue-400 font-medium">{watchlistCount}</span> auf Liste
-                </span>
-              )}
-            </div>
-
-            {totalWinners - watchedCount > 0 && (
-              <button
-                onClick={() => setStatusFilter("UNSEEN")}
-                className="w-full text-center text-[11px] font-semibold text-amber-400/90 hover:text-amber-300 hover:underline pt-1 transition"
-              >
-                Noch {totalWinners - watchedCount} ungesehene Filme anzeigen →
-              </button>
             )}
           </div>
+
+          {totalWinners - watchedCount > 0 && (
+            <button
+              type="button"
+              onClick={() => setStatusFilter("UNSEEN")}
+              className="w-full text-center text-[11px] font-semibold text-primary-text hover:underline pt-1 transition cursor-pointer"
+            >
+              Noch {totalWinners - watchedCount} ungesehene Filme anzeigen →
+            </button>
+          )}
         </div>
       </div>
 
@@ -256,21 +251,21 @@ export default function OscarsPage() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <input
               type="search"
               enterKeyHint="search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Film, Regie oder Stichwort suchen..."
-              className="w-full min-h-[44px] sm:min-h-0 pl-10 pr-10 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-500/70 transition shadow-inner"
+              className="w-full min-h-[44px] sm:min-h-0 pl-10 pr-10 py-2.5 rounded-xl bg-input border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary transition"
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
                 aria-label="Suche leeren"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-xs text-slate-400 hover:text-white"
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-xs text-muted-foreground hover:text-foreground"
               >
                 ✕
               </button>
@@ -279,45 +274,49 @@ export default function OscarsPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             {/* Status Quick Filters */}
-            <div className="flex flex-wrap sm:flex-nowrap items-center bg-slate-900 border border-slate-800 rounded-xl p-1 text-xs max-w-full">
+            <div className="flex flex-wrap sm:flex-nowrap items-center bg-muted border border-border rounded-xl p-1 text-xs max-w-full">
               <button
+                type="button"
                 onClick={() => setStatusFilter("ALL")}
-                className={`px-3 py-1.5 rounded-lg font-medium transition ${
+                className={`px-3 py-1.5 rounded-lg font-medium transition cursor-pointer ${
                   statusFilter === "ALL"
-                    ? "bg-amber-500 text-black font-bold shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-card text-foreground font-bold shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
                 Alle
               </button>
               <button
+                type="button"
                 onClick={() => setStatusFilter("WATCHED")}
-                className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition ${
+                className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition cursor-pointer ${
                   statusFilter === "WATCHED"
-                    ? "bg-emerald-500 text-black font-bold shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-card text-emerald-600 dark:text-emerald-400 font-bold shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
                 <Check className="w-3.5 h-3.5" />
                 Gesehen ({watchedCount})
               </button>
               <button
+                type="button"
                 onClick={() => setStatusFilter("UNSEEN")}
-                className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition ${
+                className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition cursor-pointer ${
                   statusFilter === "UNSEEN"
-                    ? "bg-amber-500 text-black font-bold shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-card text-primary-text font-bold shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
                 <Eye className="w-3.5 h-3.5" />
                 Ungesehen ({totalWinners - watchedCount})
               </button>
               <button
+                type="button"
                 onClick={() => setStatusFilter("WATCHLIST")}
-                className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition ${
+                className={`px-3 py-1.5 rounded-lg font-medium flex items-center gap-1 transition cursor-pointer ${
                   statusFilter === "WATCHLIST"
-                    ? "bg-blue-500 text-white font-bold shadow-sm"
-                    : "text-slate-400 hover:text-white"
+                    ? "bg-card text-sky-600 dark:text-sky-400 font-bold shadow-sm border border-border"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
                 }`}
               >
                 <Bookmark className="w-3.5 h-3.5" />
@@ -331,14 +330,14 @@ export default function OscarsPage() {
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
                 aria-label="Sortieren nach"
-                className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 focus:outline-none focus:border-amber-500/70 cursor-pointer transition appearance-none pr-8"
+                className="bg-input border border-border rounded-xl px-3 py-2 text-xs font-semibold text-foreground focus:outline-none focus:border-primary cursor-pointer transition appearance-none pr-8"
               >
                 <option value="ceremony_desc">Neueste Oscars</option>
                 <option value="ceremony_asc">Älteste Oscars</option>
                 <option value="oscars_desc">Meiste Oscars</option>
                 <option value="rating_desc">Beste TMDB-Bewertung</option>
               </select>
-              <ArrowUpDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
+              <ArrowUpDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
             </div>
           </div>
         </div>
@@ -350,17 +349,18 @@ export default function OscarsPage() {
             return (
               <button
                 key={tab.key}
+                type="button"
                 onClick={() => setSelectedDecade(tab.key)}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 ${
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition flex items-center gap-1.5 cursor-pointer ${
                   isActive
-                    ? "bg-amber-500 text-black shadow-lg shadow-amber-500/20"
-                    : "bg-slate-900/90 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-card border border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <span>{tab.label}</span>
                 <span
                   className={`text-[10px] px-1.5 py-0.5 rounded-md ${
-                    isActive ? "bg-black/20 text-black" : "bg-slate-800 text-slate-400"
+                    isActive ? "bg-black/15 text-primary-foreground" : "bg-muted text-muted-foreground"
                   }`}
                 >
                   {tab.count}
@@ -371,8 +371,9 @@ export default function OscarsPage() {
 
           {hasActiveFilters && (
             <button
+              type="button"
               onClick={resetFilters}
-              className="px-3 py-2 rounded-xl text-xs font-medium text-slate-400 hover:text-white bg-slate-900/60 border border-dashed border-slate-700 flex items-center gap-1 shrink-0 ml-auto transition"
+              className="px-3 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground bg-card border border-dashed border-border flex items-center gap-1 shrink-0 ml-auto transition cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
               Filter zurücksetzen
@@ -383,28 +384,29 @@ export default function OscarsPage() {
       </MobileFilterBar>
 
       {/* Grid Results Header */}
-      <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+      <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
         <span>
-          Zeige <strong className="text-white font-semibold">{filteredWinners.length}</strong> von{" "}
+          Zeige <strong className="text-foreground font-semibold">{filteredWinners.length}</strong> von{" "}
           {totalWinners} Oscar-Gewinnern
         </span>
       </div>
 
       {/* Empty State */}
       {filteredWinners.length === 0 ? (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-4">
-          <div className="w-14 h-14 mx-auto rounded-full bg-slate-800/80 flex items-center justify-center text-slate-500">
-            <Trophy className="w-7 h-7 text-slate-500" />
+        <div className="p-12 text-center rounded-2xl bg-card border border-border space-y-4">
+          <div className="w-14 h-14 mx-auto rounded-full bg-muted flex items-center justify-center text-muted-foreground">
+            <Trophy className="w-7 h-7" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-base font-bold text-white">Keine Oscar-Gewinner gefunden</h3>
-            <p className="text-xs text-slate-400 max-w-sm mx-auto">
+            <h3 className="text-base font-bold text-foreground">Keine Oscar-Gewinner gefunden</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
               Für deine aktuelle Filter- und Suchkombination gibt es keine Treffer.
             </p>
           </div>
           <button
+            type="button"
             onClick={resetFilters}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold hover:bg-primary-hover transition cursor-pointer"
           >
             <RotateCcw className="w-3.5 h-3.5" />
             Alle Filter zurücksetzen
@@ -422,31 +424,31 @@ export default function OscarsPage() {
               <div key={item.id} className="flex flex-col group">
                 <MediaCard item={item} priority={idx < 5} />
                 {item.oscarInfo && (
-                  <div className="mt-2 p-2.5 rounded-xl bg-slate-900/70 border border-slate-800/80 text-[11px] space-y-1.5 hover:border-amber-500/30 transition">
+                  <div className="mt-2 p-2.5 rounded-xl bg-card border border-border text-[11px] space-y-1.5 hover:border-primary/40 transition">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1 text-amber-400 font-bold">
-                        <Trophy className="w-3 h-3 text-amber-400 shrink-0" />
+                      <div className="flex items-center gap-1 text-primary-text font-bold">
+                        <Trophy className="w-3 h-3 shrink-0" />
                         <span>Oscar {item.oscarInfo.ceremonyYear}</span>
                       </div>
-                      <span className="text-amber-300 font-semibold text-[10px] bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                      <span className="text-primary-text font-semibold text-[10px] bg-primary-soft px-1.5 py-0.5 rounded border border-primary/20">
                         {item.oscarInfo.oscarsWon} Oscars
                       </span>
                     </div>
 
-                    <p className="text-slate-300 text-[11px] line-clamp-1 font-medium">
+                    <p className="text-foreground/85 text-[11px] line-clamp-1 font-medium">
                       {item.oscarInfo.categoryHighlight}
                     </p>
 
-                    <div className="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-800/60">
+                    <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5 border-t border-border">
                       <span className="line-clamp-1">Regie: {item.oscarInfo.director}</span>
                       {isWatched ? (
-                        <span className="text-emerald-400 font-bold flex items-center gap-0.5 shrink-0 ml-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-0.5 shrink-0 ml-1">
+                          <CheckCircle2 className="w-3 h-3" />
                           {userStatus?.rating ? `${userStatus.rating}★` : "Gesehen"}
                         </span>
                       ) : isWatchlist ? (
-                        <span className="text-blue-400 font-medium flex items-center gap-0.5 shrink-0 ml-1">
-                          <Bookmark className="w-3 h-3 text-blue-400" />
+                        <span className="text-sky-600 dark:text-sky-400 font-medium flex items-center gap-0.5 shrink-0 ml-1">
+                          <Bookmark className="w-3 h-3" />
                           Merkliste
                         </span>
                       ) : null}

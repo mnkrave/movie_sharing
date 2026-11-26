@@ -35,5 +35,9 @@ export default async function PersonPage({ params }: PageProps) {
   const person = await getPersonDetails(personId);
   if (!person) notFound();
 
-  return <PersonProfileClient initialPerson={person} personId={personId} />;
+  return (
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
+      <PersonProfileClient initialPerson={person} personId={personId} />
+    </div>
+  );
 }
