@@ -346,46 +346,45 @@ export function HomeHero({
   const nextSlideIdx = (activeSlideIdx + 1) % slides.length;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-4 sm:pt-6">
-      <section
-        aria-roledescription="carousel"
-        aria-label="Empfohlene Highlights"
-        onMouseEnter={() => setIsPaused(true)}
-        onMouseLeave={() => setIsPaused(false)}
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-        className="relative min-h-[380px] sm:min-h-[470px] w-full rounded-2xl sm:rounded-3xl overflow-hidden bg-[#0a0e17] border border-border shadow-lg group select-none"
-      >
-        {/* Background Backdrop Images */}
-        {slides.map((s, idx) => {
-          const isActive = idx === activeSlideIdx;
-          const shouldMount = isActive || idx === prevSlideIdx || idx === nextSlideIdx;
-          if (!s.item.backdropPath || !shouldMount) return null;
-          return (
-            <div
-              key={`${s.item.mediaType}_${s.item.id}_bg`}
-              className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-                isActive ? "opacity-80 sm:opacity-85 z-0" : "opacity-0 pointer-events-none"
-              }`}
-            >
-              <Image
-                src={`https://image.tmdb.org/t/p/w1280${s.item.backdropPath}`}
-                alt={s.item.title}
-                fill
-                priority={isActive && idx === 0}
-                sizes="(max-width: 1280px) 100vw, 1280px"
-                className="object-cover object-center sm:object-top"
-              />
-            </div>
-          );
-        })}
+    <section
+      aria-roledescription="carousel"
+      aria-label="Empfohlene Highlights"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      className="relative min-h-[430px] sm:min-h-[540px] w-full overflow-hidden bg-[#0a0e17] border-b border-border group select-none"
+    >
+      {/* Background Backdrop Images */}
+      {slides.map((s, idx) => {
+        const isActive = idx === activeSlideIdx;
+        const shouldMount = isActive || idx === prevSlideIdx || idx === nextSlideIdx;
+        if (!s.item.backdropPath || !shouldMount) return null;
+        return (
+          <div
+            key={`${s.item.mediaType}_${s.item.id}_bg`}
+            className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
+              isActive ? "opacity-80 sm:opacity-90 z-0" : "opacity-0 pointer-events-none"
+            }`}
+          >
+            <Image
+              src={`https://image.tmdb.org/t/p/w1280${s.item.backdropPath}`}
+              alt={s.item.title}
+              fill
+              priority={isActive && idx === 0}
+              sizes="100vw"
+              className="object-cover object-center sm:object-top"
+            />
+          </div>
+        );
+      })}
 
-        {/* Cinematic Dark Scrims (stay dark in both light and dark modes over photo backdrop) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#070a11] via-[#070a11]/60 to-[#070a11]/15 z-10" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#070a11]/95 via-[#070a11]/75 md:via-[#070a11]/45 to-transparent z-10" />
+      {/* Cinematic Dark Scrims (stay dark in both light and dark modes over photo backdrop) */}
+      <div className="absolute inset-0 bg-gradient-to-t from-[#070a11] via-[#070a11]/60 to-[#070a11]/15 z-10" />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#070a11]/95 via-[#070a11]/75 md:via-[#070a11]/45 to-transparent z-10" />
 
-        {/* Main Content Area */}
-        <div className="relative z-20 px-5 sm:px-10 lg:px-14 h-full min-h-[380px] sm:min-h-[470px] flex items-center pt-8 pb-16 sm:py-12">
+      {/* Main Content Area */}
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[430px] sm:min-h-[540px] flex items-center pt-10 pb-16 sm:py-14">
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center w-full">
             {/* Left Column: Meta, Title, Overview & 2 Actions */}
             <div className="md:col-span-8 space-y-3.5 animate-in fade-in duration-300">
@@ -486,18 +485,18 @@ export function HomeHero({
               type="button"
               onClick={handlePrev}
               aria-label="Vorheriger Titel"
-              className="hidden sm:flex absolute left-3 top-1/2 -translate-y-1/2 z-30 p-2 rounded-xl bg-black/45 hover:bg-black/75 border border-white/10 text-white/75 hover:text-white transition backdrop-blur-md cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/45 hover:bg-black/75 border border-white/10 text-white/75 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
             >
-              <ChevronLeft className="w-4 h-4" />
+              <ChevronLeft className="w-5 h-5" />
             </button>
 
             <button
               type="button"
               onClick={handleNext}
               aria-label="Nächster Titel"
-              className="hidden sm:flex absolute right-3 top-1/2 -translate-y-1/2 z-30 p-2 rounded-xl bg-black/45 hover:bg-black/75 border border-white/10 text-white/75 hover:text-white transition backdrop-blur-md cursor-pointer opacity-0 group-hover:opacity-100 focus-visible:opacity-100"
+              className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/45 hover:bg-black/75 border border-white/10 text-white/75 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
             >
-              <ChevronRight className="w-4 h-4" />
+              <ChevronRight className="w-5 h-5" />
             </button>
           </>
         )}
@@ -560,7 +559,6 @@ export function HomeHero({
             </button>
           </div>
         )}
-      </section>
-    </div>
+    </section>
   );
 }
