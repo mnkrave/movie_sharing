@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
+import { Video } from "lucide-react";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { MediaProvider } from "@/components/MediaContext";
@@ -9,11 +11,15 @@ export const viewport: Viewport = {
   initialScale: 1,
   viewportFit: "cover",
   interactiveWidget: "resizes-content",
-  themeColor: "#07090e",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#070a11" },
+  ],
 };
 
 import { MobileBottomNav } from "@/components/MobileBottomNav";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { WhatsNewModal } from "@/components/WhatsNewModal";
 
 export const metadata: Metadata = {
   title: "CineCircle – Filme & Serien mit Freunden teilen & VPN-Streaming",
@@ -44,29 +50,44 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="de" className="dark">
-      <body className="bg-[#07090e] text-slate-100 min-h-dvh flex flex-col antialiased selection:bg-amber-500 selection:text-black pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
+    <html lang="de" suppressHydrationWarning>
+      <head>
+        <meta name="color-scheme" content="light dark" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var s=localStorage.getItem("color-scheme");if(s==="light"||s==="dark"){document.querySelector('meta[name="color-scheme"]').setAttribute("content",s)}}catch(e){}`,
+          }}
+        />
+      </head>
+      <body className="bg-background text-foreground min-h-dvh flex flex-col antialiased selection:bg-primary selection:text-primary-foreground pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-0">
         <Providers>
           <MediaProvider>
             <Navbar />
             <ServiceWorkerRegister />
+            <WhatsNewModal />
             <main className="flex-1">{children}</main>
-            <footer className="border-t border-slate-900 bg-[#05070a] py-8 md:py-10 mt-10 md:mt-20 text-center text-xs text-slate-500">
-              <div className="max-w-7xl mx-auto px-4 space-y-2">
-                <p className="font-semibold text-slate-400">
-                  CineCircle – Entwickelt für Freunde & Film-Liebhaber
-                </p>
-                <p>
-                  Filmdaten & Streaming-Anbieter bereitgestellt durch{" "}
+            <footer className="border-t border-border bg-card/50 py-8 mt-12 md:mt-20">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-muted-foreground">
+                <div className="space-y-1.5">
+                  <Link href="/" className="inline-flex items-center gap-2 font-black text-sm text-foreground">
+                    <span className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center">
+                      <Video className="w-4 h-4 fill-current" aria-hidden="true" />
+                    </span>
+                    <span>CineCircle</span>
+                  </Link>
+                  <p>Entwickelt für Freunde und Film-Liebhaber.</p>
+                </div>
+                <p className="sm:text-right max-w-md">
+                  Filmdaten & Streaming-Anbieter von{" "}
                   <a
                     href="https://www.themoviedb.org/"
                     target="_blank"
                     rel="noreferrer"
-                    className="text-amber-400 hover:underline"
+                    className="text-primary-text font-medium hover:underline"
                   >
                     TMDB
                   </a>{" "}
-                  & JustWatch. Dieses Produkt nutzt die TMDB API, ist jedoch nicht von TMDB zertifiziert.
+                  & JustWatch · Nicht von TMDB zertifiziert.
                 </p>
               </div>
             </footer>

@@ -29,6 +29,7 @@ export interface AppUser {
   invitedByUserId?: string | null;
   subscriptions: string[];
   watchlistAlertsEnabled?: boolean;
+  lastSeenReleaseId?: string | null;
   friendGroups?: { id: string; name: string; emoji: string; memberNames: string[] }[];
   createdAt: string;
 }
@@ -586,6 +587,7 @@ async function ensureInviteAndModerationSchema() {
     await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "bannedAt" TIMESTAMP(3)`;
     await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "banReason" TEXT`;
     await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "invitedByUserId" TEXT`;
+    await prisma.$executeRaw`ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "lastSeenReleaseId" TEXT`;
     await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "invitedByUserId" TEXT`;
     await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "invitedByName" TEXT`;
     await prisma.$executeRaw`ALTER TABLE "WhitelistedEmail" ADD COLUMN IF NOT EXISTS "invitedByEmail" TEXT`;
@@ -639,6 +641,7 @@ function mapPrismaUser(u: any): AppUser {
     invitedByUserId: u.invitedByUserId ?? null,
     subscriptions: parseSubscriptions(u.subscriptions),
     watchlistAlertsEnabled: u.watchlistAlertsEnabled ?? true,
+    lastSeenReleaseId: u.lastSeenReleaseId ?? null,
     friendGroups: parseFriendGroups(u.friendGroups),
     createdAt: toIsoString(u.createdAt),
   };
@@ -4408,6 +4411,49 @@ export async function updateUserWatchlistAlerts(userId: string, enabled: boolean
     writeLocalDb(db);
   }
   return enabled;
+}
+
+export async function getUserReleaseStatus(
+  userId: string
+): Promise<{ lastSeenReleaseId: string | null; createdAt: string | null }> {
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    const u = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { lastSeenReleaseId: true, createdAt: true },
+    });
+    return {
+      lastSeenReleaseId: u?.lastSeenReleaseId ?? null,
+      createdAt: u?.createdAt ? toIsoString(u.createdAt) : null,
+    };
+  }
+  const db = readLocalDb();
+  const user = db.users.find((u) => u.id === userId);
+  return {
+    lastSeenReleaseId: user?.lastSeenReleaseId ?? null,
+    createdAt: user?.createdAt ?? null,
+  };
+}
+
+export async function updateUserLastSeenReleaseId(
+  userId: string,
+  releaseId: string
+): Promise<string> {
+  if (await isPostgresAvailable()) {
+    await ensureInviteAndModerationSchema();
+    await prisma.user.update({
+      where: { id: userId },
+      data: { lastSeenReleaseId: releaseId },
+    });
+    return releaseId;
+  }
+  const db = readLocalDb();
+  const user = db.users.find((u) => u.id === userId);
+  if (user) {
+    user.lastSeenReleaseId = releaseId;
+    writeLocalDb(db);
+  }
+  return releaseId;
 }
 
 export async function getWatchlistAlertContext(): Promise<{

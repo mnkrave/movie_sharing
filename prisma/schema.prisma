@@ -21,6 +21,7 @@ model User {
   invitedByUserId         String?
   subscriptions           String?          // JSON array of streaming provider names (e.g. ["Netflix", "Amazon Prime Video", "Disney Plus"])
   watchlistAlertsEnabled  Boolean          @default(true)
+  lastSeenReleaseId       String?
   friendGroups            String?          // JSON array of friend groups (e.g. [{ id, name, emoji, memberNames }])
   mediaStatuses   MediaStatus[]
   recommendations Recommendation[]
