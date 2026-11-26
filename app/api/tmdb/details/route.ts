@@ -12,7 +12,9 @@ export async function GET(req: Request) {
 
   try {
     const details = await getMediaDetails(id, type);
-    return NextResponse.json(details);
+    return NextResponse.json(details, {
+      headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+    });
   } catch (error) {
     console.error("Error fetching media details:", error);
     return NextResponse.json({ error: "Failed to load media details" }, { status: 500 });

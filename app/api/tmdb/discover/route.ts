@@ -64,7 +64,9 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const filters = sanitizeDiscoverFilters(Object.fromEntries(searchParams.entries()));
     const data = await discoverMedia(filters);
-    return NextResponse.json(data);
+    return NextResponse.json(data, {
+      headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=86400" },
+    });
   } catch (error) {
     console.error("Discover API error:", error);
     return NextResponse.json(
