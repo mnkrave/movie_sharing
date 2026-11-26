@@ -12,7 +12,10 @@ export async function GET(req: Request) {
 
   if (type === "person") {
     const results = await searchPersons(q);
-    return NextResponse.json({ results, persons: results });
+    return NextResponse.json(
+      { results, persons: results },
+      { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600" } }
+    );
   }
 
   const [mediaResults, personResults] = await Promise.all([
@@ -27,8 +30,11 @@ export async function GET(req: Request) {
     })
     .slice(0, 4);
 
-  return NextResponse.json({
-    results: mediaResults,
-    persons: relevantPersons,
-  });
+  return NextResponse.json(
+    {
+      results: mediaResults,
+      persons: relevantPersons,
+    },
+    { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=3600" } }
+  );
 }

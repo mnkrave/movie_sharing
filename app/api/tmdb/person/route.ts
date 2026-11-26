@@ -19,5 +19,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "Person not found" }, { status: 404 });
   }
 
-  return NextResponse.json(person);
+  return NextResponse.json(person, {
+    headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" },
+  });
 }
