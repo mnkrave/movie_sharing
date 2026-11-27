@@ -193,7 +193,7 @@ export function Navbar() {
                 aria-expanded={discoverDropdownOpen}
                 aria-controls="discover-menu"
                 onClick={() => setDiscoverDropdownOpen((prev) => !prev)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition cursor-pointer ${
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
                   isDiscoverActive
                     ? "bg-primary-soft text-primary-text border border-primary/30"
                     : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
@@ -256,7 +256,7 @@ export function Navbar() {
             <Link
               href="/my-list"
               aria-current={isWatchlistActive ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
                 isWatchlistActive
                   ? "bg-primary-soft text-primary-text border border-primary/30"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
@@ -275,7 +275,7 @@ export function Navbar() {
             <Link
               href="/recommendations"
               aria-current={isRecsActive ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
                 isRecsActive
                   ? "bg-primary-soft text-primary-text border border-primary/30"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
@@ -289,7 +289,7 @@ export function Navbar() {
             <Link
               href="/friends"
               aria-current={isFriendsActive ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
                 isFriendsActive
                   ? "bg-primary-soft text-primary-text border border-primary/30"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
@@ -303,32 +303,6 @@ export function Navbar() {
                 </span>
               )}
             </Link>
-
-            {/* Schnell-Bewerten (visible while signed-in user has < 250 watched items) */}
-            {showQuickRateNav && (
-              <Link
-                href="/quick-rate"
-                aria-current={pathname === "/quick-rate" ? "page" : undefined}
-                title="Schnell Filme & Serien bewerten (verschwindet ab 250 gesehenen Titeln)"
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
-                  pathname === "/quick-rate"
-                    ? "bg-primary text-primary-foreground shadow-sm"
-                    : "bg-primary-soft text-primary-text border border-primary/30 hover:border-primary/50"
-                }`}
-              >
-                <Zap className="w-3.5 h-3.5" aria-hidden="true" />
-                <span>Schnell-Bewerten</span>
-                <span
-                  className={`hidden xl:inline-block text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-none ${
-                    pathname === "/quick-rate"
-                      ? "bg-black/15 text-primary-foreground"
-                      : "bg-card/80 text-primary-text"
-                  }`}
-                >
-                  {myWatchedCount}/250
-                </span>
-              </Link>
-            )}
           </nav>
         </div>
 
