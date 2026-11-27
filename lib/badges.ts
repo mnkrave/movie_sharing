@@ -247,12 +247,21 @@ export const CORE_BADGE_DEFINITIONS: BadgeDefinition[] = [
   },
 ];
 
+const PLATINUM_COLLECTION_IDS = new Set([
+  "star-wars",
+  "fast-and-furious",
+  "marvel-mcu",
+  "james-bond",
+  "steven-spielberg",
+  "christopher-nolan",
+]);
+
 export const COLLECTION_BADGE_DEFINITIONS: BadgeDefinition[] = COLLECTIONS_DATA.map((col) => ({
   key: `collection-${col.id}`,
   title: col.name,
   description: `Alle ${col.movies.length} Titel dieser Kollektion gesehen`,
   category: "collections",
-  tier: col.movies.length >= 10 ? "platinum" : "gold",
+  tier: PLATINUM_COLLECTION_IDS.has(col.id) ? "platinum" : "gold",
   icon: "layers",
   target: col.movies.length,
   unit: "Teile",
