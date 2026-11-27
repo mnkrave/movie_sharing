@@ -1,185 +1,68 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useMemo } from "react";
 import { useSession } from "next-auth/react";
-import { useMedia } from "@/components/MediaContext";
-import {
-  Bookmark,
-  Check,
-  Star,
-  Film,
-  Tv,
-  Plus,
-  LogIn,
-  Search,
-  Filter,
-  X,
-  Trash2,
-  Sparkles,
-  ArrowUpDown,
-  WifiOff,
-} from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
+import { Bookmark, LogIn, Trophy, WifiOff } from "lucide-react";
+import { useMedia } from "@/components/MediaContext";
 import { PullToRefresh } from "@/components/PullToRefresh";
-import { MobileFilterBar } from "@/components/MobileFilterBar";
-import { formatWatchedSeasons } from "@/lib/seasons";
+import { ProfileWatchlistPanel } from "@/components/ProfileWatchlistPanel";
+import { isCurrentUserMatch } from "@/lib/auth-match";
+import { useBatchMediaMeta } from "@/lib/useBatchMediaMeta";
 
 export default function MyListPage() {
   const { data: session } = useSession();
-  const {
-    communityData,
-    openMediaModal,
-    updateMediaStatus,
-    openSearch,
-    openRatingModal,
-    refreshCommunity,
-    showToast,
-    isOfflineSnapshot,
-  } = useMedia();
+  const { communityData, refreshCommunity, showToast, isOfflineSnapshot } = useMedia();
 
-  const [activeTab, setActiveTab] = useState<"WATCHLIST" | "WATCHING" | "WATCHED">("WATCHLIST");
-  const [mediaTypeFilter, setMediaTypeFilter] = useState<"ALL" | "movie" | "tv">("ALL");
-  const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<"date_desc" | "rating_desc" | "year_desc" | "title_asc">("date_desc");
-
-  // Map of genres per item: key `${mediaType}_${tmdbId}` => string[]
-  const [genreMap, setGenreMap] = useState<Record<string, string[]>>({});
-
-  const myUserId = (session?.user as any)?.id || "user_lukas";
-  const myName = session?.user?.name;
+  const myUserId = (session?.user as any)?.id as string | undefined;
 
   const myStatuses = useMemo(() => {
-    return communityData.mediaStatuses.filter(
-      (m) => m.userId === myUserId || (myName && m.userName === myName)
+    if (!session?.user) return [];
+    return communityData.mediaStatuses.filter((m) =>
+      isCurrentUserMatch(
+        { userId: myUserId, name: session.user?.name, email: session.user?.email },
+        { userId: m.userId, userName: m.userName }
+      )
     );
-  }, [communityData.mediaStatuses, myUserId, myName]);
+  }, [communityData.mediaStatuses, session?.user, myUserId]);
 
-  // Items for the current tab
-  const allMyItems = useMemo(() => {
-    return myStatuses.filter(
-      (m) => m.status === activeTab && (activeTab !== "WATCHING" || m.mediaType === "tv")
-    );
-  }, [myStatuses, activeTab]);
+  const watchlistItems = useMemo(
+    () => myStatuses.filter((m) => m.status === "WATCHLIST"),
+    [myStatuses]
+  );
 
-  const { watchlistTotal, watchingTotal, watchedTotal } = useMemo(() => {
-    let watchlist = 0;
-    let watching = 0;
-    let watched = 0;
-    for (const m of myStatuses) {
-      if (m.status === "WATCHLIST") watchlist++;
-      else if (m.status === "WATCHING" && m.mediaType === "tv") watching++;
-      else if (m.status === "WATCHED") watched++;
-    }
-    return { watchlistTotal: watchlist, watchingTotal: watching, watchedTotal: watched };
-  }, [myStatuses]);
+  const watchingItems = useMemo(
+    () => myStatuses.filter((m) => m.status === "WATCHING" && m.mediaType === "tv"),
+    [myStatuses]
+  );
 
-  // Fetch genres for items in the user's list
-  useEffect(() => {
-    if (allMyItems.length === 0) return;
+  const watchedCount = useMemo(
+    () => myStatuses.filter((m) => m.status === "WATCHED").length,
+    [myStatuses]
+  );
 
-    const itemsToFetch = allMyItems
-      .filter((m) => !genreMap[`${m.mediaType}_${m.tmdbId}`])
-      .map((m) => ({ id: m.tmdbId, type: m.mediaType }));
+  const metaInputItems = useMemo(
+    () => [...watchlistItems, ...watchingItems],
+    [watchlistItems, watchingItems]
+  );
 
-    if (itemsToFetch.length === 0) return;
-
-    fetch("/api/tmdb/batch-genres", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ items: itemsToFetch }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.genres) {
-          setGenreMap((prev) => ({ ...prev, ...data.genres }));
-        }
-      })
-      .catch((err) => console.error("Failed to fetch batch genres:", err));
-  }, [allMyItems, genreMap]);
-
-  // Counts for media types
-  const movieCount = allMyItems.filter((m) => m.mediaType === "movie").length;
-  const tvCount = allMyItems.filter((m) => m.mediaType === "tv").length;
-
-  // Extract all unique genres present in the current tab
-  const availableGenres = useMemo(() => {
-    const counts: Record<string, number> = {};
-    allMyItems.forEach((item) => {
-      const genres = genreMap[`${item.mediaType}_${item.tmdbId}`] || [];
-      genres.forEach((g) => {
-        counts[g] = (counts[g] || 0) + 1;
-      });
-    });
-
-    return Object.entries(counts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, count]) => ({ name, count }));
-  }, [allMyItems, genreMap]);
-
-  // Filter and sort items
-  const filteredItems = useMemo(() => {
-    let list = allMyItems.filter((item) => {
-      // 1. Media Type Filter
-      if (mediaTypeFilter !== "ALL" && item.mediaType !== mediaTypeFilter) {
-        return false;
-      }
-
-      // 2. Search Query Filter
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        if (!item.title.toLowerCase().includes(q)) {
-          return false;
-        }
-      }
-
-      // 3. Category / Genre Filter
-      if (selectedCategory !== "ALL") {
-        const genres = genreMap[`${item.mediaType}_${item.tmdbId}`] || [];
-        if (!genres.includes(selectedCategory)) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-
-    // Sorting
-    list.sort((a, b) => {
-      if (sortBy === "rating_desc") {
-        return (b.rating || 0) - (a.rating || 0);
-      }
-      if (sortBy === "year_desc") {
-        return (parseInt(b.releaseYear || "0", 10) || 0) - (parseInt(a.releaseYear || "0", 10) || 0);
-      }
-      if (sortBy === "title_asc") {
-        return a.title.localeCompare(b.title);
-      }
-      // Default: date_desc (most recently updated first)
-      const dateA = new Date(a.updatedAt || 0).getTime();
-      const dateB = new Date(b.updatedAt || 0).getTime();
-      return dateB - dateA;
-    });
-
-    return list;
-  }, [allMyItems, mediaTypeFilter, searchQuery, selectedCategory, sortBy, genreMap]);
+  const { metaMap } = useBatchMediaMeta(metaInputItems);
 
   if (!session) {
     return (
       <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
-        <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto">
-          <Bookmark className="w-8 h-8" />
+        <div className="w-16 h-16 rounded-2xl bg-primary-soft border border-primary/30 text-primary-text flex items-center justify-center mx-auto">
+          <Bookmark className="w-8 h-8" aria-hidden="true" />
         </div>
-        <h2 className="text-2xl font-black text-white">Melde dich an</h2>
-        <p className="text-sm text-slate-400">
-          Um deine persönliche Watchlist und deine bewerteten Filme zu speichern, melde dich kurz an.
+        <h1 className="text-2xl font-black text-foreground">Melde dich an</h1>
+        <p className="text-sm text-muted-foreground">
+          Um deine persönliche Watchlist und deine vorgemerkten Filme zu sehen, melde dich kurz an.
         </p>
         <Link
           href="/login"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm shadow-lg shadow-amber-500/20"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-sm shadow-sm transition"
         >
-          <LogIn className="w-4 h-4" />
+          <LogIn className="w-4 h-4" aria-hidden="true" />
           <span>Jetzt einloggen</span>
         </Link>
       </div>
@@ -189,537 +72,50 @@ export default function MyListPage() {
   const handlePullRefresh = async () => {
     try {
       await refreshCommunity();
-      showToast("Liste aktualisiert!", { type: "success" });
+      showToast("Watchlist aktualisiert!", { type: "success" });
     } catch {
-      showToast("Konnte Liste nicht aktualisieren.", { type: "error" });
+      showToast("Konnte Watchlist nicht aktualisieren.", { type: "error" });
     }
   };
 
-  const myListActiveFilterCount =
-    (mediaTypeFilter !== "ALL" ? 1 : 0) +
-    (selectedCategory !== "ALL" ? 1 : 0) +
-    (searchQuery.trim() ? 1 : 0) +
-    (sortBy !== "date_desc" ? 1 : 0);
-
-  const myListFilterSummary = [
-    mediaTypeFilter === "movie" ? "Filme" : mediaTypeFilter === "tv" ? "Serien" : "Suche & Filter",
-    selectedCategory !== "ALL" ? selectedCategory : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
-
   return (
-    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
     <PullToRefresh onRefresh={handlePullRefresh}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-10 space-y-6 md:space-y-8">
-      {isOfflineSnapshot && (
-        <div className="p-3.5 rounded-2xl bg-amber-500/15 border border-amber-500/35 text-amber-200 text-xs font-semibold flex items-center gap-2.5">
-          <WifiOff className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <span>Offline-Ansicht: Zeigt deinen zuletzt gespeicherten Stand deiner Liste.</span>
-        </div>
-      )}
-
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-5 sm:p-8 rounded-3xl bg-slate-900/60 border border-slate-800 shadow-xl">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight">
-            Meine Listen
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-400">
-            Behalte den Überblick über alles, was du noch sehen willst oder bereits gesehen hast.
-          </p>
-        </div>
-
-        <button
-          onClick={openSearch}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow-lg shadow-amber-500/20"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Titel hinzufügen</span>
-        </button>
-      </div>
-
-      {/* Main Tabs (Watchlist vs Aktuell am Schauen [Serien] vs Bereits gesehen) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => {
-              setActiveTab("WATCHLIST");
-              setSelectedCategory("ALL");
-            }}
-            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              activeTab === "WATCHLIST"
-                ? "bg-sky-500 text-black shadow-lg shadow-sky-500/20"
-                : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
-            }`}
-          >
-            <Bookmark className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">Watchlist ({watchlistTotal})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("WATCHING");
-              setSelectedCategory("ALL");
-              setMediaTypeFilter("ALL");
-            }}
-            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              activeTab === "WATCHING"
-                ? "bg-cyan-400 text-black shadow-lg shadow-cyan-500/20"
-                : "bg-slate-900 border border-slate-800 text-cyan-300 hover:text-white"
-            }`}
-          >
-            <Tv className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">Schaue ich ({watchingTotal})</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setActiveTab("WATCHED");
-              setSelectedCategory("ALL");
-            }}
-            className={`flex-1 sm:flex-initial justify-center flex items-center gap-2 px-3 sm:px-5 py-2.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-              activeTab === "WATCHED"
-                ? "bg-emerald-500 text-black shadow-lg shadow-emerald-500/20"
-                : "bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
-            }`}
-          >
-            <Check className="w-4 h-4 flex-shrink-0" />
-            <span className="truncate">Bereits gesehen ({watchedTotal})</span>
-          </button>
-        </div>
-
-        {/* Media Type Switcher (Alle / Filme / Serien - hidden on WATCHING since it's TV only) */}
-        {activeTab !== "WATCHING" && (
-          <div className="flex items-center gap-1 bg-slate-900/90 p-1 rounded-xl border border-slate-800 overflow-x-auto scrollbar-none max-w-full w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={() => setMediaTypeFilter("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                mediaTypeFilter === "ALL"
-                  ? "bg-amber-500 text-black font-bold shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Alle ({allMyItems.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setMediaTypeFilter("movie")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                mediaTypeFilter === "movie"
-                  ? "bg-amber-500 text-black font-bold shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Film className="w-3.5 h-3.5" />
-              <span>Filme ({movieCount})</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setMediaTypeFilter("tv")}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${
-                mediaTypeFilter === "tv"
-                  ? "bg-amber-500 text-black font-bold shadow-sm"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              <Tv className="w-3.5 h-3.5" />
-              <span>Serien ({tvCount})</span>
-            </button>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-6">
+        {isOfflineSnapshot && (
+          <div className="p-3.5 rounded-2xl bg-primary-soft border border-primary/30 text-foreground text-xs font-semibold flex items-center gap-2.5">
+            <WifiOff className="w-4 h-4 text-primary-text shrink-0" aria-hidden="true" />
+            <span>Offline-Ansicht: Zeigt deinen zuletzt gespeicherten Stand deiner Watchlist.</span>
           </div>
         )}
-      </div>
 
-      {/* Filter and Search Bar (collapsible on mobile, always expanded on desktop) */}
-      <MobileFilterBar
-        summary={myListFilterSummary}
-        activeCount={myListActiveFilterCount}
-        resultLabel={`${filteredItems.length} Titel`}
-        onReset={() => {
-          setMediaTypeFilter("ALL");
-          setSelectedCategory("ALL");
-          setSearchQuery("");
-          setSortBy("date_desc");
-        }}
-      >
-      <div className="space-y-4">
-        {/* Search Input & Sort Selector */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="search"
-              enterKeyHint="search"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="In deiner Liste suchen..."
-              className="w-full min-h-[44px] sm:min-h-0 bg-slate-900 border border-slate-800 focus:border-amber-400 rounded-xl pl-9 pr-10 py-2 text-xs text-white placeholder-slate-500 focus:outline-none transition"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery("")}
-                aria-label="Suchfeld leeren"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 min-w-[36px] min-h-[36px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-500 hover:text-white"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            )}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-text">
+              Persönliche Merkliste
+            </p>
+            <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
+              Meine Watchlist
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              {watchlistItems.length} vorgemerkt · {watchingItems.length} Serien aktuell am Schauen
+            </p>
           </div>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <ArrowUpDown className="w-3.5 h-3.5 text-slate-400" />
-            <span className="text-xs text-slate-400">Sortierung:</span>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as any)}
-              className="bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-amber-400"
-            >
-              <option value="date_desc">Zuletzt aktualisiert</option>
-              {activeTab === "WATCHED" && <option value="rating_desc">Höchste Bewertung</option>}
-              <option value="year_desc">Erscheinungsjahr (Neu ➔ Alt)</option>
-              <option value="title_asc">Titel (A-Z)</option>
-            </select>
-          </div>
+          <Link
+            href="/profile?tab=hall-of-fame"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-card hover:bg-muted border border-border text-xs font-semibold text-foreground transition self-start sm:self-auto shadow-xs"
+          >
+            <Trophy className="w-3.5 h-3.5 text-primary-text" aria-hidden="true" />
+            <span>Gesehene Titel ({watchedCount})</span>
+          </Link>
         </div>
 
-        {/* Category & Genre Pills Filter */}
-        {availableGenres.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none scroll-fade-x">
-            <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 pr-2 flex-shrink-0">
-              <Filter className="w-3.5 h-3.5 text-amber-400" />
-              <span>Kategorien:</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setSelectedCategory("ALL")}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition whitespace-nowrap ${
-                selectedCategory === "ALL"
-                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                  : "bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
-              }`}
-            >
-              Alle ({allMyItems.length})
-            </button>
-
-            {availableGenres.map(({ name, count }) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => setSelectedCategory(name)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition whitespace-nowrap ${
-                  selectedCategory === name
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
-                    : "bg-slate-900/60 border border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
-                }`}
-              >
-                <span>{name}</span>
-                <span className="text-[10px] font-mono text-slate-500">({count})</span>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-      </MobileFilterBar>
-
-      {/* Grid of Saved Items */}
-      {filteredItems.length > 0 ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-          {filteredItems.map((item) => {
-            const genres = genreMap[`${item.mediaType}_${item.tmdbId}`] || [];
-
-            return (
-              <div
-                key={item.id}
-                onClick={() =>
-                  openMediaModal({
-                    id: item.tmdbId,
-                    mediaType: item.mediaType,
-                    title: item.title,
-                    posterPath: item.posterPath,
-                  })
-                }
-                className="group relative cursor-pointer flex flex-col rounded-2xl overflow-hidden bg-slate-900/60 border border-slate-800/80 hover:border-amber-500/40 transition duration-300 [@media(hover:hover)]:hover:-translate-y-1.5 shadow-md hover:shadow-2xl"
-              >
-                {/* Poster container */}
-                <div className="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-950">
-                  {item.posterPath ? (
-                    <Image
-                      src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
-                      alt={item.title}
-                      fill
-                      className="object-cover group-hover:scale-105 transition duration-500 ease-out"
-                      sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 20vw"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-slate-600">
-                      {item.mediaType === "tv" ? <Tv className="w-8 h-8 mb-2" /> : <Film className="w-8 h-8 mb-2" />}
-                      <span className="text-xs">{item.title}</span>
-                    </div>
-                  )}
-
-                  {/* Gradient overlay */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-40 transition" />
-
-                  {/* Media Type Badge */}
-                  <div className="absolute top-2.5 left-2.5 bg-black/75 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 text-[10px] font-bold uppercase tracking-wider text-slate-300">
-                    {item.mediaType === "tv" ? "Serie" : "Film"}
-                  </div>
-
-                  {/* Rating Badge if rated */}
-                  {item.rating && (
-                    <div
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openRatingModal({
-                          tmdbId: item.tmdbId,
-                          mediaType: item.mediaType,
-                          title: item.title,
-                          posterPath: item.posterPath,
-                          releaseYear: item.releaseYear,
-                          currentRating: item.rating,
-                          isWatched: item.status === "WATCHED",
-                          currentStatus: item.status,
-                          watchedSeasons: item.watchedSeasons,
-                          totalSeasons: item.totalSeasons,
-                        });
-                      }}
-                      className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md bg-black/80 backdrop-blur-md text-amber-400 font-extrabold text-xs border border-white/10 flex items-center gap-1 shadow cursor-pointer hover:bg-black"
-                      title="Bewertung oder Staffeln anpassen"
-                    >
-                      <Star className="w-3 h-3 fill-amber-400" />
-                      <span>{item.rating}/10</span>
-                    </div>
-                  )}
-
-                  {/* Partial seasons / watching progress badge for series */}
-                  {item.mediaType === "tv" &&
-                    item.watchedSeasons &&
-                    item.watchedSeasons.length > 0 &&
-                    (item.status === "WATCHING" ||
-                      (item.totalSeasons && item.watchedSeasons.length < item.totalSeasons)) && (
-                      <div
-                        className={`absolute bottom-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-md font-bold text-[10px] shadow backdrop-blur-sm ${
-                          item.status === "WATCHING"
-                            ? "bg-cyan-400/95 text-black"
-                            : "bg-purple-600/90 text-white"
-                        }`}
-                      >
-                        <span>
-                          {item.status === "WATCHING" ? "📺 " : ""}
-                          {formatWatchedSeasons(item.watchedSeasons, item.totalSeasons)}
-                        </span>
-                      </div>
-                    )}
-
-                  {/* Hover Quick Action Indicator */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition hidden [@media(hover:hover)]:flex items-center justify-center p-3 text-center">
-                    <span className="text-xs font-bold bg-amber-500 text-black px-3 py-1.5 rounded-xl shadow-lg">
-                      Streaming & Details →
-                    </span>
-                  </div>
-                </div>
-
-                {/* Details Footer */}
-                <div className="p-3 flex-1 flex flex-col justify-between space-y-2">
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-bold text-white truncate group-hover:text-amber-400 transition">
-                      {item.title}
-                    </h4>
-                    <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5">
-                      {item.releaseYear && <span>{item.releaseYear}</span>}
-                      {genres.length > 0 && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate text-slate-400">{genres.slice(0, 2).join(", ")}</span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Action Bar */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-800/80 gap-1">
-                    {activeTab === "WATCHLIST" ? (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openRatingModal({
-                            tmdbId: item.tmdbId,
-                            mediaType: item.mediaType,
-                            title: item.title,
-                            posterPath: item.posterPath,
-                            releaseYear: item.releaseYear,
-                            currentRating: item.rating,
-                            isWatched: false,
-                            currentStatus: item.status,
-                            watchedSeasons: item.watchedSeasons,
-                            totalSeasons: item.totalSeasons,
-                          });
-                        }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[11px] sm:text-[10px] font-bold transition"
-                        title="Als gesehen markieren & bewerten"
-                      >
-                        <Check className="w-3 h-3" />
-                        <span>Gesehen</span>
-                      </button>
-                    ) : activeTab === "WATCHING" ? (
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openRatingModal({
-                              tmdbId: item.tmdbId,
-                              mediaType: "tv",
-                              title: item.title,
-                              posterPath: item.posterPath,
-                              releaseYear: item.releaseYear,
-                              currentRating: item.rating,
-                              isWatched: false,
-                              currentStatus: "WATCHING",
-                              watchedSeasons: item.watchedSeasons,
-                              totalSeasons: item.totalSeasons,
-                            });
-                          }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-cyan-500/15 hover:bg-cyan-400 text-cyan-300 hover:text-black border border-cyan-500/30 text-[10px] font-bold transition"
-                          title="Staffel & Bewertung anpassen"
-                        >
-                          <Tv className="w-3 h-3" />
-                          <span>Stand</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            updateMediaStatus({
-                              tmdbId: item.tmdbId,
-                              mediaType: "tv",
-                              title: item.title,
-                              posterPath: item.posterPath,
-                              releaseYear: item.releaseYear,
-                              status: "WATCHED",
-                              rating: item.rating ?? undefined,
-                              watchedSeasons: item.totalSeasons
-                                ? Array.from({ length: item.totalSeasons }, (_, i) => i + 1)
-                                : item.watchedSeasons,
-                              totalSeasons: item.totalSeasons,
-                            });
-                          }}
-                          className="flex items-center gap-1 px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500 text-emerald-400 hover:text-black border border-emerald-500/30 text-[10px] font-bold transition"
-                          title="Serie komplett abgeschlossen"
-                        >
-                          <Check className="w-3 h-3" />
-                          <span>Fertig</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          updateMediaStatus({
-                            tmdbId: item.tmdbId,
-                            mediaType: item.mediaType,
-                            title: item.title,
-                            posterPath: item.posterPath,
-                            releaseYear: item.releaseYear,
-                            status: "WATCHLIST",
-                          });
-                        }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 sm:py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500 text-sky-400 hover:text-black border border-sky-500/30 text-[11px] sm:text-[10px] font-bold transition"
-                        title="Zurück auf die Watchlist"
-                      >
-                        <Bookmark className="w-3 h-3" />
-                        <span>Watchlist</span>
-                      </button>
-                    )}
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const snapshot = {
-                          tmdbId: item.tmdbId,
-                          mediaType: item.mediaType,
-                          title: item.title,
-                          posterPath: item.posterPath,
-                          releaseYear: item.releaseYear,
-                          status: item.status,
-                          rating: item.rating ?? undefined,
-                          watchedSeasons: item.watchedSeasons ?? undefined,
-                          totalSeasons: item.totalSeasons ?? undefined,
-                        };
-                        updateMediaStatus({
-                          tmdbId: item.tmdbId,
-                          mediaType: item.mediaType,
-                          title: item.title,
-                          status: "NONE",
-                        });
-                        showToast(`„${item.title}“ aus deiner Liste entfernt.`, {
-                          type: "info",
-                          actionLabel: "Rückgängig",
-                          onAction: () => {
-                            updateMediaStatus(snapshot);
-                          },
-                          durationMs: 6000,
-                        });
-                      }}
-                      aria-label={`${item.title} aus Liste entfernen`}
-                      className="min-w-[38px] min-h-[38px] sm:min-w-0 sm:min-h-0 flex items-center justify-center text-slate-400 sm:text-slate-500 hover:text-rose-400 p-2 sm:p-1 rounded-lg hover:bg-rose-500/10 transition"
-                      title="Aus Liste entfernen"
-                    >
-                      <Trash2 className="w-4 h-4 sm:w-3.5 sm:h-3.5" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      ) : (
-        <div className="p-16 text-center rounded-3xl bg-slate-900/30 border border-slate-800/60 text-slate-400 space-y-4">
-          <Bookmark className="w-10 h-10 text-slate-600 mx-auto" />
-          <h3 className="text-lg font-bold text-white">
-            {searchQuery || selectedCategory !== "ALL" || mediaTypeFilter !== "ALL"
-              ? "Keine passenden Titel gefunden"
-              : "Hier ist noch nichts gespeichert"}
-          </h3>
-          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-            {searchQuery || selectedCategory !== "ALL" || mediaTypeFilter !== "ALL"
-              ? "Passe deine Filterkriterien an oder setze sie zurück."
-              : activeTab === "WATCHLIST"
-              ? "Klicke bei einem beliebigen Film auf '+', um ihn für später auf deine Watchlist zu setzen."
-              : activeTab === "WATCHING"
-              ? "Öffne eine Serie und wähle 'Schaue ich', um deine aktuelle Staffel & Bewertung festzuhalten."
-              : "Markiere Filme als 'Gesehen' und bewerte sie, um deinen Freunden deine Highlights zu zeigen!"}
-          </p>
-          {(searchQuery || selectedCategory !== "ALL" || mediaTypeFilter !== "ALL") && (
-            <button
-              onClick={() => {
-                setSearchQuery("");
-                setSelectedCategory("ALL");
-                setMediaTypeFilter("ALL");
-              }}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs border border-slate-700 transition"
-            >
-              Filter zurücksetzen
-            </button>
-          )}
-          {!searchQuery && selectedCategory === "ALL" && mediaTypeFilter === "ALL" && (
-            <button
-              onClick={openSearch}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 text-black font-bold text-xs shadow-lg shadow-amber-500/20"
-            >
-              Filme & Serien entdecken
-            </button>
-          )}
-        </div>
-      )}
+        <ProfileWatchlistPanel
+          watchlistItems={watchlistItems}
+          watchingItems={watchingItems}
+          metaMap={metaMap}
+        />
       </div>
     </PullToRefresh>
-    </div>
   );
 }

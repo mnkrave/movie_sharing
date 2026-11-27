@@ -1,20 +1,21 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "@/components/MediaContext";
 import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import { COLLECTIONS_DATA } from "@/lib/collections";
-import { WatchtimeDetailsModal } from "@/components/WatchtimeDetailsModal";
+import { ProfileWatchtimePanel } from "@/components/ProfileWatchtimePanel";
+import { ProfileWatchlistPanel } from "@/components/ProfileWatchlistPanel";
 import { EditRecommendationModal } from "@/components/EditRecommendationModal";
-import { MyRecommendationsModal } from "@/components/MyRecommendationsModal";
 import { StreamingHistoryImporter } from "@/components/StreamingHistoryImporter";
 import { ThemeSelector } from "@/components/ThemeToggle";
 import { SubscriptionToggleList, SwitchRow } from "@/components/SubscriptionToggleList";
 import { useBatchMediaMeta } from "@/lib/useBatchMediaMeta";
 import { useWatchlistAlerts } from "@/lib/useWatchlistAlerts";
+import { isCurrentUserMatch } from "@/lib/auth-match";
 import type { AppRecommendation } from "@/lib/store";
 import { formatWatchedSeasons, getItemRuntimeMinutes } from "@/lib/seasons";
 import {
@@ -44,7 +45,14 @@ import {
 import Image from "next/image";
 import Link from "next/link";
 
-type ProfileTab = "overview" | "hall-of-fame" | "stats" | "streaming" | "settings";
+type ProfileTab =
+  | "overview"
+  | "hall-of-fame"
+  | "watchlist"
+  | "watchtime"
+  | "stats"
+  | "streaming"
+  | "settings";
 
 type HofRatingFilter =
   | "ALL"
@@ -108,10 +116,12 @@ function ProfileContent() {
   const [hofSortBy, setHofSortBy] = useState<
     "rating_desc" | "rating_asc" | "date_desc" | "year_desc" | "year_asc" | "title_asc"
   >("rating_desc");
-  const [showWatchtimeModal, setShowWatchtimeModal] = useState(false);
-  const [showRecommendationsModal, setShowRecommendationsModal] = useState(false);
+  const [watchlistSubTab, setWatchlistSubTab] = useState<
+    "watchlist" | "watching" | "recommendations"
+  >(() => (searchParams.get("tab") === "recommendations" ? "recommendations" : "watchlist"));
   const [editingRecommendation, setEditingRecommendation] = useState<AppRecommendation | null>(null);
   const [genreSortMode, setGenreSortMode] = useState<"count" | "rating">("count");
+  const tabButtonRefs = useRef<Partial<Record<ProfileTab, HTMLButtonElement | null>>>({});
 
   // Notification toggle state (Settings tab)
   const { watchlistAlerts, savingAlerts, toggleWatchlistAlerts } = useWatchlistAlerts({
@@ -121,7 +131,23 @@ function ProfileContent() {
   const urlTab = searchParams.get("tab");
   const urlPrompt = searchParams.get("prompt");
 
-  // Redirect legacy /profile?tab=ai or matches to /recommendations
+  const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
+    if (
+      urlTab === "overview" ||
+      urlTab === "hall-of-fame" ||
+      urlTab === "watchlist" ||
+      urlTab === "watchtime" ||
+      urlTab === "stats" ||
+      urlTab === "streaming" ||
+      urlTab === "settings"
+    ) {
+      return urlTab;
+    }
+    if (urlTab === "recommendations") return "watchlist";
+    return "overview";
+  });
+
+  // Redirect legacy /profile?tab=ai or matches to /recommendations & sync profile tabs
   useEffect(() => {
     if (urlTab === "ai" || urlPrompt) {
       const params = new URLSearchParams();
@@ -131,36 +157,30 @@ function ProfileContent() {
     } else if (urlTab === "matches") {
       router.replace("/recommendations?tab=algorithm");
     } else if (urlTab === "recommendations") {
-      setShowRecommendationsModal(true);
+      setWatchlistSubTab("recommendations");
+      setActiveTab("watchlist");
+    } else if (
+      urlTab === "overview" ||
+      urlTab === "hall-of-fame" ||
+      urlTab === "watchlist" ||
+      urlTab === "watchtime" ||
+      urlTab === "stats" ||
+      urlTab === "streaming" ||
+      urlTab === "settings"
+    ) {
+      if (urlTab === "watchlist") setWatchlistSubTab("watchlist");
+      setActiveTab(urlTab);
     }
   }, [urlTab, urlPrompt, router]);
 
-  const [activeTab, setActiveTab] = useState<ProfileTab>(() => {
-    if (
-      urlTab === "overview" ||
-      urlTab === "hall-of-fame" ||
-      urlTab === "stats" ||
-      urlTab === "streaming" ||
-      urlTab === "settings"
-    ) {
-      return urlTab;
-    }
-    return "overview";
-  });
-
   useEffect(() => {
-    if (
-      urlTab === "overview" ||
-      urlTab === "hall-of-fame" ||
-      urlTab === "stats" ||
-      urlTab === "streaming" ||
-      urlTab === "settings"
-    ) {
-      setActiveTab(urlTab);
-    }
-  }, [urlTab]);
+    tabButtonRefs.current[activeTab]?.scrollIntoView({
+      block: "nearest",
+      inline: "nearest",
+    });
+  }, [activeTab]);
 
-  const myUserId = (session?.user as any)?.id || "user_lukas";
+  const myUserId = (session?.user as any)?.id as string | undefined;
   const myName = session?.user?.name || "Kino-Fan";
   const myEmail = session?.user?.email || "";
   const isAdmin =
@@ -168,10 +188,14 @@ function ProfileContent() {
     (session?.user as any)?.role === "ADMIN";
 
   const myStatuses = useMemo(() => {
-    return communityData.mediaStatuses.filter(
-      (m) => m.userId === myUserId || (session?.user?.name && m.userName === session.user.name)
+    if (!session?.user) return [];
+    return communityData.mediaStatuses.filter((m) =>
+      isCurrentUserMatch(
+        { userId: myUserId, name: session.user?.name, email: session.user?.email },
+        { userId: m.userId, userName: m.userName }
+      )
     );
-  }, [communityData.mediaStatuses, myUserId, session?.user?.name]);
+  }, [communityData.mediaStatuses, session?.user, myUserId]);
 
   const watchedItems = useMemo(
     () => myStatuses.filter((m) => m.status === "WATCHED"),
@@ -183,14 +207,28 @@ function ProfileContent() {
     [myStatuses]
   );
 
-  const myRecommendations = useMemo(() => {
-    return communityData.recommendations.filter(
-      (r) => r.userId === myUserId || (session?.user?.name && r.userName === session.user.name)
-    );
-  }, [communityData.recommendations, myUserId, session?.user?.name]);
+  const watchingItems = useMemo(
+    () => myStatuses.filter((m) => m.status === "WATCHING" && m.mediaType === "tv"),
+    [myStatuses]
+  );
 
-  // Fetch rich TMDB metadata for watched items
-  const { metaMap, loadingMeta } = useBatchMediaMeta(watchedItems);
+  const myRecommendations = useMemo(() => {
+    if (!session?.user) return [];
+    return communityData.recommendations.filter((r) =>
+      isCurrentUserMatch(
+        { userId: myUserId, name: session.user?.name, email: session.user?.email },
+        { userId: r.userId, userName: r.userName }
+      )
+    );
+  }, [communityData.recommendations, session?.user, myUserId]);
+
+  const metaInputItems = useMemo(
+    () => [...watchedItems, ...watchlistItems, ...watchingItems],
+    [watchedItems, watchlistItems, watchingItems]
+  );
+
+  // Fetch rich TMDB metadata for watched & watchlist items
+  const { metaMap, loadingMeta } = useBatchMediaMeta(metaInputItems);
 
   const watchedMoviesCount = watchedItems.filter((m) => m.mediaType === "movie").length;
   const watchedTvCount = watchedItems.filter((m) => m.mediaType === "tv").length;
@@ -631,7 +669,7 @@ function ProfileContent() {
 
         <button
           type="button"
-          onClick={() => setShowWatchtimeModal(true)}
+          onClick={() => setActiveTab("watchtime")}
           className="group text-left p-4 rounded-2xl bg-card border border-border hover:border-primary/50 active:scale-[0.99] transition space-y-1 cursor-pointer shadow-xs"
         >
           <div className="flex items-center justify-between text-muted-foreground text-xs">
@@ -646,7 +684,10 @@ function ProfileContent() {
 
         <button
           type="button"
-          onClick={() => setShowRecommendationsModal(true)}
+          onClick={() => {
+            setWatchlistSubTab("watchlist");
+            setActiveTab("watchlist");
+          }}
           className="group text-left p-4 rounded-2xl bg-card border border-border hover:border-primary/50 active:scale-[0.99] transition space-y-1 cursor-pointer shadow-xs"
         >
           <div className="flex items-center justify-between text-muted-foreground text-xs">
@@ -660,15 +701,17 @@ function ProfileContent() {
         </button>
       </div>
 
-      {/* 3. Segmented Tabs Navigation (Flowstep) */}
+      {/* 3. Segmented Tabs Navigation (Single-row Scrollable Tabs) */}
       <div
         role="tablist"
         aria-label="Profil-Bereiche"
-        className="flex items-center gap-1 p-1 rounded-xl bg-muted border border-border overflow-x-auto no-scrollbar"
+        className="flex flex-nowrap items-center gap-1 p-1 rounded-xl bg-muted border border-border overflow-x-auto no-scrollbar"
       >
         {[
           { id: "overview" as const, label: "Übersicht" },
           { id: "hall-of-fame" as const, label: `Gesehen (${watchedItems.length})` },
+          { id: "watchlist" as const, label: `Watchlist (${watchlistItems.length})` },
+          { id: "watchtime" as const, label: "Kino-Lebenszeit" },
           { id: "stats" as const, label: "Statistiken" },
           { id: "streaming" as const, label: "Streaming-Abos" },
           { id: "settings" as const, label: "Einstellungen" },
@@ -677,13 +720,20 @@ function ProfileContent() {
           return (
             <button
               key={tab.id}
+              id={`profile-tab-${tab.id}`}
+              ref={(el) => {
+                tabButtonRefs.current[tab.id] = el;
+              }}
               type="button"
               role="tab"
               aria-selected={active}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition cursor-pointer ${
+              onClick={() => {
+                if (tab.id === "watchlist") setWatchlistSubTab("watchlist");
+                setActiveTab(tab.id);
+              }}
+              className={`relative shrink-0 px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold whitespace-nowrap transition cursor-pointer ${
                 active
-                  ? "bg-card text-foreground shadow-sm border border-border"
+                  ? "bg-card text-foreground shadow-sm border border-border after:content-[''] after:absolute after:inset-x-2.5 after:bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary"
                   : "text-muted-foreground hover:text-foreground border border-transparent"
               }`}
             >
@@ -851,18 +901,44 @@ function ProfileContent() {
               <div>
                 <h2 className="text-sm font-bold text-foreground">Meine Watchlist</h2>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {watchlistItems.length} Titel vorgemerkt
+                  {watchlistItems.length} vorgemerkt · {myRecommendations.length} Empfehlungen
                 </p>
               </div>
-              <Link
-                href="/my-list"
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background hover:bg-muted border border-border text-xs font-semibold text-foreground transition"
+              <button
+                type="button"
+                onClick={() => {
+                  setWatchlistSubTab("watchlist");
+                  setActiveTab("watchlist");
+                }}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-background hover:bg-muted border border-border text-xs font-semibold text-foreground transition cursor-pointer"
               >
-                <span>Liste öffnen</span>
+                <span>Watchlist öffnen</span>
                 <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
-              </Link>
+              </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* TAB: WATCHLIST & EMPFEHLUNGEN */}
+      {activeTab === "watchlist" && (
+        <div role="tabpanel" aria-labelledby="profile-tab-watchlist">
+          <ProfileWatchlistPanel
+            watchlistItems={watchlistItems}
+            watchingItems={watchingItems}
+            metaMap={metaMap}
+            recommendations={myRecommendations}
+            initialSubTab={watchlistSubTab}
+            onEditRecommendation={(rec) => setEditingRecommendation(rec)}
+            onDeleteRecommendation={(rec) => handleDeleteRec(rec)}
+          />
+        </div>
+      )}
+
+      {/* TAB: KINO-LEBENSZEIT */}
+      {activeTab === "watchtime" && (
+        <div role="tabpanel" aria-labelledby="profile-tab-watchtime">
+          <ProfileWatchtimePanel watchedItems={watchedItems} metaMap={metaMap} />
         </div>
       )}
 
@@ -1485,28 +1561,6 @@ function ProfileContent() {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Existing Modals Preserved */}
-      {showWatchtimeModal && (
-        <WatchtimeDetailsModal
-          isOpen={showWatchtimeModal}
-          onClose={() => setShowWatchtimeModal(false)}
-          watchedItems={watchedItems}
-          metaMap={metaMap}
-        />
-      )}
-
-      {showRecommendationsModal && (
-        <MyRecommendationsModal
-          isOpen={showRecommendationsModal}
-          onClose={() => setShowRecommendationsModal(false)}
-          recommendations={myRecommendations}
-          onEdit={(rec) => setEditingRecommendation(rec)}
-          onDelete={(rec) => handleDeleteRec(rec)}
-          onOpenMedia={openMediaModal}
-          onOpenSearch={openSearch}
-        />
       )}
 
       {editingRecommendation && (

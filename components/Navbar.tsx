@@ -27,6 +27,7 @@ import {
   Layers,
   User,
   Zap,
+  Bookmark,
 } from "lucide-react";
 
 export function isDiscoverRoute(pathname: string | null): boolean {
@@ -146,9 +147,20 @@ export function Navbar() {
           )
       ).length
     : 0;
+  const myWatchlistCount = session?.user
+    ? communityData.mediaStatuses.filter(
+        (m) =>
+          m.status === "WATCHLIST" &&
+          isCurrentUserMatch(
+            { userId: myUserId, name: session.user?.name, email: session.user?.email },
+            { userId: m.userId, userName: m.userName }
+          )
+      ).length
+    : 0;
   const showQuickRateNav = Boolean(session?.user && myWatchedCount < 250);
 
   const isDiscoverActive = isDiscoverRoute(pathname);
+  const isWatchlistActive = pathname === "/my-list";
   const isRecsActive = pathname?.startsWith("/recommendations");
   const isFriendsActive = pathname?.startsWith("/friends");
   const isProfileActive = pathname === "/profile";
@@ -240,6 +252,25 @@ export function Navbar() {
               )}
             </div>
 
+            {/* Watchlist */}
+            <Link
+              href="/my-list"
+              aria-current={isWatchlistActive ? "page" : undefined}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                isWatchlistActive
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
+              }`}
+            >
+              <Bookmark className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Watchlist</span>
+              {session?.user && myWatchlistCount > 0 && (
+                <span className="hidden xl:inline-block px-1.5 py-0.5 rounded-full bg-muted text-foreground font-mono font-bold text-[10px] leading-none">
+                  {myWatchlistCount}
+                </span>
+              )}
+            </Link>
+
             {/* Empfehlungen */}
             <Link
               href="/recommendations"
@@ -288,7 +319,7 @@ export function Navbar() {
                 <Zap className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Schnell-Bewerten</span>
                 <span
-                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-none ${
+                  className={`hidden xl:inline-block text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-none ${
                     pathname === "/quick-rate"
                       ? "bg-black/15 text-primary-foreground"
                       : "bg-card/80 text-primary-text"
@@ -433,6 +464,27 @@ export function Navbar() {
               </div>
             </Link>
           ))}
+
+          <Link
+            href="/my-list"
+            aria-current={isWatchlistActive ? "page" : undefined}
+            onClick={() => setMobileMenuOpen(false)}
+            className={`flex items-center justify-between gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
+              isWatchlistActive
+                ? "bg-primary-soft text-primary-text border border-primary/30"
+                : "text-foreground hover:bg-muted"
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Bookmark className="w-4 h-4 text-primary-text flex-shrink-0" aria-hidden="true" />
+              <span>Watchlist</span>
+            </span>
+            {session?.user && myWatchlistCount > 0 && (
+              <span className="text-xs font-mono text-muted-foreground">
+                {myWatchlistCount}
+              </span>
+            )}
+          </Link>
 
           {showQuickRateNav && (
             <Link
