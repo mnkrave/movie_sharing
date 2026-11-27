@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "./MediaContext";
 import { NavbarThemeToggle, ThemeSelector } from "./ThemeToggle";
+import { isCurrentUserMatch } from "@/lib/auth-match";
 import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 import {
   Video,
@@ -134,13 +135,18 @@ export function Navbar() {
     session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
     (session?.user as any)?.role === "ADMIN";
 
-  const myUserId = (session?.user as any)?.id || "user_lukas";
-  const myName = session?.user?.name?.toLowerCase();
-  const myWatchedCount = communityData.mediaStatuses.filter(
-    (m) =>
-      m.status === "WATCHED" &&
-      (m.userId === myUserId || (myName && m.userName?.toLowerCase() === myName))
-  ).length;
+  const myUserId = (session?.user as any)?.id as string | undefined;
+  const myWatchedCount = session?.user
+    ? communityData.mediaStatuses.filter(
+        (m) =>
+          m.status === "WATCHED" &&
+          isCurrentUserMatch(
+            { userId: myUserId, name: session.user?.name, email: session.user?.email },
+            { userId: m.userId, userName: m.userName }
+          )
+      ).length
+    : 0;
+  const showQuickRateNav = Boolean(session?.user && myWatchedCount < 250);
 
   const isDiscoverActive = isDiscoverRoute(pathname);
   const isRecsActive = pathname?.startsWith("/recommendations");
@@ -266,6 +272,32 @@ export function Navbar() {
                 </span>
               )}
             </Link>
+
+            {/* Schnell-Bewerten (visible while signed-in user has < 250 watched items) */}
+            {showQuickRateNav && (
+              <Link
+                href="/quick-rate"
+                aria-current={pathname === "/quick-rate" ? "page" : undefined}
+                title="Schnell Filme & Serien bewerten (verschwindet ab 250 gesehenen Titeln)"
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${
+                  pathname === "/quick-rate"
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "bg-primary-soft text-primary-text border border-primary/30 hover:border-primary/50"
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Schnell-Bewerten</span>
+                <span
+                  className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-none ${
+                    pathname === "/quick-rate"
+                      ? "bg-black/15 text-primary-foreground"
+                      : "bg-card/80 text-primary-text"
+                  }`}
+                >
+                  {myWatchedCount}/250
+                </span>
+              </Link>
+            )}
           </nav>
         </div>
 
@@ -402,21 +434,24 @@ export function Navbar() {
             </Link>
           ))}
 
-          {session?.user && (
+          {showQuickRateNav && (
             <Link
               href="/quick-rate"
+              aria-current={pathname === "/quick-rate" ? "page" : undefined}
               onClick={() => setMobileMenuOpen(false)}
-              className="flex items-center justify-between gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-foreground hover:bg-muted transition"
+              className={`flex items-center justify-between gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
+                pathname === "/quick-rate"
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-foreground hover:bg-muted"
+              }`}
             >
               <span className="flex items-center gap-3">
                 <Zap className="w-4 h-4 text-primary-text flex-shrink-0" aria-hidden="true" />
                 <span>Schnell-Bewerten</span>
               </span>
-              {myWatchedCount < 250 && (
-                <span className="text-xs font-mono text-muted-foreground">
-                  {myWatchedCount}/250
-                </span>
-              )}
+              <span className="text-xs font-mono text-muted-foreground">
+                {myWatchedCount}/250
+              </span>
             </Link>
           )}
 

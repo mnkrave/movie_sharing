@@ -5,9 +5,10 @@ import { MediaItem } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
 import { useMedia } from "@/components/MediaContext";
 import { useSession } from "next-auth/react";
-import { Award, Film, Tv, ArrowRight, Sparkles, Dices, Layers } from "lucide-react";
+import { Award, Film, Tv, Sparkles, Dices, Layers } from "lucide-react";
 import Link from "next/link";
 import { MobileOnboardingBanner } from "@/components/MobileOnboardingBanner";
+import { HomeCatalogSearch } from "@/components/HomeCatalogSearch";
 
 const MOBILE_RAIL_GRID_CLASS =
   "flex overflow-x-auto snap-x snap-mandatory overscroll-x-contain snap-smooth gap-3.5 -mx-4 px-4 pb-2 scrollbar-none sm:mx-0 sm:px-0 sm:pb-0 sm:overflow-visible sm:grid sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 sm:gap-5";
@@ -110,11 +111,6 @@ export function HomeContentClient({
     shuffleSeed,
     watchedKeys,
   ]);
-
-  const displayedTrending = trending.filter((item) => {
-    if (filterMode === "ALL") return true;
-    return item.mediaType === filterMode;
-  });
 
   const quickLinks = [
     { href: "/collections", label: "Kollektionen", icon: Layers },
@@ -243,62 +239,8 @@ export function HomeContentClient({
         </div>
       </section>
 
-      {/* SECTION 2: Aktuell im Trend */}
-      <section className="space-y-5">
-        <div className="flex items-end justify-between gap-4">
-          <div className="space-y-1">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-text">
-              Diese Woche beliebt
-            </p>
-            <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
-              {filterMode === "movie"
-                ? "Aktuelle Film-Trends"
-                : filterMode === "tv"
-                ? "Aktuelle Serien-Trends"
-                : "Aktuell im Trend"}
-            </h2>
-          </div>
-        </div>
-
-        <div className={MOBILE_RAIL_GRID_CLASS}>
-          {displayedTrending.slice(0, 10).map((item) => (
-            <div key={`${item.mediaType}_${item.id}`} className={MOBILE_RAIL_ITEM_CLASS}>
-              <MediaCard item={item} />
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* SECTION 3: Oscar-Gewinner (only for ALL or movie) */}
-      {(filterMode === "ALL" || filterMode === "movie") && (
-        <section className="space-y-5">
-          <div className="flex items-end justify-between gap-4">
-            <div className="space-y-1">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-text">
-                Academy Awards · Bester Film
-              </p>
-              <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
-                Oscar-Gewinner
-              </h2>
-            </div>
-            <Link
-              href="/oscars"
-              className="inline-flex items-center gap-1 text-xs font-bold text-primary-text hover:underline whitespace-nowrap py-1"
-            >
-              <span>Alle 97 ansehen</span>
-              <ArrowRight className="w-3.5 h-3.5" aria-hidden="true" />
-            </Link>
-          </div>
-
-          <div className={MOBILE_RAIL_GRID_CLASS}>
-            {oscarWinners.map((item) => (
-              <div key={item.id} className={MOBILE_RAIL_ITEM_CLASS}>
-                <MediaCard item={item} />
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+      {/* SECTION 2: Compact Live Search, Filters & Expandable Catalog */}
+      <HomeCatalogSearch initialTrending={trending} />
     </div>
   );
 }

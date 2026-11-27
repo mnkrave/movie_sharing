@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { discoverMedia, DiscoverFilters } from "@/lib/tmdb";
+import { discoverMedia, getTrendingPage, DiscoverFilters } from "@/lib/tmdb";
 
 const VALID_MEDIA_TYPES = new Set(["all", "movie", "tv"]);
 const VALID_SORT_BY = new Set([
@@ -59,11 +59,29 @@ function sanitizeDiscoverFilters(raw: Record<string, unknown>): DiscoverFilters 
   };
 }
 
+function shouldUseTrending(raw: Record<string, unknown>, filters: DiscoverFilters): boolean {
+  const isTrending = raw.trending === "1" || raw.trending === "true" || raw.trending === true;
+  if (!isTrending) return false;
+  return (
+    !filters.query &&
+    filters.genreId === null &&
+    !filters.director &&
+    !filters.actor &&
+    (!filters.country || filters.country === "ALL") &&
+    !filters.minRating &&
+    !filters.era &&
+    (filters.sortBy || "popularity.desc") === "popularity.desc"
+  );
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const filters = sanitizeDiscoverFilters(Object.fromEntries(searchParams.entries()));
-    const data = await discoverMedia(filters);
+    const raw = Object.fromEntries(searchParams.entries());
+    const filters = sanitizeDiscoverFilters(raw);
+    const data = shouldUseTrending(raw, filters)
+      ? await getTrendingPage(filters.mediaType || "all", filters.page || 1)
+      : await discoverMedia(filters);
     return NextResponse.json(data, {
       headers: { "Cache-Control": "public, s-maxage=1800, stale-while-revalidate=86400" },
     });
@@ -81,7 +99,9 @@ export async function POST(req: Request) {
     const body = await req.json();
     const raw = body && typeof body === "object" && !Array.isArray(body) ? body : {};
     const filters = sanitizeDiscoverFilters(raw as Record<string, unknown>);
-    const data = await discoverMedia(filters);
+    const data = shouldUseTrending(raw as Record<string, unknown>, filters)
+      ? await getTrendingPage(filters.mediaType || "all", filters.page || 1)
+      : await discoverMedia(filters);
     return NextResponse.json(data);
   } catch (error) {
     console.error("Discover API error:", error);

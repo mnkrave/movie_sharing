@@ -607,6 +607,41 @@ export interface DiscoverMediaResult {
   hasMore: boolean;
 }
 
+export async function getTrendingPage(
+  mediaType: "all" | "movie" | "tv" = "all",
+  page = 1
+): Promise<DiscoverMediaResult> {
+  const safePage = Math.min(500, Math.max(1, Math.floor(page || 1)));
+  try {
+    const res = await tmdbFetch<{ results: any[]; total_pages?: number }>(
+      `/trending/${mediaType}/week`,
+      { page: String(safePage) }
+    );
+    const seen = new Set<string>();
+    const results: MediaItem[] = [];
+    for (const raw of res.results || []) {
+      const resolvedType = mediaType === "all" ? raw.media_type : mediaType;
+      if (resolvedType !== "movie" && resolvedType !== "tv") continue;
+      const item = mapRawItem(raw, mediaType === "all" ? undefined : mediaType);
+      if (!item.posterPath) continue;
+      const key = `${item.mediaType}_${item.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      results.push(item);
+    }
+    const totalPages = Math.min(500, Math.max(1, res.total_pages || 1));
+    return {
+      results,
+      page: safePage,
+      totalPages,
+      hasMore: safePage < totalPages && results.length > 0,
+    };
+  } catch (err) {
+    console.error("Error fetching trending page:", err);
+    return { results: [], page: safePage, totalPages: 1, hasMore: false };
+  }
+}
+
 export async function discoverMedia(filters: DiscoverFilters): Promise<DiscoverMediaResult> {
   const mediaType = filters.mediaType || "all";
   const sortBy = filters.sortBy || "popularity.desc";
