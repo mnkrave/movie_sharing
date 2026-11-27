@@ -353,7 +353,7 @@ export function HomeHero({
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="relative min-h-[430px] sm:min-h-[540px] w-full overflow-hidden bg-[#0a0e17] border-b border-border group select-none"
+      className="relative min-h-[430px] sm:min-h-[540px] w-full overflow-hidden hero-surface border-b border-border group select-none"
     >
       {/* Background Backdrop Images */}
       {slides.map((s, idx) => {
@@ -364,7 +364,7 @@ export function HomeHero({
           <div
             key={`${s.item.mediaType}_${s.item.id}_bg`}
             className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-              isActive ? "opacity-80 sm:opacity-90 z-0" : "opacity-0 pointer-events-none"
+              isActive ? "hero-backdrop-active z-0" : "opacity-0 pointer-events-none"
             }`}
           >
             <Image
@@ -379,9 +379,9 @@ export function HomeHero({
         );
       })}
 
-      {/* Cinematic Dark Scrims (stay dark in both light and dark modes over photo backdrop) */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#070a11] via-[#070a11]/60 to-[#070a11]/15 z-10" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#070a11]/95 via-[#070a11]/75 md:via-[#070a11]/45 to-transparent z-10" />
+      {/* Theme-Adaptive Scrims (bright frosted fade in Light Mode, cinematic dark fade in Dark Mode) */}
+      <div className="absolute inset-0 hero-scrim-vertical z-10" />
+      <div className="absolute inset-0 hero-scrim-horizontal z-10" />
 
       {/* Main Content Area */}
       <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[430px] sm:min-h-[540px] flex items-center pt-10 pb-16 sm:py-14">
@@ -389,12 +389,12 @@ export function HomeHero({
             {/* Left Column: Meta, Title, Overview & 2 Actions */}
             <div className="md:col-span-8 space-y-3.5 animate-in fade-in duration-300">
               <div className="flex flex-wrap items-center gap-2.5 text-xs">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-400/35 text-amber-300 font-bold tracking-wide uppercase">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-soft border border-primary/35 text-primary-text font-bold tracking-wide uppercase backdrop-blur-sm">
                   <BadgeIcon className="w-3.5 h-3.5" aria-hidden="true" />
                   <span>{currentSlide.badgeLabel}</span>
                 </span>
 
-                <span className="text-slate-300 font-medium">
+                <span className="text-[var(--hero-meta)] font-medium">
                   {currentItem.mediaType === "tv" ? "Serie" : "Film"}
                   {currentItem.releaseYear ? ` · ${currentItem.releaseYear}` : ""}
                   {currentItem.isUpcoming
@@ -409,13 +409,13 @@ export function HomeHero({
 
               <h1
                 onClick={() => openMediaModal(currentItem)}
-                className="text-2xl sm:text-4xl lg:text-5xl font-black text-white tracking-tight leading-tight cursor-pointer hover:text-amber-300 transition"
+                className="text-2xl sm:text-4xl lg:text-5xl font-black text-[var(--hero-title)] tracking-tight leading-tight cursor-pointer hover:text-primary-text transition"
                 title="Details, Trailer & Stream öffnen"
               >
                 {currentItem.title}
               </h1>
 
-              <p className="text-xs sm:text-sm text-slate-300 line-clamp-3 leading-relaxed max-w-xl">
+              <p className="text-xs sm:text-sm text-[var(--hero-body)] line-clamp-3 leading-relaxed max-w-xl">
                 {currentItem.overview}
               </p>
 
@@ -423,9 +423,9 @@ export function HomeHero({
                 <button
                   type="button"
                   onClick={() => openMediaModal(currentItem)}
-                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs sm:text-sm transition shadow-lg shadow-amber-500/20 cursor-pointer"
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs sm:text-sm transition shadow-lg shadow-amber-500/20 cursor-pointer"
                 >
-                  <Play className="w-4 h-4 fill-slate-950" aria-hidden="true" />
+                  <Play className="w-4 h-4 fill-current" aria-hidden="true" />
                   <span>Details & Stream</span>
                 </button>
 
@@ -435,7 +435,7 @@ export function HomeHero({
                   className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer ${
                     isWatchlist
                       ? "bg-emerald-500 text-slate-950 border-emerald-400"
-                      : "bg-black/45 hover:bg-black/65 text-white border-white/20 backdrop-blur-md"
+                      : "hero-control backdrop-blur-md shadow-xs"
                   }`}
                 >
                   {isWatchlist ? (
@@ -457,7 +457,7 @@ export function HomeHero({
             <div className="hidden md:flex md:col-span-4 justify-end">
               <div
                 onClick={() => openMediaModal(currentItem)}
-                className="group/poster relative cursor-pointer aspect-[2/3] w-44 lg:w-52 rounded-2xl overflow-hidden bg-slate-900 border border-white/15 hover:border-amber-400/60 shadow-2xl transition-all duration-300 hover:scale-[1.03]"
+                className="group/poster relative cursor-pointer aspect-[2/3] w-44 lg:w-52 rounded-2xl overflow-hidden bg-card border border-[var(--hero-poster-border)] hover:border-primary/60 shadow-2xl transition-all duration-300 hover:scale-[1.03]"
                 title="Details, Trailer & Stream öffnen"
               >
                 {currentItem.posterPath ? (
@@ -469,7 +469,7 @@ export function HomeHero({
                     className="object-cover"
                   />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center text-slate-500">
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                     <Film className="w-10 h-10" />
                   </div>
                 )}
@@ -485,7 +485,7 @@ export function HomeHero({
               type="button"
               onClick={handlePrev}
               aria-label="Vorheriger Titel"
-              className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/45 hover:bg-black/75 border border-white/10 text-white/75 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
+              className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl border hero-control transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
@@ -494,7 +494,7 @@ export function HomeHero({
               type="button"
               onClick={handleNext}
               aria-label="Nächster Titel"
-              className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/45 hover:bg-black/75 border border-white/10 text-white/75 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100 focus-visible:opacity-100"
+              className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl border hero-control transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
             >
               <ChevronRight className="w-5 h-5" />
             </button>
@@ -508,7 +508,7 @@ export function HomeHero({
               type="button"
               onClick={handlePrev}
               aria-label="Vorheriger Titel"
-              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full bg-black/50 border border-white/10 text-white/85 mr-1"
+              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full border hero-control backdrop-blur-md mr-1"
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
@@ -527,7 +527,7 @@ export function HomeHero({
                 >
                   <span
                     className={`block transition-all duration-300 rounded-full ${
-                      isActive ? "w-6 h-2 bg-amber-400" : "w-2 h-2 bg-white/40 hover:bg-white/70"
+                      isActive ? "w-6 h-2 bg-primary" : "w-2 h-2 hero-dot-inactive"
                     }`}
                   />
                 </button>
@@ -538,7 +538,7 @@ export function HomeHero({
               type="button"
               onClick={handleNext}
               aria-label="Nächster Titel"
-              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full bg-black/50 border border-white/10 text-white/85 ml-1"
+              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full border hero-control backdrop-blur-md ml-1"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
@@ -549,7 +549,7 @@ export function HomeHero({
               aria-label={
                 autoAdvanceDisabled ? "Automatischen Wechsel starten" : "Automatischen Wechsel pausieren"
               }
-              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 ml-1"
+              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full border hero-control backdrop-blur-md ml-1"
             >
               {autoAdvanceDisabled ? (
                 <Play className="w-3.5 h-3.5 fill-current" />
