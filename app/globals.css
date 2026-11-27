@@ -540,6 +540,18 @@
   background-color: #07090e;
   color: #f8fafc;
   color-scheme: dark;
+  --bg-primary: #070a11;
+  --bg-card: #0d121d;
+  --bg-muted: #141b29;
+  --bg-secondary: #111827;
+  --bg-input: #0b101a;
+  --border-subtle: rgba(148, 163, 184, 0.16);
+  --border-strong: rgba(148, 163, 184, 0.28);
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --accent-text: #f59e0b;
+  --accent-soft: rgba(245, 158, 11, 0.14);
 }
 
 /* Legacy scrollbar fallback for browsers without standard scrollbar-color */

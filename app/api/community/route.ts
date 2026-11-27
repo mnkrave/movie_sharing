@@ -57,6 +57,7 @@ export async function GET() {
       friendRequests: { pendingReceived: [], pendingSent: [] },
       friendGroups: [],
       customCollections: publicCollections,
+      userBadges: {},
     });
   }
 

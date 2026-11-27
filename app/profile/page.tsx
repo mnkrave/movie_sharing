@@ -9,6 +9,7 @@ import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
 import { COLLECTIONS_DATA } from "@/lib/collections";
 import { ProfileWatchtimePanel } from "@/components/ProfileWatchtimePanel";
 import { ProfileWatchlistPanel } from "@/components/ProfileWatchlistPanel";
+import { ProfileBadgesTile } from "@/components/ProfileBadgesTile";
 import { EditRecommendationModal } from "@/components/EditRecommendationModal";
 import { StreamingHistoryImporter } from "@/components/StreamingHistoryImporter";
 import { ThemeSelector } from "@/components/ThemeToggle";
@@ -916,6 +917,18 @@ function ProfileContent() {
                 <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
               </button>
             </div>
+          </div>
+
+          {/* Full-width Achievement & Collection Badges Tile */}
+          <div className="lg:col-span-2">
+            <ProfileBadgesTile
+              watchedItems={watchedItems}
+              recommendationsCount={myRecommendations.length}
+              friendsCount={communityData.friends.length}
+              metaMap={metaMap}
+              persistedBadges={myUserId ? communityData.userBadges?.[myUserId] : undefined}
+              isOwnProfile={true}
+            />
           </div>
         </div>
       )}

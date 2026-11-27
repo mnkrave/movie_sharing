@@ -5,6 +5,7 @@ import bcrypt from "bcryptjs";
 import { fetchDeStreamingProviders } from "./tmdb";
 import { SUPER_ADMIN_EMAIL, isValidEmailAddress } from "./constants";
 import { isSamePerson } from "./auth-match";
+import { evaluateUserBadges } from "./badges";
 
 export { SUPER_ADMIN_EMAIL, isValidEmailAddress, isSamePerson };
 
@@ -197,6 +198,18 @@ export interface StreamingSnapshotEntry {
   checkedAt: string;
 }
 
+export interface AppUserBadge {
+  badgeKey: string;
+  unlockedAt: string;
+}
+
+interface StoredUserBadgeRecord {
+  id: string;
+  userId: string;
+  badgeKey: string;
+  unlockedAt: string;
+}
+
 interface LocalDbFile {
   users: AppUser[];
   whitelist: AppWhitelistEntry[];
@@ -208,6 +221,7 @@ interface LocalDbFile {
   customCollections?: AppCustomCollection[];
   streamingSnapshots?: StreamingSnapshotEntry[];
   inviteApprovalRequests?: AppInviteApprovalRequest[];
+  userBadges?: StoredUserBadgeRecord[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -557,6 +571,34 @@ async function ensureWatchlistAlertSchema() {
       ON "StreamingProviderSnapshot"("tmdbId", "mediaType")
     `;
     watchlistAlertSchemaEnsured = true;
+  } catch {
+    // ignore if permissions or DB unavailable
+  }
+}
+
+let userBadgeSchemaEnsured = false;
+async function ensureUserBadgeSchema() {
+  if (userBadgeSchemaEnsured) return;
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "UserBadge" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "badgeKey" TEXT NOT NULL,
+        "unlockedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "UserBadge_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "UserBadge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `;
+    await prisma.$executeRaw`
+      CREATE UNIQUE INDEX IF NOT EXISTS "UserBadge_userId_badgeKey_key"
+      ON "UserBadge"("userId", "badgeKey")
+    `;
+    await prisma.$executeRaw`
+      CREATE INDEX IF NOT EXISTS "UserBadge_userId_unlockedAt_idx"
+      ON "UserBadge"("userId", "unlockedAt")
+    `;
+    userBadgeSchemaEnsured = true;
   } catch {
     // ignore if permissions or DB unavailable
   }
@@ -3236,17 +3278,148 @@ async function ensureMediaStatusColumns() {
   }
 }
 
+async function syncAndLoadUserBadges(params: {
+  currentUserId: string;
+  allowedUserIds: string[];
+  statuses: AppMediaStatus[];
+  recommendations: AppRecommendation[];
+  currentUserFriendCount: number;
+}): Promise<Record<string, AppUserBadge[]>> {
+  const {
+    currentUserId,
+    allowedUserIds,
+    statuses,
+    recommendations,
+    currentUserFriendCount,
+  } = params;
+
+  const myWatched = statuses.filter(
+    (s) => s.userId === currentUserId && s.status === "WATCHED"
+  );
+  const myRecsCount = recommendations.filter((r) => r.userId === currentUserId).length;
+  const evaluated = evaluateUserBadges({
+    watchedItems: myWatched,
+    recommendationsCount: myRecsCount,
+    friendsCount: currentUserFriendCount,
+  });
+  const earnedKeys = new Set(evaluated.filter((b) => b.unlocked).map((b) => b.key));
+
+  if (await isPostgresAvailable()) {
+    try {
+      await ensureUserBadgeSchema();
+      const existingRows = await (prisma as any).userBadge.findMany({
+        where: { userId: { in: allowedUserIds } },
+        orderBy: { unlockedAt: "asc" },
+      });
+
+      const myExistingKeys = new Set<string>(
+        existingRows
+          .filter((row: any) => row.userId === currentUserId)
+          .map((row: any) => String(row.badgeKey))
+      );
+
+      const missingKeys = Array.from(earnedKeys).filter((k) => !myExistingKeys.has(k));
+      const revokedKeys = Array.from(myExistingKeys).filter((k) => !earnedKeys.has(k));
+
+      if (missingKeys.length > 0) {
+        await (prisma as any).userBadge.createMany({
+          data: missingKeys.map((badgeKey) => ({
+            userId: currentUserId,
+            badgeKey,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      if (revokedKeys.length > 0) {
+        await (prisma as any).userBadge.deleteMany({
+          where: {
+            userId: currentUserId,
+            badgeKey: { in: revokedKeys },
+          },
+        });
+      }
+
+      const finalRows =
+        missingKeys.length > 0 || revokedKeys.length > 0
+          ? await (prisma as any).userBadge.findMany({
+              where: { userId: { in: allowedUserIds } },
+              orderBy: { unlockedAt: "asc" },
+            })
+          : existingRows;
+
+      const grouped: Record<string, AppUserBadge[]> = {};
+      for (const row of finalRows) {
+        const uid = String(row.userId);
+        if (!grouped[uid]) grouped[uid] = [];
+        grouped[uid].push({
+          badgeKey: String(row.badgeKey),
+          unlockedAt: new Date(row.unlockedAt).toISOString(),
+        });
+      }
+      return grouped;
+    } catch {
+      // Graceful fallback if DB schema isn't migrated yet
+      return {
+        [currentUserId]: Array.from(earnedKeys).map((badgeKey) => ({
+          badgeKey,
+          unlockedAt: new Date().toISOString(),
+        })),
+      };
+    }
+  }
+
+  const db = readLocalDb();
+  const existing = db.userBadges || [];
+  const allowedSet = new Set(allowedUserIds);
+  const myExistingKeys = new Set(
+    existing.filter((b) => b.userId === currentUserId).map((b) => b.badgeKey)
+  );
+  const missingKeys = Array.from(earnedKeys).filter((k) => !myExistingKeys.has(k));
+  const revokedKeys = new Set(Array.from(myExistingKeys).filter((k) => !earnedKeys.has(k)));
+
+  let updated = existing;
+  if (missingKeys.length > 0 || revokedKeys.size > 0) {
+    const now = new Date().toISOString();
+    updated = existing.filter(
+      (b) => !(b.userId === currentUserId && revokedKeys.has(b.badgeKey))
+    );
+    missingKeys.forEach((badgeKey, idx) => {
+      updated.push({
+        id: `ub_${Date.now()}_${idx}`,
+        userId: currentUserId,
+        badgeKey,
+        unlockedAt: now,
+      });
+    });
+    db.userBadges = updated;
+    writeLocalDb(db);
+  }
+
+  const grouped: Record<string, AppUserBadge[]> = {};
+  for (const row of updated) {
+    if (!allowedSet.has(row.userId)) continue;
+    if (!grouped[row.userId]) grouped[row.userId] = [];
+    grouped[row.userId].push({
+      badgeKey: row.badgeKey,
+      unlockedAt: row.unlockedAt,
+    });
+  }
+  return grouped;
+}
+
 export async function getAllCommunityData(
   currentUserId?: string,
   currentUserName?: string
 ): Promise<{
   mediaStatuses: AppMediaStatus[];
   recommendations: AppRecommendation[];
+  userBadges: Record<string, AppUserBadge[]>;
 }> {
   if (!currentUserId) {
     return {
       mediaStatuses: [],
       recommendations: [],
+      userBadges: {},
     };
   }
   const friendIds = await getAcceptedFriendIds(currentUserId);
@@ -3299,6 +3472,7 @@ export async function getAllCommunityData(
     const activeStatuses = statuses.filter(
       (s: any) => !s.user?.isBanned || s.userId === currentUserId
     );
+    const mappedStatuses = activeStatuses.map((s: any) => mapRawMediaStatus(s));
     const mappedRecs: AppRecommendation[] = recs
       .filter((r: any) => !r.user?.isBanned || r.userId === currentUserId)
       .map((r: any) => mapRawRecommendation(r));
@@ -3307,9 +3481,18 @@ export async function getAllCommunityData(
       isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
     );
 
+    const userBadges = await syncAndLoadUserBadges({
+      currentUserId,
+      allowedUserIds: Array.from(allowedUserIds),
+      statuses: mappedStatuses,
+      recommendations: mappedRecs,
+      currentUserFriendCount: friendIds.length,
+    });
+
     return {
-      mediaStatuses: activeStatuses.map((s: any) => mapRawMediaStatus(s)),
+      mediaStatuses: mappedStatuses,
       recommendations: visibleRecs,
+      userBadges,
     };
   }
 
@@ -3338,9 +3521,18 @@ export async function getAllCommunityData(
       isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
     );
 
+  const userBadges = await syncAndLoadUserBadges({
+    currentUserId,
+    allowedUserIds: Array.from(allowedUserIds),
+    statuses,
+    recommendations: visibleRecs,
+    currentUserFriendCount: friendIds.length,
+  });
+
   return {
     mediaStatuses: statuses,
     recommendations: visibleRecs,
+    userBadges,
   };
 }
 

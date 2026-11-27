@@ -19,6 +19,7 @@ import type {
   AppRecommendation,
   AppCustomCollection,
   AppCustomCollectionMovie,
+  AppUserBadge,
 } from "@/lib/store";
 import { useSession, signOut } from "next-auth/react";
 import { parseMediaDeepLink } from "@/lib/share";
@@ -79,6 +80,7 @@ interface MediaContextType {
       pendingSent: FriendRequestItem[];
     };
     customCollections?: AppCustomCollection[];
+    userBadges?: Record<string, AppUserBadge[]>;
   };
   customCollections: AppCustomCollection[];
   saveCustomCollection: (params: {
@@ -202,6 +204,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       pendingSent: FriendRequestItem[];
     };
     customCollections?: AppCustomCollection[];
+    userBadges?: Record<string, AppUserBadge[]>;
   }>({
     mediaStatuses: [],
     recommendations: [],
@@ -211,6 +214,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       pendingSent: [],
     },
     customCollections: [],
+    userBadges: {},
   });
 
   // Load subscriptions, onlyMySubs & friendGroups from localStorage on start

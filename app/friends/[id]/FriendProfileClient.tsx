@@ -35,6 +35,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { BanUserModal } from "@/components/BanUserModal";
+import { ProfileBadgesTile } from "@/components/ProfileBadgesTile";
 import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { updateUserBanStatus } from "@/lib/admin-client";
 import Image from "next/image";
@@ -1151,6 +1152,16 @@ export function FriendProfileClient({
           </div>
         </div>
       </div>
+
+      {/* Earned Badges & Collections Showcase */}
+      <ProfileBadgesTile
+        watchedItems={friendWatched}
+        recommendationsCount={friendRecommendations.length}
+        friendsCount={adminProfile ? adminProfile.friends.length : undefined}
+        persistedBadges={communityData.userBadges?.[friend.id]}
+        isOwnProfile={isMe}
+        ownerName={friend.name}
+      />
 
       {/* Currently Watching TV Series Spotlight (TV only) */}
       {friendWatching.length > 0 && (

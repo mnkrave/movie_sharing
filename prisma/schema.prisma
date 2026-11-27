@@ -28,6 +28,7 @@ model User {
   upvotes         RecommendationUpvote[]
   recommendationReplies RecommendationReply[]
   customCollections CustomCollection[]
+  badges          UserBadge[]
   sentFriendships     Friendship[] @relation("UserSentFriendships")
   receivedFriendships Friendship[] @relation("UserReceivedFriendships")
   createdAt       DateTime         @default(now())
@@ -189,4 +190,15 @@ model StreamingProviderSnapshot {
   updatedAt   DateTime @updatedAt
 
   @@unique([tmdbId, mediaType])
+}
+
+model UserBadge {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badgeKey   String
+  unlockedAt DateTime @default(now())
+
+  @@unique([userId, badgeKey])
+  @@index([userId, unlockedAt])
 }
