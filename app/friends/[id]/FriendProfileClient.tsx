@@ -132,6 +132,7 @@ export function FriendProfileClient({
   const [searchFilter, setSearchFilter] = useState<string>("");
   const [requestSent, setRequestSent] = useState(false);
   const [requestError, setRequestError] = useState<string | null>(null);
+  const [showAllAgreed, setShowAllAgreed] = useState(false);
 
   const [adminProfile, setAdminProfile] = useState<AdminUserProfile | null>(null);
   const [adminLoading, setAdminLoading] = useState(false);
@@ -153,6 +154,7 @@ export function FriendProfileClient({
     setFilterType("ALL");
     setRatingFilter("ALL");
     setSearchFilter("");
+    setShowAllAgreed(false);
     setRequestSent(false);
     setRequestError(null);
   }, [friendIdParam]);
@@ -354,26 +356,20 @@ export function FriendProfileClient({
     return set;
   }, [communityData.mediaStatuses, myUserId, myName]);
 
-  // Taste Match & Common Hits Calculation
+  // Taste Match & Agreed Favorites Calculation
   const tasteMatchAnalysis = useMemo(() => {
-    const commonRated: {
+    interface RatedMatchItem {
       title: string;
       myRating: number;
       friendRating: number;
+      diff: number;
       mediaType: string;
       tmdbId: number;
       posterPath?: string | null;
-    }[] = [];
+    }
 
-    const commonLoved: {
-      title: string;
-      myRating: number;
-      friendRating: number;
-      mediaType: string;
-      tmdbId: number;
-      posterPath?: string | null;
-    }[] = [];
-
+    const commonRated: RatedMatchItem[] = [];
+    const commonLoved: RatedMatchItem[] = [];
     let totalDiff = 0;
 
     friendWatched.forEach((fw) => {
@@ -383,10 +379,11 @@ export function FriendProfileClient({
       if (myMatch && typeof myMatch.rating === "number" && typeof fw.rating === "number") {
         const diff = Math.abs(myMatch.rating - fw.rating);
         totalDiff += diff;
-        const item = {
+        const item: RatedMatchItem = {
           title: fw.title,
           myRating: myMatch.rating,
           friendRating: fw.rating,
+          diff,
           mediaType: fw.mediaType,
           tmdbId: fw.tmdbId,
           posterPath: fw.posterPath,
@@ -398,6 +395,24 @@ export function FriendProfileClient({
       }
     });
 
+    const strongAgreed = commonRated.filter(
+      (i) => i.diff <= 1 && i.myRating >= 7 && i.friendRating >= 7
+    );
+    const anyAgreed = commonRated.filter((i) => i.diff <= 1);
+    const baseAgreed =
+      strongAgreed.length > 0
+        ? strongAgreed
+        : anyAgreed.length > 0
+        ? anyAgreed
+        : commonLoved;
+
+    const commonAgreed = [...baseAgreed].sort(
+      (a, b) =>
+        a.diff - b.diff ||
+        b.myRating + b.friendRating - (a.myRating + a.friendRating) ||
+        TITLE_COLLATOR.compare(a.title, b.title)
+    );
+
     let score: number | null = null;
     if (commonRated.length >= 2) {
       const avgDiff = totalDiff / commonRated.length; // 0 to 9
@@ -408,7 +423,7 @@ export function FriendProfileClient({
     return {
       score,
       comparisonCount: commonRated.length,
-      commonLoved,
+      commonAgreed,
     };
   }, [friendWatched, myWatchedMap]);
 
@@ -1235,67 +1250,170 @@ export function FriendProfileClient({
       )}
 
       {/* Taste Match Analysis Section */}
-      {!isMe && (
-        <div className="p-6 sm:p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <Heart className="w-5 h-5 text-rose-500 fill-rose-500/20" />
-                <h2 className="text-lg font-black text-white">
-                  Geschmacks-Match zwischen dir und @{friend.name}
+      {!isMe && (() => {
+        const friendFirstName = friend.name.trim().split(/\s+/)[0] || friend.name;
+        const score = tasteMatchAnalysis.score;
+        const ringRadius = 19;
+        const ringCircumference = 2 * Math.PI * ringRadius;
+        const ringOffset =
+          score !== null ? ringCircumference * (1 - score / 100) : ringCircumference;
+        const scoreLabel =
+          score === null
+            ? ""
+            : score >= 85
+            ? "Sehr hohe Übereinstimmung"
+            : score >= 70
+            ? "Guter Match"
+            : "Unterschiedlicher Geschmack";
+        const agreedList = tasteMatchAnalysis.commonAgreed;
+        const displayedAgreed = showAllAgreed ? agreedList : agreedList.slice(0, 6);
+
+        return (
+          <section
+            aria-label="Geschmacks-Match"
+            className="trophy-cabinet rounded-2xl border border-border p-5 sm:p-6 shadow-xs space-y-5"
+          >
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-primary-text">
+                  Film-Kompatibilität
+                </p>
+                <h2 className="text-base sm:text-lg font-bold text-foreground tracking-tight">
+                  Geschmacks-Match mit {friend.name}
                 </h2>
+                <p className="text-xs text-muted-foreground tabular-nums">
+                  Basierend auf {tasteMatchAnalysis.comparisonCount}{" "}
+                  {tasteMatchAnalysis.comparisonCount === 1
+                    ? "gemeinsamer Bewertung"
+                    : "gemeinsamen Bewertungen"}
+                </p>
               </div>
-              <p className="text-xs text-slate-400">
-                Basierend auf den Filmen und Serien, die ihr beide gesehen und bewertet habt.
-              </p>
-            </div>
 
-            {tasteMatchAnalysis.score !== null ? (
-              <div className="flex items-center gap-2.5 px-4 py-2 rounded-2xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/40 text-emerald-300 font-black text-sm">
-                <Sparkles className="w-4 h-4 text-emerald-400" />
-                <span>{tasteMatchAnalysis.score}% Film-Match</span>
-              </div>
-            ) : (
-              <div className="px-3.5 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 text-xs font-semibold">
-                {tasteMatchAnalysis.comparisonCount === 0
-                  ? "Noch keine gemeinsamen Bewertungen"
-                  : `1 gemeinsamer Film (ab 2 Filmen gibt's einen Score)`}
-              </div>
-            )}
-          </div>
-
-          {tasteMatchAnalysis.commonLoved.length > 0 && (
-            <div className="pt-2 space-y-2">
-              <p className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                <span>🔥 Eure gemeinsamen Lieblingsfilme (beide 8–10★):</span>
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {tasteMatchAnalysis.commonLoved.map((item) => (
-                  <div
-                    key={`${item.mediaType}_${item.tmdbId}`}
-                    onClick={() =>
-                      openMediaModal({
-                        id: item.tmdbId,
-                        mediaType: item.mediaType as any,
-                        title: item.title,
-                        posterPath: item.posterPath,
-                      })
-                    }
-                    className="cursor-pointer group flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-400/50 transition text-xs text-slate-200"
-                  >
-                    <span className="font-bold group-hover:text-amber-300 transition truncate max-w-[200px]">
-                      {item.title}
-                    </span>
-                    <span className="text-[10px] text-amber-400 font-mono">
-                      (Du: {item.myRating}★ | @{friend.name}: {item.friendRating}★)
+              {score !== null ? (
+                <div className="trophy-card inline-flex items-center gap-3.5 px-4 py-2.5 rounded-2xl border border-border self-start sm:self-auto">
+                  <div className="relative w-12 h-12 shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 48 48" className="w-12 h-12 -rotate-90" aria-hidden="true">
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r={ringRadius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        className="text-muted"
+                      />
+                      <circle
+                        cx="24"
+                        cy="24"
+                        r={ringRadius}
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                        strokeLinecap="round"
+                        strokeDasharray={ringCircumference}
+                        strokeDashoffset={ringOffset}
+                        className="text-emerald-400"
+                      />
+                    </svg>
+                    <span className="absolute text-[11px] font-black text-foreground tabular-nums">
+                      {score}%
                     </span>
                   </div>
-                ))}
-              </div>
+                  <div>
+                    <p className="text-lg font-black text-foreground leading-none tabular-nums">
+                      {score}%
+                    </p>
+                    <p className="text-[11px] font-semibold text-emerald-400 mt-1">
+                      {scoreLabel}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="px-3.5 py-2 rounded-xl bg-muted border border-border text-muted-foreground text-xs font-semibold self-start sm:self-auto">
+                  Ab 2 gemeinsamen Bewertungen
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      )}
+
+            {agreedList.length > 0 && (
+              <div className="pt-4 border-t border-border/70 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground tabular-nums">
+                    Gleiche Meinung ({agreedList.length})
+                  </p>
+                  {agreedList.length > 6 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllAgreed((prev) => !prev)}
+                      className="text-xs font-semibold text-primary-text hover:underline cursor-pointer"
+                    >
+                      {showAllAgreed ? "Weniger anzeigen" : `Alle ${agreedList.length} zeigen`}
+                    </button>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {displayedAgreed.map((item) => (
+                    <button
+                      key={`${item.mediaType}_${item.tmdbId}`}
+                      type="button"
+                      onClick={() =>
+                        openMediaModal({
+                          id: item.tmdbId,
+                          mediaType: item.mediaType as "movie" | "tv",
+                          title: item.title,
+                          posterPath: item.posterPath,
+                        })
+                      }
+                      className="trophy-card group rounded-xl border border-border hover:border-primary/45 p-2.5 flex items-center gap-3 text-left transition cursor-pointer"
+                    >
+                      <div className="relative w-10 aspect-[2/3] rounded-lg overflow-hidden bg-muted border border-border/70 shrink-0">
+                        {item.posterPath ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w185${item.posterPath}`}
+                            alt={item.title}
+                            fill
+                            sizes="40px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                            {item.mediaType === "tv" ? (
+                              <Tv className="w-4 h-4" />
+                            ) : (
+                              <Film className="w-4 h-4" />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="text-xs sm:text-sm font-bold text-foreground group-hover:text-primary-text transition truncate">
+                          {item.title}
+                        </p>
+                        <p className="text-[11px] tabular-nums">
+                          {item.myRating === item.friendRating ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-primary-text">
+                              <Star className="w-3 h-3 fill-primary text-primary" aria-hidden="true" />
+                              <span>Beide {item.myRating} ★</span>
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">
+                              Du <strong className="text-foreground">{item.myRating}★</strong> ·{" "}
+                              {friendFirstName}{" "}
+                              <strong className="text-foreground">{item.friendRating}★</strong>
+                            </span>
+                          )}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </section>
+        );
+      })()}
 
       {/* Navigation Tabs & Content Panels */}
       <div className="space-y-5">
