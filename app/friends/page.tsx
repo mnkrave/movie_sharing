@@ -420,9 +420,9 @@ function FriendsContent() {
                   </p>
                 ) : (
                   <div className="space-y-3">
-                    {friendGroups.slice(0, 4).map((grp) => (
+                    {friendGroups.slice(0, 4).map((grp, idx) => (
                       <Link
-                        key={grp.id}
+                        key={`crew-${idx}`}
                         href={`/recommendations?tab=ai&prompt=${encodeURIComponent(
                           `Heute will ich mit ${grp.name} einen Film schauen`
                         )}`}
