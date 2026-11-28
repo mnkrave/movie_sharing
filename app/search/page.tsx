@@ -1,11 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { MediaItem, PersonSearchResult, formatGermanReleaseDate } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
+import { useCatalogDiscover, usePersonSearch } from "@/lib/useCatalogDiscover";
 import {
   EXTENDED_GENRES,
   COUNTRIES,
@@ -46,53 +46,11 @@ function ExtendedSearchContent() {
   const [era, setEra] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortByOption>("popularity.desc");
   const [query, setQuery] = useState("");
-
-  const [results, setResults] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [matchingPersons, setMatchingPersons] = useState<PersonSearchResult[]>([]);
-  const [selectedActorPerson, setSelectedActorPerson] = useState<PersonSearchResult | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Auto-resolve actor profile info when actor filter changes
-  useEffect(() => {
-    if (!actor.trim()) {
-      setSelectedActorPerson(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(actor.trim())}`);
-        const data = await res.json();
-        const first = (data.results || data.persons || [])[0];
-        setSelectedActorPerson(first || null);
-      } catch (e) {
-        // ignore
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [actor]);
-
-  // Auto-search matching persons when main query changes
-  useEffect(() => {
-    if (!query.trim() || query.trim().length < 2) {
-      setMatchingPersons([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(query.trim())}`);
-        const data = await res.json();
-        setMatchingPersons((data.results || data.persons || []).slice(0, 3));
-      } catch (e) {
-        // ignore
-      }
-    }, 280);
-    return () => clearTimeout(timer);
-  }, [query]);
+  const actorMatches = usePersonSearch(actor, { minLength: 1, limit: 1, delayMs: 250 });
+  const selectedActorPerson = actorMatches[0] ?? null;
+  const matchingPersons = usePersonSearch(query, { minLength: 2, limit: 3, delayMs: 280 });
 
   // Initialize from URL search params if present
   useEffect(() => {
@@ -118,86 +76,22 @@ function ExtendedSearchContent() {
     if (typeParam === "movie" || typeParam === "tv") setMediaType(typeParam);
   }, [searchParams]);
 
-  // Fetch function
-  const fetchResults = useCallback(
-    async (targetPage = 1, append = false) => {
-      if (!append) {
-        abortControllerRef.current?.abort();
-        setLoading(true);
-        setLoadingMore(false);
-      } else {
-        setLoadingMore(true);
-      }
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      try {
-        const params = new URLSearchParams();
-        if (mediaType !== "all") params.set("mediaType", mediaType);
-        if (genreId !== null) params.set("genreId", String(genreId));
-        if (director.trim()) params.set("director", director.trim());
-        if (actor.trim()) params.set("actor", actor.trim());
-        if (country !== "ALL") params.set("country", country);
-        if (minRating > 0) params.set("minRating", String(minRating));
-        if (era !== "all") params.set("era", era);
-        if (sortBy) params.set("sortBy", sortBy);
-        if (query.trim()) params.set("query", query.trim());
-        params.set("page", String(targetPage));
-
-        const res = await fetch(`/api/tmdb/discover?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          throw new Error(`Discover failed (${res.status})`);
-        }
-        const data = await res.json();
-        const incoming: MediaItem[] = data.results || [];
-
-        if (append) {
-          setResults((prev) => {
-            const seen = new Set(prev.map((item) => `${item.mediaType}-${item.id}`));
-            const unique = incoming.filter(
-              (item) => !seen.has(`${item.mediaType}-${item.id}`)
-            );
-            return [...prev, ...unique];
-          });
-        } else {
-          setResults(incoming);
-        }
-        setPage(targetPage);
-        setHasMore(Boolean(data.hasMore));
-      } catch (err) {
-        if ((err as Error)?.name !== "AbortError") {
-          console.error("Extended discover error:", err);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setLoadingMore(false);
-        }
-      }
-    },
+  const discoverFilters = useMemo(
+    () => ({ mediaType, genreId, director, actor, country, minRating, era, sortBy, query }),
     [mediaType, genreId, director, actor, country, minRating, era, sortBy, query]
   );
 
-  // Debounced auto-fetch
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchResults(1, false);
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-      abortControllerRef.current?.abort();
-    };
-  }, [fetchResults]);
-
-  const handleLoadMore = () => {
-    if (!loading && !loadingMore && hasMore) {
-      fetchResults(page + 1, true);
-    }
-  };
+  const { results, loading, loadingMore, hasMore, handleLoadMore } = useCatalogDiscover({
+    filters: discoverFilters,
+    initialResults: [],
+    initialPage: 1,
+    initialHasMore: false,
+    initialLoading: true,
+    skipInitialFetch: false,
+    useTrendingMode: false,
+    debounceMs: 300,
+    textDebounceMs: 300,
+  });
 
   const advancedFilterCount =
     (genreId !== null ? 1 : 0) +

@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import Image from "next/image";
 import { useMedia } from "@/components/MediaContext";
 import type { AppMediaStatus } from "@/lib/store";
-import { formatWatchedSeasons, getItemRuntimeMinutes } from "@/lib/seasons";
+import { computeWatchtimeBreakdown, formatWatchedSeasons } from "@/lib/seasons";
 import type { BatchMediaMeta } from "@/app/api/tmdb/batch-genres/route";
 import { Clock, Trophy, BarChart3, Film, Tv, Star } from "lucide-react";
 
@@ -21,55 +21,15 @@ export function ProfileWatchtimePanel({
   const [subTab, setSubTab] = useState<"contributors" | "genres">("contributors");
   const [contributorLimit, setContributorLimit] = useState<10 | 15 | 25>(15);
 
-  const totalStats = useMemo(() => {
-    let totalMinutes = 0;
-    let movieMinutes = 0;
-    let tvMinutes = 0;
-    let movieCount = 0;
-    let tvCount = 0;
-
-    watchedItems.forEach((item) => {
-      const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const minutes = getItemRuntimeMinutes(item, meta);
-      totalMinutes += minutes;
-
-      if (item.mediaType === "movie") {
-        movieMinutes += minutes;
-        movieCount++;
-      } else {
-        tvMinutes += minutes;
-        tvCount++;
-      }
-    });
-
-    const totalHours = Math.round(totalMinutes / 60);
-    const totalDays = (totalHours / 24).toFixed(1);
-    const movieHours = Math.round(movieMinutes / 60);
-    const tvHours = Math.round(tvMinutes / 60);
-    const movieSharePct = totalMinutes > 0 ? Math.round((movieMinutes / totalMinutes) * 100) : 0;
-    const tvSharePct = totalMinutes > 0 ? 100 - movieSharePct : 0;
-    const avgMovieMin = movieCount > 0 ? Math.round(movieMinutes / movieCount) : 0;
-    const avgTvHours = tvCount > 0 ? Math.round((tvMinutes / tvCount / 60) * 10) / 10 : 0;
-
-    return {
-      totalMinutes,
-      totalHours,
-      totalDays,
-      movieHours,
-      tvHours,
-      movieCount,
-      tvCount,
-      movieSharePct,
-      tvSharePct,
-      avgMovieMin,
-      avgTvHours,
-    };
-  }, [watchedItems, metaMap]);
+  const totalStats = useMemo(
+    () => computeWatchtimeBreakdown(watchedItems, metaMap),
+    [watchedItems, metaMap]
+  );
 
   const contributors = useMemo(() => {
-    const list = watchedItems.map((item) => {
+    const list = watchedItems.map((item, idx) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const minutes = getItemRuntimeMinutes(item, meta);
+      const minutes = totalStats.itemMinutes[idx] ?? 0;
       let seasonInfo: string | null = null;
       if (item.mediaType === "tv") {
         const total = item.totalSeasons || meta?.numberOfSeasons || 1;
@@ -99,7 +59,7 @@ export function ProfileWatchtimePanel({
 
     list.sort((a, b) => b.minutes - a.minutes);
     return list.slice(0, contributorLimit);
-  }, [watchedItems, metaMap, totalStats.totalMinutes, contributorLimit]);
+  }, [watchedItems, metaMap, totalStats.totalMinutes, totalStats.itemMinutes, contributorLimit]);
 
   const maxContributorMinutes = contributors[0]?.minutes || 1;
 
@@ -109,35 +69,23 @@ export function ProfileWatchtimePanel({
       { name: string; minutes: number; count: number; ratingSum: number; ratedCount: number }
     > = {};
 
-    watchedItems.forEach((item) => {
+    watchedItems.forEach((item, idx) => {
       const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      const itemMinutes = getItemRuntimeMinutes(item, meta);
+      const itemMinutes = totalStats.itemMinutes[idx] ?? 0;
       const genres = meta?.genres || [];
+      const targetGenres = genres.length > 0 ? genres.map((g) => g.name) : ["Sonstige"];
 
-      if (genres.length === 0) {
-        const fallback = "Sonstige";
-        if (!map[fallback]) {
-          map[fallback] = { name: fallback, minutes: 0, count: 0, ratingSum: 0, ratedCount: 0 };
+      targetGenres.forEach((genreName) => {
+        if (!map[genreName]) {
+          map[genreName] = { name: genreName, minutes: 0, count: 0, ratingSum: 0, ratedCount: 0 };
         }
-        map[fallback].minutes += itemMinutes;
-        map[fallback].count += 1;
+        map[genreName].minutes += itemMinutes;
+        map[genreName].count += 1;
         if (item.rating) {
-          map[fallback].ratingSum += item.rating;
-          map[fallback].ratedCount += 1;
+          map[genreName].ratingSum += item.rating;
+          map[genreName].ratedCount += 1;
         }
-      } else {
-        genres.forEach((g) => {
-          if (!map[g.name]) {
-            map[g.name] = { name: g.name, minutes: 0, count: 0, ratingSum: 0, ratedCount: 0 };
-          }
-          map[g.name].minutes += itemMinutes;
-          map[g.name].count += 1;
-          if (item.rating) {
-            map[g.name].ratingSum += item.rating;
-            map[g.name].ratedCount += 1;
-          }
-        });
-      }
+      });
     });
 
     const totalGenreMinutesSum = Object.values(map).reduce((acc, g) => acc + g.minutes, 0) || 1;
@@ -153,7 +101,7 @@ export function ProfileWatchtimePanel({
           g.ratedCount > 0 ? Math.round((g.ratingSum / g.ratedCount) * 10) / 10 : 0,
       }))
       .sort((a, b) => b.minutes - a.minutes);
-  }, [watchedItems, metaMap]);
+  }, [watchedItems, metaMap, totalStats.itemMinutes]);
 
   if (watchedItems.length === 0) {
     return (

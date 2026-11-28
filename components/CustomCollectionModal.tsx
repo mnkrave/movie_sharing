@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useMedia } from "./MediaContext";
 import type { AppCustomCollection, AppCustomCollectionMovie } from "@/lib/store";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { BottomSheetDialog } from "./BottomSheetDialog";
 import {
   X,
@@ -87,7 +88,7 @@ export function CustomCollectionModal({
   const myUserId = (session?.user as any)?.id;
   const myName = session?.user?.name;
   const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL ||
     (session?.user as any)?.role === "ADMIN";
 
   // My top watched items for 1-click quick-add

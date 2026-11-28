@@ -21,7 +21,7 @@ import {
   Mail,
 } from "lucide-react";
 import { POPULAR_SUBSCRIPTIONS } from "@/lib/tmdb";
-import { isValidEmailAddress } from "@/lib/constants";
+import { isValidEmailAddress, SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { isCurrentUserMatch, isSamePerson } from "@/lib/auth-match";
 import { useMedia, FriendGroup } from "@/components/MediaContext";
 import { PullToRefresh } from "@/components/PullToRefresh";
@@ -204,7 +204,7 @@ function FriendsContent() {
     };
 
   const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL ||
     (session?.user as any)?.role === "ADMIN";
 
   const pendingReceived = communityData.friendRequests?.pendingReceived || [];
@@ -816,7 +816,9 @@ function FriendsContent() {
                               <p className="text-sm font-semibold text-foreground truncate">
                                 {user.name}
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                              {user.email && (
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                              )}
                               {typeof user.mutualWatchedCount === "number" &&
                                 user.mutualWatchedCount > 0 && (
                                   <p className="text-[11px] text-primary-text font-medium mt-0.5">
@@ -850,7 +852,7 @@ function FriendsContent() {
                               <button
                                 type="button"
                                 disabled={isSubmitting}
-                                onClick={() => handleSendRequest(user.email || user.name)}
+                                onClick={() => handleSendRequest(user.id)}
                                 className="px-3 py-1.5 rounded-lg bg-background hover:bg-muted border border-border text-foreground font-semibold text-xs transition disabled:opacity-50 cursor-pointer"
                               >
                                 {isSubmitting ? "..." : "Hinzufügen"}

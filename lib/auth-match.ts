@@ -34,13 +34,11 @@ export function isCurrentUserMatch(
   current: CurrentUserIdentity,
   target: TargetUserCandidate
 ): boolean {
-  if (current.userId && target.userId && target.userId === current.userId) return true;
-  if (
-    current.email &&
-    target.userEmail &&
-    target.userEmail.toLowerCase() === current.email.toLowerCase()
-  ) {
-    return true;
+  if (current.userId && target.userId) {
+    return target.userId === current.userId;
+  }
+  if (current.email && target.userEmail) {
+    return target.userEmail.toLowerCase() === current.email.toLowerCase();
   }
   return isSamePerson(target.userName, current.name);
 }

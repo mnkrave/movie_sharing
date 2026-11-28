@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireUserSession } from "@/lib/auth";
+import { isSamePerson } from "@/lib/auth-match";
 import {
   normalizeProviderKey,
   resolveCollectionEntry,
@@ -69,20 +70,6 @@ function normalizeTitle(t: string): string {
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "")
     .trim();
-}
-
-export function isSamePerson(nameA?: string | null, nameB?: string | null): boolean {
-  if (!nameA || !nameB) return false;
-  const a = nameA.toLowerCase().trim();
-  const b = nameB.toLowerCase().trim();
-  if (a === b) return true;
-  const aParts = a.split(/\s+/);
-  const bParts = b.split(/\s+/);
-  // Matches e.g. "Lukas" and "Lukas Reinle", or "Birgit" and "Birgit Reinle"
-  if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) {
-    return true;
-  }
-  return a.startsWith(b) || b.startsWith(a);
 }
 
 export function deduplicateParticipants(rawNames: string[]): string[] {

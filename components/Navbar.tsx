@@ -8,6 +8,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "./MediaContext";
 import { NavbarThemeToggle, ThemeSelector } from "./ThemeToggle";
 import { isCurrentUserMatch } from "@/lib/auth-match";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 import {
   Video,
@@ -133,7 +134,7 @@ export function Navbar() {
   };
 
   const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL ||
     (session?.user as any)?.role === "ADMIN";
 
   const myUserId = (session?.user as any)?.id as string | undefined;

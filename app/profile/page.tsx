@@ -17,8 +17,9 @@ import { SubscriptionToggleList, SwitchRow } from "@/components/SubscriptionTogg
 import { useBatchMediaMeta } from "@/lib/useBatchMediaMeta";
 import { useWatchlistAlerts } from "@/lib/useWatchlistAlerts";
 import { isCurrentUserMatch } from "@/lib/auth-match";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import type { AppRecommendation } from "@/lib/store";
-import { formatWatchedSeasons, getItemRuntimeMinutes } from "@/lib/seasons";
+import { computeWatchtimeBreakdown, formatWatchedSeasons } from "@/lib/seasons";
 import {
   User,
   Star,
@@ -185,7 +186,7 @@ function ProfileContent() {
   const myName = session?.user?.name || "Kino-Fan";
   const myEmail = session?.user?.email || "";
   const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL ||
     (session?.user as any)?.role === "ADMIN";
 
   const myStatuses = useMemo(() => {
@@ -259,15 +260,10 @@ function ProfileContent() {
     return Math.round((diffSum / count) * 10) / 10;
   }, [ratedItems, metaMap]);
 
-  const totalMinutes = useMemo(() => {
-    return watchedItems.reduce((acc, item) => {
-      const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
-      return acc + getItemRuntimeMinutes(item, meta);
-    }, 0);
-  }, [watchedItems, metaMap]);
-
-  const totalHours = Math.round(totalMinutes / 60);
-  const totalDays = (totalHours / 24).toFixed(1);
+  const { totalHours, totalDays } = useMemo(
+    () => computeWatchtimeBreakdown(watchedItems, metaMap),
+    [watchedItems, metaMap]
+  );
 
   const recentRatings = useMemo(() => {
     return [...watchedItems]

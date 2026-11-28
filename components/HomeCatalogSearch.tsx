@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import React, { useState, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { MediaItem } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
+import { useCatalogDiscover, usePersonSearch } from "@/lib/useCatalogDiscover";
 import {
   EXTENDED_GENRES,
   COUNTRIES,
@@ -26,11 +27,73 @@ import {
   User,
 } from "lucide-react";
 
-interface PersonBadge {
-  id: number;
-  name: string;
-  profilePath: string | null;
-  knownFor?: string;
+interface PersonFilterFieldProps {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  suggestions: readonly string[];
+  rightExtra?: React.ReactNode;
+}
+
+function PersonFilterField({
+  id,
+  label,
+  value,
+  onChange,
+  placeholder,
+  suggestions,
+  rightExtra,
+}: PersonFilterFieldProps) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <label htmlFor={id} className="text-[11px] font-bold text-muted-foreground">
+          {label}
+        </label>
+        <div className="flex items-center gap-2">
+          {rightExtra}
+          {value && (
+            <button
+              type="button"
+              onClick={() => onChange("")}
+              className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              Leeren
+            </button>
+          )}
+        </div>
+      </div>
+      <input
+        id={id}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full px-3 py-2 rounded-xl bg-muted/70 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60"
+      />
+      <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
+        {suggestions.map((name) => {
+          const selected = value.toLowerCase().trim() === name.toLowerCase();
+          return (
+            <button
+              key={name}
+              type="button"
+              onClick={() => onChange(selected ? "" : name)}
+              className={`whitespace-nowrap px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer ${
+                selected
+                  ? "bg-primary-soft text-primary-text border-primary/40 font-semibold"
+                  : "bg-muted/50 text-muted-foreground border-border hover:text-foreground"
+              }`}
+            >
+              {name}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 interface HomeCatalogSearchProps {
@@ -49,30 +112,34 @@ export function HomeCatalogSearch({ initialTrending }: HomeCatalogSearchProps) {
   const [sortBy, setSortBy] = useState<SortByOption>("popularity.desc");
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const [results, setResults] = useState<MediaItem[]>(initialTrending);
-  const [page, setPage] = useState(2);
-  const [hasMore, setHasMore] = useState(true);
-  const [loading, setLoading] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [matchingPersons, setMatchingPersons] = useState<PersonBadge[]>([]);
-  const [selectedActorPerson, setSelectedActorPerson] = useState<PersonBadge | null>(null);
-
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const isFirstMountRef = useRef(true);
-  const prevTextRef = useRef({ query: "", director: "", actor: "" });
-
-  const isDefaultTrendingMode = useMemo(
-    () =>
-      !query.trim() &&
-      genreId === null &&
-      !director.trim() &&
-      !actor.trim() &&
-      country === "ALL" &&
-      minRating === 0 &&
-      era === "all" &&
-      sortBy === "popularity.desc",
-    [query, genreId, director, actor, country, minRating, era, sortBy]
+  const filters = useMemo(
+    () => ({ mediaType, genreId, director, actor, country, minRating, era, sortBy, query }),
+    [mediaType, genreId, director, actor, country, minRating, era, sortBy, query]
   );
+
+  const {
+    results,
+    loading,
+    loadingMore,
+    hasMore,
+    isDefaultTrendingMode,
+    handleLoadMore,
+    triggerImmediateSearch,
+  } = useCatalogDiscover({
+    filters,
+    initialResults: initialTrending,
+    initialPage: 2,
+    initialHasMore: true,
+    initialLoading: false,
+    skipInitialFetch: true,
+    useTrendingMode: true,
+    debounceMs: 0,
+    textDebounceMs: 200,
+  });
+
+  const matchingPersons = usePersonSearch(query, { minLength: 2, limit: 3, delayMs: 220 });
+  const actorMatches = usePersonSearch(actor, { minLength: 1, limit: 1, delayMs: 220 });
+  const selectedActorPerson = actorMatches[0] ?? null;
 
   const advancedFilterCount =
     (sortBy !== "popularity.desc" ? 1 : 0) +
@@ -88,176 +155,81 @@ export function HomeCatalogSearch({ initialTrending }: HomeCatalogSearchProps) {
     (query.trim() ? 1 : 0) +
     advancedFilterCount;
 
-  const buildDiscoverParams = useCallback(
-    (targetPage: number, trendingOnly: boolean) => {
-      const params = new URLSearchParams();
-      if (mediaType !== "all") params.set("mediaType", mediaType);
-      if (trendingOnly) {
-        params.set("trending", "1");
-      } else {
-        if (genreId !== null) params.set("genreId", String(genreId));
-        if (director.trim()) params.set("director", director.trim());
-        if (actor.trim()) params.set("actor", actor.trim());
-        if (country !== "ALL") params.set("country", country);
-        if (minRating > 0) params.set("minRating", String(minRating));
-        if (era !== "all") params.set("era", era);
-        if (sortBy) params.set("sortBy", sortBy);
-        if (query.trim()) params.set("query", query.trim());
-      }
-      params.set("page", String(targetPage));
-      return params;
-    },
-    [mediaType, genreId, director, actor, country, minRating, era, sortBy, query]
-  );
-
-  const fetchCatalog = useCallback(
-    async (targetPage: number, append: boolean, trendingOnly: boolean) => {
-      if (!append) {
-        abortControllerRef.current?.abort();
-        setLoading(true);
-        setLoadingMore(false);
-      } else {
-        setLoadingMore(true);
-      }
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      try {
-        const params = buildDiscoverParams(targetPage, trendingOnly);
-        const res = await fetch(`/api/tmdb/discover?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) throw new Error(`Discover failed (${res.status})`);
-        const data = await res.json();
-        const incoming: MediaItem[] = data.results || [];
-
-        if (append) {
-          setResults((prev) => {
-            const seen = new Set(prev.map((item) => `${item.mediaType}_${item.id}`));
-            const unique = incoming.filter((item) => !seen.has(`${item.mediaType}_${item.id}`));
-            return [...prev, ...unique];
-          });
-        } else {
-          setResults(incoming);
+  const activeChips = [
+    query.trim()
+      ? {
+          key: "query",
+          label: `Suche: „${query.trim()}“`,
+          ariaLabel: "Suche entfernen",
+          onClear: () => setQuery(""),
+          highlight: true,
         }
-        setPage(targetPage);
-        setHasMore(Boolean(data.hasMore));
-      } catch (err) {
-        if ((err as Error)?.name !== "AbortError") {
-          console.error("Home catalog discover error:", err);
+      : null,
+    mediaType !== "all"
+      ? {
+          key: "mediaType",
+          label: mediaType === "movie" ? "Nur Filme" : "Nur Serien",
+          ariaLabel: "Format zurücksetzen",
+          onClear: () => setMediaType("all"),
         }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setLoadingMore(false);
+      : null,
+    genreId !== null
+      ? {
+          key: "genre",
+          label: EXTENDED_GENRES.find((g) => g.id === genreId)?.label || "",
+          ariaLabel: "Genre entfernen",
+          onClear: () => setGenreId(null),
         }
-      }
-    },
-    [buildDiscoverParams]
-  );
-
-  useEffect(() => {
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false;
-      return;
-    }
-
-    const textChanged =
-      prevTextRef.current.query !== query ||
-      prevTextRef.current.director !== director ||
-      prevTextRef.current.actor !== actor;
-    prevTextRef.current = { query, director, actor };
-
-    if (isDefaultTrendingMode && mediaType === "all") {
-      abortControllerRef.current?.abort();
-      setResults(initialTrending);
-      setPage(2);
-      setHasMore(true);
-      setLoading(false);
-      setLoadingMore(false);
-      return;
-    }
-
-    if (isDefaultTrendingMode && (mediaType === "movie" || mediaType === "tv")) {
-      const immediateSubset = initialTrending.filter((item) => item.mediaType === mediaType);
-      if (immediateSubset.length > 0) {
-        setResults(immediateSubset);
-      }
-      fetchCatalog(1, false, true);
-      return () => {
-        abortControllerRef.current?.abort();
-      };
-    }
-
-    const delay = textChanged ? 200 : 0;
-    const timer = setTimeout(() => {
-      fetchCatalog(1, false, false);
-    }, delay);
-
-    return () => {
-      clearTimeout(timer);
-      abortControllerRef.current?.abort();
-    };
-  }, [
-    query,
-    director,
-    actor,
-    mediaType,
-    genreId,
-    country,
-    minRating,
-    era,
-    sortBy,
-    isDefaultTrendingMode,
-    initialTrending,
-    fetchCatalog,
-  ]);
-
-  // Resolve matching persons when searching by query
-  useEffect(() => {
-    const trimmed = query.trim();
-    if (trimmed.length < 2) {
-      setMatchingPersons([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(trimmed)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setMatchingPersons((data.results || data.persons || []).slice(0, 3));
-      } catch {
-        // ignore transient errors
-      }
-    }, 220);
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  // Resolve actor spotlight link when filtering by actor
-  useEffect(() => {
-    const trimmed = actor.trim();
-    if (!trimmed) {
-      setSelectedActorPerson(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(trimmed)}`);
-        if (!res.ok) return;
-        const data = await res.json();
-        setSelectedActorPerson((data.results || data.persons || [])[0] || null);
-      } catch {
-        // ignore transient errors
-      }
-    }, 220);
-    return () => clearTimeout(timer);
-  }, [actor]);
-
-  const handleLoadMore = () => {
-    if (loading || loadingMore || !hasMore) return;
-    fetchCatalog(page + 1, true, isDefaultTrendingMode);
-  };
+      : null,
+    director.trim()
+      ? {
+          key: "director",
+          label: `Regie: ${director.trim()}`,
+          ariaLabel: "Regie entfernen",
+          onClear: () => setDirector(""),
+        }
+      : null,
+    actor.trim()
+      ? {
+          key: "actor",
+          label: `Cast: ${actor.trim()}`,
+          ariaLabel: "Cast entfernen",
+          onClear: () => setActor(""),
+        }
+      : null,
+    country !== "ALL"
+      ? {
+          key: "country",
+          label: COUNTRIES.find((c) => c.code === country)?.label || country,
+          ariaLabel: "Land entfernen",
+          onClear: () => setCountry("ALL"),
+        }
+      : null,
+    minRating > 0
+      ? {
+          key: "rating",
+          label: `★ ${minRating}+`,
+          ariaLabel: "Bewertung zurücksetzen",
+          onClear: () => setMinRating(0),
+        }
+      : null,
+    era !== "all"
+      ? {
+          key: "era",
+          label: ERAS.find((e) => e.id === era)?.label || era,
+          ariaLabel: "Zeitraum entfernen",
+          onClear: () => setEra("all"),
+        }
+      : null,
+    sortBy !== "popularity.desc"
+      ? {
+          key: "sort",
+          label: SORT_OPTIONS.find((s) => s.value === sortBy)?.label || sortBy,
+          ariaLabel: "Sortierung zurücksetzen",
+          onClear: () => setSortBy("popularity.desc"),
+        }
+      : null,
+  ].filter((chip): chip is NonNullable<typeof chip> => Boolean(chip));
 
   const resetAllFilters = () => {
     setQuery("");
@@ -269,11 +241,6 @@ export function HomeCatalogSearch({ initialTrending }: HomeCatalogSearchProps) {
     setMinRating(0);
     setEra("all");
     setSortBy("popularity.desc");
-  };
-
-  const triggerImmediateSearch = () => {
-    if (isDefaultTrendingMode && mediaType === "all") return;
-    fetchCatalog(1, false, isDefaultTrendingMode);
   };
 
   const sectionTitle = isDefaultTrendingMode
@@ -543,191 +510,61 @@ export function HomeCatalogSearch({ initialTrending }: HomeCatalogSearchProps) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Director Filter */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="home-filter-director"
-                    className="text-[11px] font-bold text-muted-foreground"
-                  >
-                    Regie
-                  </label>
-                  {director && (
-                    <button
-                      type="button"
-                      onClick={() => setDirector("")}
-                      className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
-                    >
-                      Leeren
-                    </button>
-                  )}
-                </div>
-                <input
-                  id="home-filter-director"
-                  type="text"
-                  value={director}
-                  onChange={(e) => setDirector(e.target.value)}
-                  placeholder="z. B. Christopher Nolan, Denis Villeneuve"
-                  className="w-full px-3 py-2 rounded-xl bg-muted/70 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60"
-                />
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-                  {POPULAR_DIRECTORS.map((name) => {
-                    const selected = director.toLowerCase().trim() === name.toLowerCase();
-                    return (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => setDirector(selected ? "" : name)}
-                        className={`whitespace-nowrap px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer ${
-                          selected
-                            ? "bg-primary-soft text-primary-text border-primary/40 font-semibold"
-                            : "bg-muted/50 text-muted-foreground border-border hover:text-foreground"
-                        }`}
-                      >
-                        {name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <PersonFilterField
+                id="home-filter-director"
+                label="Regie"
+                value={director}
+                onChange={setDirector}
+                placeholder="z. B. Christopher Nolan, Denis Villeneuve"
+                suggestions={POPULAR_DIRECTORS}
+              />
 
-              {/* Actor Filter */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label
-                    htmlFor="home-filter-actor"
-                    className="text-[11px] font-bold text-muted-foreground"
-                  >
-                    Schauspieler:in (Cast)
-                  </label>
-                  <div className="flex items-center gap-2">
-                    {selectedActorPerson && (
-                      <Link
-                        href={`/person/${selectedActorPerson.id}`}
-                        className="text-[11px] font-semibold text-primary-text hover:underline inline-flex items-center gap-0.5"
-                      >
-                        <span>Profil: {selectedActorPerson.name}</span>
-                        <ChevronRight className="w-3 h-3" aria-hidden="true" />
-                      </Link>
-                    )}
-                    {actor && (
-                      <button
-                        type="button"
-                        onClick={() => setActor("")}
-                        className="text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
-                      >
-                        Leeren
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <input
-                  id="home-filter-actor"
-                  type="text"
-                  value={actor}
-                  onChange={(e) => setActor(e.target.value)}
-                  placeholder="z. B. Leonardo DiCaprio, Cillian Murphy"
-                  className="w-full px-3 py-2 rounded-xl bg-muted/70 border border-border text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary/60"
-                />
-                <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none">
-                  {POPULAR_ACTORS.map((name) => {
-                    const selected = actor.toLowerCase().trim() === name.toLowerCase();
-                    return (
-                      <button
-                        key={name}
-                        type="button"
-                        onClick={() => setActor(selected ? "" : name)}
-                        className={`whitespace-nowrap px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer ${
-                          selected
-                            ? "bg-primary-soft text-primary-text border-primary/40 font-semibold"
-                            : "bg-muted/50 text-muted-foreground border-border hover:text-foreground"
-                        }`}
-                      >
-                        {name}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
+              <PersonFilterField
+                id="home-filter-actor"
+                label="Schauspieler:in (Cast)"
+                value={actor}
+                onChange={setActor}
+                placeholder="z. B. Leonardo DiCaprio, Cillian Murphy"
+                suggestions={POPULAR_ACTORS}
+                rightExtra={
+                  selectedActorPerson ? (
+                    <Link
+                      href={`/person/${selectedActorPerson.id}`}
+                      className="text-[11px] font-semibold text-primary-text hover:underline inline-flex items-center gap-0.5"
+                    >
+                      <span>Profil: {selectedActorPerson.name}</span>
+                      <ChevronRight className="w-3 h-3" aria-hidden="true" />
+                    </Link>
+                  ) : null
+                }
+              />
             </div>
           </div>
         )}
 
         {/* Active Filter Chips */}
-        {activeFilterCount > 0 && (
+        {activeChips.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5 pt-1 text-xs">
-            {query.trim() && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-primary-soft text-primary-text border border-primary/30 font-medium">
-                <span>Suche: „{query.trim()}“</span>
-                <button type="button" onClick={() => setQuery("")} aria-label="Suche entfernen" className="cursor-pointer">
+            {activeChips.map((chip) => (
+              <span
+                key={chip.key}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border font-medium ${
+                  chip.highlight
+                    ? "bg-primary-soft text-primary-text border-primary/30"
+                    : "bg-muted text-foreground border-border"
+                }`}
+              >
+                <span>{chip.label}</span>
+                <button
+                  type="button"
+                  onClick={chip.onClear}
+                  aria-label={chip.ariaLabel}
+                  className="cursor-pointer"
+                >
                   <X className="w-3 h-3" />
                 </button>
               </span>
-            )}
-            {mediaType !== "all" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>{mediaType === "movie" ? "Nur Filme" : "Nur Serien"}</span>
-                <button type="button" onClick={() => setMediaType("all")} aria-label="Format zurücksetzen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {genreId !== null && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>{EXTENDED_GENRES.find((g) => g.id === genreId)?.label}</span>
-                <button type="button" onClick={() => setGenreId(null)} aria-label="Genre entfernen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {director.trim() && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>Regie: {director.trim()}</span>
-                <button type="button" onClick={() => setDirector("")} aria-label="Regie entfernen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {actor.trim() && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>Cast: {actor.trim()}</span>
-                <button type="button" onClick={() => setActor("")} aria-label="Cast entfernen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {country !== "ALL" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>{COUNTRIES.find((c) => c.code === country)?.label}</span>
-                <button type="button" onClick={() => setCountry("ALL")} aria-label="Land entfernen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {minRating > 0 && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>★ {minRating}+</span>
-                <button type="button" onClick={() => setMinRating(0)} aria-label="Bewertung zurücksetzen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {era !== "all" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>{ERAS.find((e) => e.id === era)?.label}</span>
-                <button type="button" onClick={() => setEra("all")} aria-label="Zeitraum entfernen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
-            {sortBy !== "popularity.desc" && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-muted text-foreground border border-border font-medium">
-                <span>{SORT_OPTIONS.find((s) => s.value === sortBy)?.label}</span>
-                <button type="button" onClick={() => setSortBy("popularity.desc")} aria-label="Sortierung zurücksetzen" className="cursor-pointer">
-                  <X className="w-3 h-3" />
-                </button>
-              </span>
-            )}
+            ))}
           </div>
         )}
       </div>
