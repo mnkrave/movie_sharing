@@ -1,11 +1,20 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { MediaItem, PersonSearchResult, formatGermanReleaseDate } from "@/lib/tmdb";
 import { MediaCard } from "@/components/MediaCard";
+import { useCatalogDiscover, usePersonSearch } from "@/lib/useCatalogDiscover";
+import {
+  EXTENDED_GENRES,
+  COUNTRIES,
+  POPULAR_DIRECTORS,
+  POPULAR_ACTORS,
+  ERAS,
+  RATINGS,
+  SortByOption,
+} from "@/lib/search-filters";
 import {
   SlidersHorizontal,
   Search,
@@ -24,84 +33,6 @@ import {
   ChevronRight,
 } from "lucide-react";
 
-const EXTENDED_GENRES = [
-  { id: null, label: "Alle Genres", emoji: "✨" },
-  { id: 28, label: "Action", emoji: "💥" },
-  { id: 878, label: "Sci-Fi", emoji: "🚀" },
-  { id: 53, label: "Thriller", emoji: "😱" },
-  { id: 35, label: "Komödie", emoji: "😂" },
-  { id: 18, label: "Drama", emoji: "🎭" },
-  { id: 80, label: "Krimi", emoji: "🕵️" },
-  { id: 12, label: "Abenteuer", emoji: "🗺️" },
-  { id: 14, label: "Fantasy", emoji: "🧙‍♂️" },
-  { id: 16, label: "Animation", emoji: "✨" },
-  { id: 27, label: "Horror", emoji: "🩸" },
-  { id: 99, label: "Doku", emoji: "🎥" },
-  { id: 10749, label: "Romantik", emoji: "❤️" },
-  { id: 36, label: "Historie", emoji: "📜" },
-  { id: 10752, label: "Kriegsfilm", emoji: "🪖" },
-];
-
-const COUNTRIES = [
-  { code: "ALL", label: "Alle Länder", flag: "🌍" },
-  { code: "US", label: "USA", flag: "🇺🇸" },
-  { code: "DE", label: "Deutschland", flag: "🇩🇪" },
-  { code: "GB", label: "Großbritannien", flag: "🇬🇧" },
-  { code: "JP", label: "Japan", flag: "🇯🇵" },
-  { code: "KR", label: "Südkorea", flag: "🇰🇷" },
-  { code: "FR", label: "Frankreich", flag: "🇫🇷" },
-  { code: "ES", label: "Spanien", flag: "🇪🇸" },
-  { code: "IT", label: "Italien", flag: "🇮🇹" },
-  { code: "CA", label: "Kanada", flag: "🇨🇦" },
-  { code: "AU", label: "Australien", flag: "🇦🇺" },
-  { code: "DK", label: "Dänemark", flag: "🇩🇰" },
-  { code: "SE", label: "Schweden", flag: "🇸🇪" },
-];
-
-const POPULAR_DIRECTORS = [
-  "Christopher Nolan",
-  "Quentin Tarantino",
-  "Martin Scorsese",
-  "Steven Spielberg",
-  "David Fincher",
-  "Denis Villeneuve",
-  "James Cameron",
-  "Ridley Scott",
-  "Wes Anderson",
-  "Hayao Miyazaki",
-];
-
-const POPULAR_ACTORS = [
-  "Leonardo DiCaprio",
-  "Cillian Murphy",
-  "Brad Pitt",
-  "Christian Bale",
-  "Tom Hardy",
-  "Margot Robbie",
-  "Ryan Gosling",
-  "Keanu Reeves",
-  "Robert De Niro",
-  "Tom Hanks",
-];
-
-const ERAS = [
-  { id: "all", label: "Alle Jahre" },
-  { id: "new", label: "✨ 2024–2026" },
-  { id: "2020s", label: "2020er" },
-  { id: "2010s", label: "2010er" },
-  { id: "2000s", label: "2000er" },
-  { id: "1990s", label: "90er" },
-  { id: "classics", label: "🎞️ Klassiker (<1990)" },
-];
-
-const RATINGS = [
-  { value: 0, label: "Alle" },
-  { value: 7.0, label: "★ 7.0+" },
-  { value: 7.5, label: "★ 7.5+" },
-  { value: 8.0, label: "★ 8.0+ (Top)" },
-  { value: 8.5, label: "★ 8.5+ (Meisterwerke)" },
-];
-
 function ExtendedSearchContent() {
   const searchParams = useSearchParams();
 
@@ -113,57 +44,13 @@ function ExtendedSearchContent() {
   const [country, setCountry] = useState("ALL");
   const [minRating, setMinRating] = useState<number>(0);
   const [era, setEra] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<
-    "popularity.desc" | "vote_average.desc" | "primary_release_date.desc"
-  >("popularity.desc");
+  const [sortBy, setSortBy] = useState<SortByOption>("popularity.desc");
   const [query, setQuery] = useState("");
-
-  const [results, setResults] = useState<MediaItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const [matchingPersons, setMatchingPersons] = useState<PersonSearchResult[]>([]);
-  const [selectedActorPerson, setSelectedActorPerson] = useState<PersonSearchResult | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
-  // Auto-resolve actor profile info when actor filter changes
-  useEffect(() => {
-    if (!actor.trim()) {
-      setSelectedActorPerson(null);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(actor.trim())}`);
-        const data = await res.json();
-        const first = (data.results || data.persons || [])[0];
-        setSelectedActorPerson(first || null);
-      } catch (e) {
-        // ignore
-      }
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [actor]);
-
-  // Auto-search matching persons when main query changes
-  useEffect(() => {
-    if (!query.trim() || query.trim().length < 2) {
-      setMatchingPersons([]);
-      return;
-    }
-    const timer = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/tmdb/search?type=person&q=${encodeURIComponent(query.trim())}`);
-        const data = await res.json();
-        setMatchingPersons((data.results || data.persons || []).slice(0, 3));
-      } catch (e) {
-        // ignore
-      }
-    }, 280);
-    return () => clearTimeout(timer);
-  }, [query]);
+  const actorMatches = usePersonSearch(actor, { minLength: 1, limit: 1, delayMs: 250 });
+  const selectedActorPerson = actorMatches[0] ?? null;
+  const matchingPersons = usePersonSearch(query, { minLength: 2, limit: 3, delayMs: 280 });
 
   // Initialize from URL search params if present
   useEffect(() => {
@@ -189,86 +76,22 @@ function ExtendedSearchContent() {
     if (typeParam === "movie" || typeParam === "tv") setMediaType(typeParam);
   }, [searchParams]);
 
-  // Fetch function
-  const fetchResults = useCallback(
-    async (targetPage = 1, append = false) => {
-      if (!append) {
-        abortControllerRef.current?.abort();
-        setLoading(true);
-        setLoadingMore(false);
-      } else {
-        setLoadingMore(true);
-      }
-
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      try {
-        const params = new URLSearchParams();
-        if (mediaType !== "all") params.set("mediaType", mediaType);
-        if (genreId !== null) params.set("genreId", String(genreId));
-        if (director.trim()) params.set("director", director.trim());
-        if (actor.trim()) params.set("actor", actor.trim());
-        if (country !== "ALL") params.set("country", country);
-        if (minRating > 0) params.set("minRating", String(minRating));
-        if (era !== "all") params.set("era", era);
-        if (sortBy) params.set("sortBy", sortBy);
-        if (query.trim()) params.set("query", query.trim());
-        params.set("page", String(targetPage));
-
-        const res = await fetch(`/api/tmdb/discover?${params.toString()}`, {
-          signal: controller.signal,
-        });
-        if (!res.ok) {
-          throw new Error(`Discover failed (${res.status})`);
-        }
-        const data = await res.json();
-        const incoming: MediaItem[] = data.results || [];
-
-        if (append) {
-          setResults((prev) => {
-            const seen = new Set(prev.map((item) => `${item.mediaType}-${item.id}`));
-            const unique = incoming.filter(
-              (item) => !seen.has(`${item.mediaType}-${item.id}`)
-            );
-            return [...prev, ...unique];
-          });
-        } else {
-          setResults(incoming);
-        }
-        setPage(targetPage);
-        setHasMore(Boolean(data.hasMore));
-      } catch (err) {
-        if ((err as Error)?.name !== "AbortError") {
-          console.error("Extended discover error:", err);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-          setLoadingMore(false);
-        }
-      }
-    },
+  const discoverFilters = useMemo(
+    () => ({ mediaType, genreId, director, actor, country, minRating, era, sortBy, query }),
     [mediaType, genreId, director, actor, country, minRating, era, sortBy, query]
   );
 
-  // Debounced auto-fetch
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      fetchResults(1, false);
-    }, 300);
-
-    return () => {
-      clearTimeout(timer);
-      abortControllerRef.current?.abort();
-    };
-  }, [fetchResults]);
-
-  const handleLoadMore = () => {
-    if (!loading && !loadingMore && hasMore) {
-      fetchResults(page + 1, true);
-    }
-  };
+  const { results, loading, loadingMore, hasMore, handleLoadMore } = useCatalogDiscover({
+    filters: discoverFilters,
+    initialResults: [],
+    initialPage: 1,
+    initialHasMore: false,
+    initialLoading: true,
+    skipInitialFetch: false,
+    useTrendingMode: false,
+    debounceMs: 300,
+    textDebounceMs: 300,
+  });
 
   const advancedFilterCount =
     (genreId !== null ? 1 : 0) +
@@ -912,15 +735,17 @@ function ExtendedSearchContent() {
 
 export default function ExtendedSearchPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-slate-400 gap-3">
-          <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
-          <span>Extended Search wird geladen...</span>
-        </div>
-      }
-    >
-      <ExtendedSearchContent />
-    </Suspense>
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-[#07090e] flex items-center justify-center text-slate-400 gap-3">
+            <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+            <span>Extended Search wird geladen...</span>
+          </div>
+        }
+      >
+        <ExtendedSearchContent />
+      </Suspense>
+    </div>
   );
 }

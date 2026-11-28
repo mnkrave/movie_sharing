@@ -5,11 +5,10 @@ import { MediaItem, formatGermanReleaseDate } from "@/lib/tmdb";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
 import Image from "next/image";
-import Link from "next/link";
 import {
   Flame,
   Play,
-  Plus,
+  Bookmark,
   Check,
   Sparkles,
   Award,
@@ -24,7 +23,6 @@ import {
 interface CarouselSlide {
   item: MediaItem;
   badgeLabel: string;
-  badgeStyle: string;
   badgeIcon: React.ElementType;
 }
 
@@ -50,7 +48,6 @@ export function HomeHero({
   const [shuffleSeed, setShuffleSeed] = useState<number>(0);
   const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
-  // Pause auto-advance on touch screens (prevents accidental mis-taps on mobile) & reduced-motion
   useEffect(() => {
     if (typeof window === "undefined") return;
     const coarse = window.matchMedia("(pointer: coarse)").matches;
@@ -62,12 +59,10 @@ export function HomeHero({
 
   const myUserId = (session?.user as any)?.id;
 
-  // Set random seed after mount so every page visit picks fresh hero highlights
   useEffect(() => {
     setShuffleSeed(Math.floor(Math.random() * 100000) + 1);
   }, []);
 
-  // Filter user's watched items
   const watchedItems = useMemo(() => {
     return communityData.mediaStatuses.filter(
       (m) =>
@@ -84,7 +79,6 @@ export function HomeHero({
     return s;
   }, [watchedItems]);
 
-  // Fetch personalized match recommendations in background (without match indicators)
   useEffect(() => {
     if (watchedItems.length === 0) return;
     let isMounted = true;
@@ -150,12 +144,10 @@ export function HomeHero({
     };
   }, [watchedItems, userSubscriptions]);
 
-  // Assemble an 8-slide dynamic carousel from our rich pool (excluding already watched titles & duplicates)
   const slides: CarouselSlide[] = useMemo(() => {
     const scoreWithSeed = (item: MediaItem, idx: number, salt: number) => {
       if (shuffleSeed === 0) return idx;
-      const hash = ((item.id * 2654435761 + shuffleSeed * 40503 + salt * 97) >>> 0) % 10000;
-      return hash;
+      return ((item.id * 2654435761 + shuffleSeed * 40503 + salt * 97) >>> 0) % 10000;
     };
 
     const usedKeys = new Set<string>();
@@ -167,9 +159,7 @@ export function HomeHero({
         const key = `${it.mediaType}_${it.id}`;
         if (seenLocal.has(key)) return false;
         seenLocal.add(key);
-        // Prefer items with a backdrop image for the big hero banner
         if (!it.backdropPath && items.length > 8) return false;
-        // Hide items the user already marked as WATCHED
         if (watchedKeySet.has(key)) return false;
         return true;
       });
@@ -221,15 +211,13 @@ export function HomeHero({
         ? {
             item: m1,
             badgeLabel: m1.oscarInfo ? "Oscar-Meisterwerk" : "Trending diese Woche",
-            badgeStyle: "bg-amber-500/20 border-amber-500/40 text-amber-300",
             badgeIcon: m1.oscarInfo ? Award : Flame,
           }
         : null,
       t1
         ? {
             item: t1,
-            badgeLabel: t1.mediaType === "tv" ? "Top-Serie der Woche" : "Trending Highlight",
-            badgeStyle: "bg-cyan-500/20 border-cyan-500/40 text-cyan-300",
+            badgeLabel: t1.mediaType === "tv" ? "Top-Serie" : "Highlight",
             badgeIcon: Tv,
           }
         : null,
@@ -237,7 +225,6 @@ export function HomeHero({
         ? {
             item: recM1,
             badgeLabel: matchedMovies.length > 0 ? "Empfehlung für dich" : "Kino-Highlight",
-            badgeStyle: "bg-purple-500/20 border-purple-500/40 text-purple-300",
             badgeIcon: Sparkles,
           }
         : null,
@@ -245,15 +232,13 @@ export function HomeHero({
         ? {
             item: recT1,
             badgeLabel: recT1.mediaType === "tv" ? "Serien-Highlight" : "Film-Highlight",
-            badgeStyle: "bg-indigo-500/20 border-indigo-500/40 text-indigo-300",
             badgeIcon: Tv,
           }
         : null,
       m2
         ? {
             item: m2,
-            badgeLabel: m2.oscarInfo ? "Prämiertes Highlight" : "Blockbuster-Tipp",
-            badgeStyle: "bg-emerald-500/20 border-emerald-500/40 text-emerald-300",
+            badgeLabel: m2.oscarInfo ? "Prämiertes Highlight" : "Kino-Tipp",
             badgeIcon: Film,
           }
         : null,
@@ -261,23 +246,20 @@ export function HomeHero({
         ? {
             item: recM2,
             badgeLabel: "Must-Watch",
-            badgeStyle: "bg-rose-500/20 border-rose-500/40 text-rose-300",
             badgeIcon: Star,
           }
         : null,
       t2
         ? {
             item: t2,
-            badgeLabel: t2.mediaType === "tv" ? "Binge-Tipp" : "Publikumsliebling",
-            badgeStyle: "bg-sky-500/20 border-sky-500/40 text-sky-300",
+            badgeLabel: t2.mediaType === "tv" ? "Serien-Tipp" : "Publikumsliebling",
             badgeIcon: Tv,
           }
         : null,
       m3
         ? {
             item: m3,
-            badgeLabel: "Geheimtipp & Klassiker",
-            badgeStyle: "bg-amber-500/20 border-amber-500/40 text-amber-300",
+            badgeLabel: "Klassiker & Perle",
             badgeIcon: Sparkles,
           }
         : null,
@@ -286,7 +268,6 @@ export function HomeHero({
     return candidateSlides.filter((s): s is CarouselSlide => Boolean(s && s.item && s.item.id));
   }, [initialGenericMovies, initialGenericTv, heroItem, matchedMovies, matchedTv, shuffleSeed, watchedKeySet]);
 
-  // Auto-advance carousel every 7 seconds when not paused (disabled by default on touch & reduced-motion)
   useEffect(() => {
     if (slides.length <= 1 || isPaused || autoAdvanceDisabled) return;
 
@@ -353,7 +334,6 @@ export function HomeHero({
     if (!touchStartRef.current) return;
     const dx = touchStartRef.current.x - e.changedTouches[0].clientX;
     const dy = touchStartRef.current.y - e.changedTouches[0].clientY;
-    // Only trigger slide switch for deliberate horizontal swipes, never diagonal vertical scrolls
     if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.25) {
       if (dx > 0) handleNext();
       else handlePrev();
@@ -373,9 +353,9 @@ export function HomeHero({
       onMouseLeave={() => setIsPaused(false)}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="relative min-h-[460px] sm:min-h-[580px] w-full overflow-hidden bg-slate-950 border-b border-slate-800/80 group select-none"
+      className="relative min-h-[430px] sm:min-h-[540px] w-full overflow-hidden hero-surface border-b border-border group select-none"
     >
-      {/* Background Backdrop Images: mount only active & adjacent slides to save mobile bandwidth */}
+      {/* Background Backdrop Images */}
       {slides.map((s, idx) => {
         const isActive = idx === activeSlideIdx;
         const shouldMount = isActive || idx === prevSlideIdx || idx === nextSlideIdx;
@@ -384,7 +364,7 @@ export function HomeHero({
           <div
             key={`${s.item.mediaType}_${s.item.id}_bg`}
             className={`absolute inset-0 transition-opacity duration-700 ease-in-out ${
-              isActive ? "opacity-80 sm:opacity-90 z-0" : "opacity-0 pointer-events-none"
+              isActive ? "hero-backdrop-active z-0" : "opacity-0 pointer-events-none"
             }`}
           >
             <Image
@@ -399,240 +379,186 @@ export function HomeHero({
         );
       })}
 
-      {/* Atmospheric Gradients ensuring contrast & readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-[#07090e] via-[#07090e]/60 to-transparent z-10" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#07090e] via-[#07090e]/85 md:via-[#07090e]/45 to-transparent z-10" />
+      {/* Theme-Adaptive Scrims (bright frosted fade in Light Mode, cinematic dark fade in Dark Mode) */}
+      <div className="absolute inset-0 hero-scrim-vertical z-10" />
+      <div className="absolute inset-0 hero-scrim-horizontal z-10" />
 
       {/* Main Content Area */}
-      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[430px] sm:min-h-[580px] flex items-center pt-10 pb-16 sm:py-14">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center w-full">
-          {/* Left Column: Title, Overview & Actions */}
-          <div className="md:col-span-8 lg:col-span-8 space-y-4 animate-in fade-in duration-300">
-            {/* Badges */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full border text-xs font-bold tracking-wide uppercase shadow-sm ${currentSlide.badgeStyle}`}
-              >
-                <BadgeIcon className="w-3.5 h-3.5 fill-current" />
-                <span>{currentSlide.badgeLabel}</span>
-              </span>
-
-              <span className="px-2.5 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-xs font-mono font-semibold text-slate-300 border border-white/10">
-                {currentItem.mediaType === "tv" ? "📺 Serie" : "🎬 Film"}
-              </span>
-
-              {currentItem.isUpcoming ? (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black bg-gradient-to-r from-amber-500 to-orange-500 text-slate-950 shadow">
-                  <Sparkles className="w-3 h-3 fill-slate-950" />
-                  <span>
-                    {currentItem.releaseDate
-                      ? `Start: ${formatGermanReleaseDate(currentItem.releaseDate)}`
-                      : "Upcoming"}
-                  </span>
+      <div className="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full min-h-[430px] sm:min-h-[540px] flex items-center pt-10 pb-16 sm:py-14">
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-center w-full">
+            {/* Left Column: Meta, Title, Overview & 2 Actions */}
+            <div className="md:col-span-8 space-y-3.5 animate-in fade-in duration-300">
+              <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-soft border border-primary/35 text-primary-text font-bold tracking-wide uppercase backdrop-blur-sm">
+                  <BadgeIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  <span>{currentSlide.badgeLabel}</span>
                 </span>
-              ) : currentItem.voteAverage > 0 ? (
-                <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-black/60 backdrop-blur-md text-amber-400 text-xs font-bold border border-amber-500/30">
-                  <Star className="w-3.5 h-3.5 fill-amber-400" />
-                  <span>{currentItem.voteAverage} ★ TMDB</span>
+
+                <span className="text-[var(--hero-meta)] font-medium">
+                  {currentItem.mediaType === "tv" ? "Serie" : "Film"}
+                  {currentItem.releaseYear ? ` · ${currentItem.releaseYear}` : ""}
+                  {currentItem.isUpcoming
+                    ? currentItem.releaseDate
+                      ? ` · Start ${formatGermanReleaseDate(currentItem.releaseDate)}`
+                      : " · Upcoming"
+                    : currentItem.voteAverage > 0
+                    ? ` · ${currentItem.voteAverage.toFixed(1).replace(".", ",")} TMDB`
+                    : ""}
                 </span>
-              ) : null}
+              </div>
 
-              {currentItem.releaseYear && (
-                <span className="text-slate-400 text-xs font-semibold">
-                  {currentItem.releaseYear}
-                </span>
-              )}
-            </div>
-
-            {/* Clickable Title */}
-            <h1
-              onClick={() => openMediaModal(currentItem)}
-              className="text-3xl sm:text-5xl lg:text-6xl font-black text-white tracking-tight leading-tight cursor-pointer hover:text-amber-400 transition"
-              title="Klicken, um Details, Trailer & Stream zu öffnen"
-            >
-              {currentItem.title}
-            </h1>
-
-            {/* Overview */}
-            <p className="text-sm sm:text-base text-slate-300 line-clamp-3 leading-relaxed max-w-2xl">
-              {currentItem.overview}
-            </p>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-2.5 sm:gap-3 pt-2 sm:pt-3">
-              {/* Primary Action Button */}
-              <button
-                type="button"
+              <h1
                 onClick={() => openMediaModal(currentItem)}
-                className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-5 sm:px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-sm transition shadow-xl shadow-amber-500/30 hover:scale-105 cursor-pointer"
+                className="text-2xl sm:text-4xl lg:text-5xl font-black text-[var(--hero-title)] tracking-tight leading-tight cursor-pointer hover:text-primary-text transition"
+                title="Details, Trailer & Stream öffnen"
               >
-                <Play className="w-4 h-4 fill-slate-950" />
-                <span>Details, Trailer & Stream</span>
-              </button>
+                {currentItem.title}
+              </h1>
 
-              {/* Quick Watchlist Toggle */}
-              <button
-                type="button"
-                onClick={handleWatchlist}
-                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
-                  isWatchlist
-                    ? "bg-emerald-500 text-slate-950 border-emerald-400 shadow-lg shadow-emerald-500/25"
-                    : "bg-slate-900/80 hover:bg-slate-800 text-white border-slate-700/80 backdrop-blur-md hover:border-slate-600"
-                }`}
-              >
-                {isWatchlist ? (
-                  <>
-                    <Check className="w-4 h-4 stroke-[2.5]" />
-                    <span>Auf Merkliste ✓</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4" />
-                    <span>Merkliste</span>
-                  </>
-                )}
-              </button>
+              <p className="text-xs sm:text-sm text-[var(--hero-body)] line-clamp-3 leading-relaxed max-w-xl">
+                {currentItem.overview}
+              </p>
 
-              {/* Secondary links */}
-              <Link
-                href="/feed"
-                className="hidden sm:flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-xs border border-slate-800 transition"
-              >
-                <Sparkles className="w-3.5 h-3.5 text-rose-400" />
-                <span>Freunde</span>
-              </Link>
+              <div className="flex flex-wrap items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => openMediaModal(currentItem)}
+                  className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs sm:text-sm transition shadow-lg shadow-amber-500/20 cursor-pointer"
+                >
+                  <Play className="w-4 h-4 fill-current" aria-hidden="true" />
+                  <span>Details & Stream</span>
+                </button>
 
-              <Link
-                href="/oscars"
-                className="hidden sm:flex items-center gap-1.5 px-4 py-3 rounded-2xl bg-slate-900/60 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-xs border border-slate-800 transition"
-              >
-                <Award className="w-3.5 h-3.5 text-amber-400" />
-                <span>Oscars</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Right Column: Hero Poster (Visible on md and up) */}
-          <div className="hidden md:flex md:col-span-4 lg:col-span-4 justify-center lg:justify-end">
-            <div
-              onClick={() => openMediaModal(currentItem)}
-              className="group/poster relative cursor-pointer aspect-[2/3] w-52 lg:w-64 rounded-2xl overflow-hidden bg-slate-900 border-2 border-slate-800/80 hover:border-amber-500/60 shadow-2xl transition-all duration-300 hover:scale-105 hover:-translate-y-1"
-              title="Klicken, um Details, Trailer & Stream zu öffnen"
-            >
-              {currentItem.posterPath ? (
-                <Image
-                  src={`https://image.tmdb.org/t/p/w500${currentItem.posterPath}`}
-                  alt={currentItem.title}
-                  fill
-                  sizes="(max-width: 1024px) 208px, 256px"
-                  className="object-cover group-hover/poster:scale-105 transition duration-500"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-slate-600">
-                  <Film className="w-12 h-12" />
-                </div>
-              )}
-
-              {/* Play / Details Hover Overlay */}
-              <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px] opacity-0 group-hover/poster:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2 text-white">
-                <div className="w-12 h-12 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-lg group-hover/poster:scale-110 transition">
-                  <Play className="w-5 h-5 fill-slate-950 ml-0.5" />
-                </div>
-                <span className="text-xs font-bold text-amber-300">Öffnen</span>
-              </div>
-
-              {/* Bottom Badge */}
-              <div className="absolute bottom-2 left-2 right-2 px-2 py-1 rounded-lg bg-black/80 backdrop-blur-md text-center text-[10px] font-bold text-amber-300 border border-white/10 shadow">
-                Klicken für Stream & Details
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Carousel Navigation Arrows (Desktop Side Controls - Hidden on mobile to avoid text overlap) */}
-      {slides.length > 1 && (
-        <>
-          <button
-            type="button"
-            onClick={handlePrev}
-            aria-label="Vorheriger Titel"
-            className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/40 hover:bg-black/80 border border-white/10 text-white/70 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={handleNext}
-            aria-label="Nächster Titel"
-            className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl bg-black/40 hover:bg-black/80 border border-white/10 text-white/70 hover:text-white transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-70 group-hover:opacity-100"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </>
-      )}
-
-      {/* Bottom Carousel Navigation Indicators (+ compact mobile arrows) */}
-      {slides.length > 1 && (
-        <div className="absolute bottom-2 sm:bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-0.5 sm:gap-1.5 px-4">
-          <button
-            type="button"
-            onClick={handlePrev}
-            aria-label="Vorheriger Titel"
-            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/50 hover:bg-black/75 border border-white/10 text-white/85 hover:text-white transition mr-1"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          {slides.map((s, idx) => {
-            const isActive = idx === activeSlideIdx;
-            return (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => setCurrentIndex(idx)}
-                title={`${idx + 1}. ${s.item.title} (${s.item.mediaType === "tv" ? "Serie" : "Film"})`}
-                aria-current={isActive ? "true" : undefined}
-                className="min-w-[26px] min-h-[44px] sm:min-w-0 sm:min-h-0 p-1.5 cursor-pointer flex items-center justify-center group/dot"
-                aria-label={`Slide ${idx + 1} von ${slides.length} - ${s.item.title}`}
-              >
-                <span
-                  className={`block transition-all duration-300 rounded-full ${
-                    isActive
-                      ? "w-7 sm:w-8 h-2.5 bg-amber-400 shadow-md shadow-amber-400/50"
-                      : "w-2.5 h-2.5 bg-slate-500/90 group-hover/dot:bg-slate-400"
+                <button
+                  type="button"
+                  onClick={handleWatchlist}
+                  className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold border transition cursor-pointer ${
+                    isWatchlist
+                      ? "bg-emerald-500 text-slate-950 border-emerald-400"
+                      : "hero-control backdrop-blur-md shadow-xs"
                   }`}
-                />
-              </button>
-            );
-          })}
+                >
+                  {isWatchlist ? (
+                    <>
+                      <Check className="w-4 h-4 stroke-[2.5]" aria-hidden="true" />
+                      <span>Auf Merkliste</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bookmark className="w-4 h-4" aria-hidden="true" />
+                      <span>Merkliste</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
 
-          <button
-            type="button"
-            onClick={handleNext}
-            aria-label="Nächster Titel"
-            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/50 hover:bg-black/75 border border-white/10 text-white/85 hover:text-white transition ml-1"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setAutoAdvanceDisabled((prev) => !prev)}
-            aria-label={
-              autoAdvanceDisabled ? "Automatischen Wechsel starten" : "Automatischen Wechsel pausieren"
-            }
-            className="sm:hidden min-w-[44px] min-h-[44px] flex items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 transition ml-1"
-          >
-            {autoAdvanceDisabled ? (
-              <Play className="w-3.5 h-3.5 fill-current" />
-            ) : (
-              <Pause className="w-3.5 h-3.5" />
-            )}
-          </button>
+            {/* Right Column: Clean Desktop Poster */}
+            <div className="hidden md:flex md:col-span-4 justify-end">
+              <div
+                onClick={() => openMediaModal(currentItem)}
+                className="group/poster relative cursor-pointer aspect-[2/3] w-44 lg:w-52 rounded-2xl overflow-hidden bg-card border border-[var(--hero-poster-border)] hover:border-primary/60 shadow-2xl transition-all duration-300 hover:scale-[1.03]"
+                title="Details, Trailer & Stream öffnen"
+              >
+                {currentItem.posterPath ? (
+                  <Image
+                    src={`https://image.tmdb.org/t/p/w500${currentItem.posterPath}`}
+                    alt={currentItem.title}
+                    fill
+                    sizes="(max-width: 1024px) 176px, 208px"
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <Film className="w-10 h-10" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
-      )}
+
+        {/* Desktop Side Arrows */}
+        {slides.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={handlePrev}
+              aria-label="Vorheriger Titel"
+              className="hidden sm:flex absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl border hero-control transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
+            >
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleNext}
+              aria-label="Nächster Titel"
+              className="hidden sm:flex absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-30 p-2.5 sm:p-3 rounded-2xl border hero-control transition backdrop-blur-md shadow-xl hover:scale-105 cursor-pointer opacity-75 group-hover:opacity-100 focus-visible:opacity-100"
+            >
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </>
+        )}
+
+        {/* Bottom Pagination Dots & Mobile Controls */}
+        {slides.length > 1 && (
+          <div className="absolute bottom-2.5 sm:bottom-4 left-0 right-0 z-30 flex items-center justify-center gap-1 px-4">
+            <button
+              type="button"
+              onClick={handlePrev}
+              aria-label="Vorheriger Titel"
+              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full border hero-control backdrop-blur-md mr-1"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+
+            {slides.map((s, idx) => {
+              const isActive = idx === activeSlideIdx;
+              return (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => setCurrentIndex(idx)}
+                  title={`${idx + 1}. ${s.item.title}`}
+                  aria-current={isActive ? "true" : undefined}
+                  aria-label={`Slide ${idx + 1} von ${slides.length} - ${s.item.title}`}
+                  className="min-w-[24px] min-h-[40px] sm:min-w-0 sm:min-h-0 p-1.5 cursor-pointer flex items-center justify-center"
+                >
+                  <span
+                    className={`block transition-all duration-300 rounded-full ${
+                      isActive ? "w-6 h-2 bg-primary" : "w-2 h-2 hero-dot-inactive"
+                    }`}
+                  />
+                </button>
+              );
+            })}
+
+            <button
+              type="button"
+              onClick={handleNext}
+              aria-label="Nächster Titel"
+              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full border hero-control backdrop-blur-md ml-1"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAutoAdvanceDisabled((prev) => !prev)}
+              aria-label={
+                autoAdvanceDisabled ? "Automatischen Wechsel starten" : "Automatischen Wechsel pausieren"
+              }
+              className="sm:hidden min-w-[40px] min-h-[40px] flex items-center justify-center rounded-full border hero-control backdrop-blur-md ml-1"
+            >
+              {autoAdvanceDisabled ? (
+                <Play className="w-3.5 h-3.5 fill-current" />
+              ) : (
+                <Pause className="w-3.5 h-3.5" />
+              )}
+            </button>
+          </div>
+        )}
     </section>
   );
 }

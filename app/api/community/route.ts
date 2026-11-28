@@ -29,6 +29,9 @@ import {
   toggleCustomCollectionUpvote,
   addCustomCollectionComment,
   deleteCustomCollectionComment,
+  sanitizeTmdbImagePath,
+  sanitizeTargetStringList,
+  normalizeRecommendationTargetType,
 } from "@/lib/store";
 
 function sanitizeWatchedSeasons(raw: unknown): number[] | undefined {
@@ -57,6 +60,7 @@ export async function GET() {
       friendRequests: { pendingReceived: [], pendingSent: [] },
       friendGroups: [],
       customCollections: publicCollections,
+      userBadges: {},
     });
   }
 
@@ -96,12 +100,16 @@ export async function POST(req: Request) {
     let actionMessage: string | undefined = undefined;
 
     if (action === "search_users") {
-      const users = await searchUsersForFriendship(userId, body.query || "");
+      const users = await searchUsersForFriendship(
+        userId,
+        typeof body.query === "string" ? body.query : ""
+      );
       return NextResponse.json({ users });
     }
 
     if (action === "friend_request") {
-      const res = await sendFriendRequest(userId, body.target || "");
+      const target = typeof body.target === "string" ? body.target.trim().slice(0, 200) : "";
+      const res = await sendFriendRequest(userId, target);
       if (!res.success) {
         return NextResponse.json({ error: res.error || "Fehler beim Senden der Anfrage." }, { status: 400 });
       }
@@ -175,7 +183,7 @@ export async function POST(req: Request) {
         tmdbId,
         mediaType,
         title: String(body.title || "").slice(0, 300),
-        posterPath: body.posterPath ? String(body.posterPath).slice(0, 250) : null,
+        posterPath: sanitizeTmdbImagePath(body.posterPath),
         releaseYear: body.releaseYear ? String(body.releaseYear).slice(0, 10) : null,
         status: requestedStatus,
         rating,
@@ -186,10 +194,11 @@ export async function POST(req: Request) {
       const rawItems = Array.isArray(body.items) ? body.items.slice(0, 300) : [];
       let importedCount = 0;
       for (const raw of rawItems) {
-        const tmdbId = Number(raw?.tmdbId);
-        if (!tmdbId || isNaN(tmdbId)) continue;
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) continue;
+        const tmdbId = Number(raw.tmdbId);
+        if (!Number.isInteger(tmdbId) || tmdbId <= 0) continue;
         const mediaType = raw.mediaType === "tv" ? "tv" : "movie";
-        const title = String(raw.title || "").trim().slice(0, 300);
+        const title = (typeof raw.title === "string" ? raw.title : "").trim().slice(0, 300);
         if (!title) continue;
         const ratingNum = raw.rating ? Number(raw.rating) : undefined;
         const cleanRating =
@@ -206,7 +215,7 @@ export async function POST(req: Request) {
           tmdbId,
           mediaType,
           title,
-          posterPath: raw.posterPath ? String(raw.posterPath).slice(0, 250) : null,
+          posterPath: sanitizeTmdbImagePath(raw.posterPath),
           releaseYear: raw.releaseYear ? String(raw.releaseYear).slice(0, 10) : null,
           status: "WATCHED",
           rating: cleanRating,
@@ -216,6 +225,10 @@ export async function POST(req: Request) {
       }
       actionMessage = `${importedCount} Titel erfolgreich in dein Profil importiert!`;
     } else if (action === "recommend") {
+      const cleanTmdbId = Number(body.tmdbId);
+      if (!Number.isInteger(cleanTmdbId) || cleanTmdbId <= 0) {
+        return NextResponse.json({ error: "Ungültige TMDB-ID." }, { status: 400 });
+      }
       const cleanRating = Math.min(10, Math.max(1, Math.round(Number(body.rating) || 9)));
       const cleanComment = String(body.comment || "").trim().slice(0, 2000);
       const cleanTags = Array.isArray(body.tags)
@@ -225,37 +238,37 @@ export async function POST(req: Request) {
         userId,
         userName,
         userImage,
-        tmdbId: Number(body.tmdbId),
+        tmdbId: cleanTmdbId,
         mediaType: body.mediaType === "tv" ? "tv" : "movie",
         title: String(body.title || "").slice(0, 300),
-        posterPath: body.posterPath ? String(body.posterPath).slice(0, 250) : null,
-        backdropPath: body.backdropPath ? String(body.backdropPath).slice(0, 250) : null,
+        posterPath: sanitizeTmdbImagePath(body.posterPath),
+        backdropPath: sanitizeTmdbImagePath(body.backdropPath),
         releaseYear: body.releaseYear ? String(body.releaseYear).slice(0, 10) : null,
         rating: cleanRating,
         comment: cleanComment,
         tags: cleanTags,
-        targetType: body.targetType || "ALL",
-        targetNames: Array.isArray(body.targetNames) ? body.targetNames.slice(0, 50) : [],
-        targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds.slice(0, 30) : [],
-        targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds.slice(0, 50) : [],
+        targetType: normalizeRecommendationTargetType(body.targetType),
+        targetNames: sanitizeTargetStringList(body.targetNames, 50),
+        targetGroupIds: sanitizeTargetStringList(body.targetGroupIds, 30),
+        targetUserIds: sanitizeTargetStringList(body.targetUserIds, 50),
       });
     } else if (action === "update_recommendation") {
-      if (body.recommendationId) {
+      if (typeof body.recommendationId === "string" && body.recommendationId.trim()) {
         const cleanRating = Math.min(10, Math.max(1, Math.round(Number(body.rating) || 9)));
         const cleanComment = String(body.comment || "").trim().slice(0, 2000);
         const cleanTags = Array.isArray(body.tags)
           ? body.tags.slice(0, 15).map((t: any) => String(t).trim().slice(0, 50)).filter(Boolean)
           : [];
         await updateRecommendation({
-          recommendationId: String(body.recommendationId),
+          recommendationId: body.recommendationId.trim(),
           userId,
           rating: cleanRating,
           comment: cleanComment,
           tags: cleanTags,
-          targetType: body.targetType || "ALL",
-          targetNames: Array.isArray(body.targetNames) ? body.targetNames.slice(0, 50) : [],
-          targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds.slice(0, 30) : [],
-          targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds.slice(0, 50) : [],
+          targetType: normalizeRecommendationTargetType(body.targetType),
+          targetNames: sanitizeTargetStringList(body.targetNames, 50),
+          targetGroupIds: sanitizeTargetStringList(body.targetGroupIds, 30),
+          targetUserIds: sanitizeTargetStringList(body.targetUserIds, 50),
         });
       }
     } else if (action === "delete_recommendation") {
@@ -263,24 +276,34 @@ export async function POST(req: Request) {
         await deleteRecommendation(userId, body.recommendationId);
       }
     } else if (action === "upvote") {
-      await toggleRecommendationUpvote(userId, body.recommendationId);
+      if (body.recommendationId) {
+        await toggleRecommendationUpvote(userId, String(body.recommendationId), userName);
+      }
     } else if (action === "subscriptions") {
       await updateUserSubscriptions(
         userId,
-        Array.isArray(body.subscriptions) ? body.subscriptions : []
+        Array.isArray(body.subscriptions)
+          ? body.subscriptions
+              .filter((s: unknown): s is string => typeof s === "string")
+              .slice(0, 30)
+          : []
       );
     } else if (action === "friend_groups") {
-      await syncUserFriendGroups(
-        userId,
-        userName,
-        Array.isArray(body.friendGroups) ? body.friendGroups : []
-      );
+      const rawGroups = Array.isArray(body.friendGroups)
+        ? body.friendGroups.filter(
+            (g: unknown): g is { id?: string; name: string; emoji: string; memberNames: string[] } =>
+              Boolean(g) && typeof g === "object" && !Array.isArray(g)
+          )
+        : [];
+      await syncUserFriendGroups(userId, userName, rawGroups);
     } else if (action === "save_friend_group") {
-      if (body.group) {
+      if (body.group && typeof body.group === "object" && !Array.isArray(body.group)) {
         await saveFriendGroup(userId, userName, body.group);
       }
     } else if (action === "delete_friend_group") {
-      await deleteFriendGroup(userId, userName, body.groupId);
+      if (typeof body.groupId === "string" && body.groupId.trim()) {
+        await deleteFriendGroup(userId, userName, body.groupId.trim());
+      }
     } else if (action === "avatar" || action === "profile_image") {
       await updateUserImage(userId, body.image ?? null);
     } else if (action === "add_reply") {
@@ -308,8 +331,8 @@ export async function POST(req: Request) {
         tagline: body.tagline ? String(body.tagline) : undefined,
         description: String(body.description || ""),
         emoji: body.emoji ? String(body.emoji) : "🎬",
-        posterPath: body.posterPath || null,
-        backdropPath: body.backdropPath || null,
+        posterPath: sanitizeTmdbImagePath(body.posterPath),
+        backdropPath: sanitizeTmdbImagePath(body.backdropPath),
         movies: Array.isArray(body.movies) ? body.movies : [],
         visibility:
           body.visibility === "PUBLIC"
@@ -317,10 +340,10 @@ export async function POST(req: Request) {
             : body.visibility === "FRIENDS"
             ? "FRIENDS"
             : "PRIVATE",
-        targetType: body.targetType || "ALL",
-        targetNames: Array.isArray(body.targetNames) ? body.targetNames.slice(0, 50) : [],
-        targetGroupIds: Array.isArray(body.targetGroupIds) ? body.targetGroupIds.slice(0, 30) : [],
-        targetUserIds: Array.isArray(body.targetUserIds) ? body.targetUserIds.slice(0, 50) : [],
+        targetType: body.targetType === "CUSTOM" ? "CUSTOM" : "ALL",
+        targetNames: sanitizeTargetStringList(body.targetNames, 50),
+        targetGroupIds: sanitizeTargetStringList(body.targetGroupIds, 30),
+        targetUserIds: sanitizeTargetStringList(body.targetUserIds, 50),
       });
       actionMessage = body.id ? "Kollektion aktualisiert!" : "Kollektion erfolgreich erstellt!";
     } else if (action === "delete_custom_collection") {
@@ -342,7 +365,7 @@ export async function POST(req: Request) {
       }
     } else if (action === "upvote_custom_collection") {
       if (body.collectionId) {
-        await toggleCustomCollectionUpvote(userId, String(body.collectionId));
+        await toggleCustomCollectionUpvote(userId, String(body.collectionId), userName);
       }
     } else if (action === "add_custom_collection_comment") {
       if (body.collectionId && body.text) {

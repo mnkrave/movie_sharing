@@ -6,6 +6,9 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useMedia } from "./MediaContext";
+import { NavbarThemeToggle, ThemeSelector } from "./ThemeToggle";
+import { isCurrentUserMatch } from "@/lib/auth-match";
+import { SUPER_ADMIN_EMAIL } from "@/lib/constants";
 import { clearOfflineWatchlist } from "@/lib/offline-watchlist";
 import {
   Video,
@@ -14,7 +17,6 @@ import {
   Tv,
   Award,
   Sparkles,
-  Bookmark,
   Users,
   Shield,
   LogOut,
@@ -25,8 +27,8 @@ import {
   Compass,
   Layers,
   User,
-  BarChart3,
   Zap,
+  Bookmark,
 } from "lucide-react";
 
 export function isDiscoverRoute(pathname: string | null): boolean {
@@ -36,11 +38,36 @@ export function isDiscoverRoute(pathname: string | null): boolean {
     pathname === "/movies" ||
     pathname === "/tv" ||
     pathname.startsWith("/collections") ||
-    pathname === "/oscars" ||
-    pathname.startsWith("/recommendations") ||
-    pathname === "/quick-rate"
+    pathname === "/oscars"
   );
 }
+
+const DISCOVER_ITEMS = [
+  {
+    href: "/collections",
+    label: "Kollektionen",
+    sub: "Filmreihen, Universen & Listen",
+    icon: Layers,
+  },
+  {
+    href: "/movies",
+    label: "Top 250 Filme",
+    sub: "Die besten Filme aller Zeiten",
+    icon: Film,
+  },
+  {
+    href: "/tv",
+    label: "Top 250 Serien",
+    sub: "Die besten TV-Serien",
+    icon: Tv,
+  },
+  {
+    href: "/oscars",
+    label: "Oscar-Gewinner",
+    sub: "Alle Bester-Film-Preisträger",
+    icon: Award,
+  },
+] as const;
 
 export function Navbar() {
   const pathname = usePathname();
@@ -50,406 +77,326 @@ export function Navbar() {
     openSubscriptions,
     userSubscriptions,
     currentUserAvatar,
-    openAvatarPicker,
     communityData,
   } = useMedia();
   const pendingRequestsCount = communityData.friendRequests?.pendingReceived?.length || 0;
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [discoverDropdownOpen, setDiscoverDropdownOpen] = useState(false);
   const discoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const userMenuRef = useRef<HTMLDivElement>(null);
+  const discoverWrapperRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setMobileMenuOpen(false);
-    setUserDropdownOpen(false);
     setDiscoverDropdownOpen(false);
   }, [pathname]);
 
   useEffect(() => {
-    if (!userDropdownOpen) return;
+    if (!discoverDropdownOpen) return;
     const handlePointerDown = (e: PointerEvent) => {
-      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
-        setUserDropdownOpen(false);
+      if (discoverWrapperRef.current && !discoverWrapperRef.current.contains(e.target as Node)) {
+        setDiscoverDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setDiscoverDropdownOpen(false);
       }
     };
     document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [userDropdownOpen]);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [discoverDropdownOpen]);
 
-  const handleDiscoverEnter = () => {
+  const canHoverPreview = () =>
+    typeof window !== "undefined" && window.matchMedia("(hover: hover)").matches;
+
+  const handleDiscoverEnter = (e: React.PointerEvent) => {
+    if (e.pointerType === "touch" || !canHoverPreview()) return;
     if (discoverTimeoutRef.current) clearTimeout(discoverTimeoutRef.current);
     setDiscoverDropdownOpen(true);
   };
 
-  const handleDiscoverLeave = () => {
+  const handleDiscoverLeave = (e: React.PointerEvent) => {
+    if (e.pointerType === "touch" || !canHoverPreview()) return;
     discoverTimeoutRef.current = setTimeout(() => {
       setDiscoverDropdownOpen(false);
-    }, 200);
+    }, 180);
+  };
+
+  const handleDiscoverBlur = (e: React.FocusEvent<HTMLDivElement>) => {
+    const next = e.relatedTarget as Node | null;
+    if (!next || !discoverWrapperRef.current?.contains(next)) {
+      setDiscoverDropdownOpen(false);
+    }
   };
 
   const isAdmin =
-    session?.user?.email?.toLowerCase() === "lukasreinle0@gmail.com" ||
+    session?.user?.email?.toLowerCase() === SUPER_ADMIN_EMAIL ||
     (session?.user as any)?.role === "ADMIN";
 
-  const myUserId = (session?.user as any)?.id || "user_lukas";
-  const myName = session?.user?.name?.toLowerCase();
-  const myWatchedCount = communityData.mediaStatuses.filter(
-    (m) =>
-      m.status === "WATCHED" &&
-      (m.userId === myUserId || (myName && m.userName?.toLowerCase() === myName))
-  ).length;
+  const myUserId = (session?.user as any)?.id as string | undefined;
+  const myWatchedCount = session?.user
+    ? communityData.mediaStatuses.filter(
+        (m) =>
+          m.status === "WATCHED" &&
+          isCurrentUserMatch(
+            { userId: myUserId, name: session.user?.name, email: session.user?.email },
+            { userId: m.userId, userName: m.userName }
+          )
+      ).length
+    : 0;
+  const myWatchlistCount = session?.user
+    ? communityData.mediaStatuses.filter(
+        (m) =>
+          m.status === "WATCHLIST" &&
+          isCurrentUserMatch(
+            { userId: myUserId, name: session.user?.name, email: session.user?.email },
+            { userId: m.userId, userName: m.userName }
+          )
+      ).length
+    : 0;
   const showQuickRateNav = Boolean(session?.user && myWatchedCount < 250);
 
   const isDiscoverActive = isDiscoverRoute(pathname);
-
-  const mainNavLinks = [
-    { href: "/feed", label: "Freunde-Feed", icon: Sparkles },
-    { href: "/my-list", label: "Meine Liste", icon: Bookmark },
-    { href: "/friends", label: "Freunde", icon: Users },
-  ];
-
-  if (isAdmin) {
-    mainNavLinks.push({ href: "/admin", label: "Admin", icon: Shield });
-  }
-
-  const discoverItems = [
-    ...(showQuickRateNav
-      ? [
-          {
-            href: "/quick-rate",
-            label: `Schnell-Bewerten (${myWatchedCount}/250)`,
-            sub: "Klassiker im Speed-Modus bewerten",
-            icon: Zap,
-            color: "text-amber-400 bg-amber-500/15",
-          },
-        ]
-      : []),
-    {
-      href: "/recommendations",
-      label: "Empfehlungen",
-      sub: "KI-Berater & Algorithmus-Matches",
-      icon: Sparkles,
-      color: "text-amber-400 bg-amber-500/10",
-    },
-    {
-      href: "/",
-      label: "Startseite",
-      sub: "Übersicht & Trends",
-      icon: Film,
-      color: "text-amber-400 bg-amber-500/10",
-    },
-    {
-      href: "/collections",
-      label: "Kollektionen & Universen",
-      sub: "Star Wars, Spielberg, MCU & mehr",
-      icon: Layers,
-      color: "text-purple-400 bg-purple-500/10",
-    },
-    {
-      href: "/movies",
-      label: "Top 250 Filme",
-      sub: "Die besten Filme aller Zeiten",
-      icon: Film,
-      color: "text-sky-400 bg-sky-500/10",
-    },
-    {
-      href: "/tv",
-      label: "Top Serien",
-      sub: "Die besten TV-Serien",
-      icon: Tv,
-      color: "text-cyan-400 bg-cyan-500/10",
-    },
-    {
-      href: "/oscars",
-      label: "Oscar-Gewinner",
-      sub: "Academy Award Meisterwerke",
-      icon: Award,
-      color: "text-amber-400 bg-amber-500/10",
-    },
-  ];
+  const isWatchlistActive = pathname === "/my-list";
+  const isRecsActive = pathname?.startsWith("/recommendations");
+  const isFriendsActive = pathname?.startsWith("/friends");
+  const isProfileActive = pathname === "/profile";
 
   return (
-    <nav className="sticky top-0 z-40 pt-[env(safe-area-inset-top)] bg-[#07090e]/95 backdrop-blur-xl border-b border-slate-800/80">
+    <header className="sticky top-0 z-40 pt-[env(safe-area-inset-top)] bg-background/90 backdrop-blur-xl border-b border-border">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Brand Logo with Film Camera */}
-        <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 flex items-center justify-center text-black shadow-lg shadow-amber-500/25 group-hover:scale-105 transition">
-            <Video className="w-5 h-5 text-black fill-black" />
-          </div>
-          <span className="text-xl font-black tracking-tight text-white group-hover:text-amber-400 transition">
-            CineCircle
-          </span>
-        </Link>
+        {/* Left: Brand Logo + Primary Navigation */}
+        <div className="flex items-center gap-6 min-w-0">
+          <Link href="/" className="flex items-center gap-2.5 group flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-primary flex items-center justify-center text-primary-foreground shadow-sm group-hover:scale-105 transition">
+              <Video className="w-5 h-5 fill-current" aria-hidden="true" />
+            </div>
+            <span className="text-lg sm:text-xl font-black tracking-tight text-foreground group-hover:text-primary-text transition">
+              CineCircle
+            </span>
+          </Link>
 
-        {/* Desktop Navigation Links */}
-        <div className="hidden md:flex items-center gap-1.5">
-          {/* Entdecken Dropdown */}
-          <div
-            className="relative"
-            onMouseEnter={handleDiscoverEnter}
-            onMouseLeave={handleDiscoverLeave}
-          >
-            <button
-              type="button"
-              onClick={() => setDiscoverDropdownOpen(!discoverDropdownOpen)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition ${
-                isDiscoverActive
-                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
-              }`}
+          <nav aria-label="Hauptnavigation" className="hidden md:flex items-center gap-1">
+            {/* Entdecken Dropdown */}
+            <div
+              ref={discoverWrapperRef}
+              className="relative"
+              onPointerEnter={handleDiscoverEnter}
+              onPointerLeave={handleDiscoverLeave}
+              onBlur={handleDiscoverBlur}
             >
-              <Compass className="w-3.5 h-3.5" />
-              <span>Entdecken</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                  discoverDropdownOpen ? "rotate-180" : ""
+              <button
+                type="button"
+                aria-expanded={discoverDropdownOpen}
+                aria-controls="discover-menu"
+                onClick={() => setDiscoverDropdownOpen((prev) => !prev)}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition cursor-pointer ${
+                  isDiscoverActive
+                    ? "bg-primary-soft text-primary-text border border-primary/30"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
                 }`}
-              />
-            </button>
-
-            {discoverDropdownOpen && (
-              <div
-                className="absolute left-0 top-full pt-1.5 w-64 z-50"
-                onMouseEnter={handleDiscoverEnter}
-                onMouseLeave={handleDiscoverLeave}
               >
-                <div
-                  className="rounded-2xl bg-[#0c111d] border border-slate-800 shadow-2xl p-1.5 animate-in fade-in"
-                  onClick={() => setDiscoverDropdownOpen(false)}
-                >
-                  {discoverItems.map((item) => {
-                    const Icon = item.icon;
-                    const active = pathname === item.href;
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        className={`flex items-start gap-3 p-2.5 rounded-xl transition ${
-                          active
-                            ? "bg-amber-500/15 border border-amber-500/30 text-white"
-                            : "text-slate-300 hover:bg-slate-800/60 hover:text-white"
-                        }`}
-                      >
-                        <div className={`p-2 rounded-lg flex-shrink-0 ${item.color}`}>
-                          <Icon className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <p className="text-xs font-bold text-white leading-tight">{item.label}</p>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{item.sub}</p>
-                        </div>
-                      </Link>
-                    );
-                  })}
+                <Compass className="w-3.5 h-3.5" aria-hidden="true" />
+                <span>Entdecken</span>
+                <ChevronDown
+                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                    discoverDropdownOpen ? "rotate-180" : ""
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+
+              {discoverDropdownOpen && (
+                <div className="absolute left-0 top-full pt-2 w-64 z-50">
+                  <ul
+                    id="discover-menu"
+                    className="rounded-2xl bg-card border border-border shadow-xl p-1.5 space-y-0.5 animate-in fade-in"
+                  >
+                    {DISCOVER_ITEMS.map((item) => {
+                      const Icon = item.icon;
+                      const active =
+                        pathname === item.href ||
+                        (item.href === "/collections" && pathname?.startsWith("/collections"));
+                      return (
+                        <li key={item.href}>
+                          <Link
+                            href={item.href}
+                            aria-current={active ? "page" : undefined}
+                            onClick={() => setDiscoverDropdownOpen(false)}
+                            className={`flex items-start gap-3 p-2.5 rounded-xl transition ${
+                              active
+                                ? "bg-primary-soft text-foreground border border-primary/30"
+                                : "text-foreground/85 hover:bg-muted hover:text-foreground border border-transparent"
+                            }`}
+                          >
+                            <span className="p-2 rounded-lg bg-primary-soft text-primary-text flex-shrink-0">
+                              <Icon className="w-4 h-4" aria-hidden="true" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block text-xs font-bold leading-tight">
+                                {item.label}
+                              </span>
+                              <span className="block text-[11px] text-muted-foreground mt-0.5">
+                                {item.sub}
+                              </span>
+                            </span>
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Main Links (Freunde-Feed, Meine Liste, Freunde, Admin) */}
-          {showQuickRateNav && (
+            {/* Watchlist */}
             <Link
-              href="/quick-rate"
-              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition ${
-                pathname === "/quick-rate"
-                  ? "bg-amber-500 text-black shadow-md shadow-amber-500/20"
-                  : "bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25"
+              href="/my-list"
+              aria-current={isWatchlistActive ? "page" : undefined}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                isWatchlistActive
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
               }`}
-              title="Schnell Filme & Serien bewerten (verschwindet ab 250 Bewertungen)"
             >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>Bewerten</span>
-              <span
-                className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black ${
-                  pathname === "/quick-rate"
-                    ? "bg-black/20 text-black"
-                    : "bg-amber-500/20 text-amber-300"
-                }`}
-              >
-                {myWatchedCount}/250
-              </span>
+              <Bookmark className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Watchlist</span>
+              {session?.user && myWatchlistCount > 0 && (
+                <span className="hidden xl:inline-block px-1.5 py-0.5 rounded-full bg-muted text-foreground font-mono font-bold text-[10px] leading-none">
+                  {myWatchlistCount}
+                </span>
+              )}
             </Link>
-          )}
-          {mainNavLinks.map((link) => {
-            const Icon = link.icon;
-            const active =
-              pathname === link.href || pathname.startsWith(`${link.href}/`);
-            const showBadge = link.href === "/friends" && pendingRequestsCount > 0;
 
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition relative ${
-                  active
-                    ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                    : "text-slate-400 hover:text-slate-100 hover:bg-slate-800/60"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{link.label}</span>
-                {showBadge && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-black font-black text-[10px] shadow">
-                    {pendingRequestsCount}
-                  </span>
-                )}
-              </Link>
-            );
-          })}
+            {/* Empfehlungen */}
+            <Link
+              href="/recommendations"
+              aria-current={isRecsActive ? "page" : undefined}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                isRecsActive
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
+              }`}
+            >
+              <Sparkles className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Empfehlungen</span>
+            </Link>
+
+            {/* Freunde */}
+            <Link
+              href="/friends"
+              aria-current={isFriendsActive ? "page" : undefined}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition ${
+                isFriendsActive
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted border border-transparent"
+              }`}
+            >
+              <Users className="w-3.5 h-3.5" aria-hidden="true" />
+              <span>Freunde</span>
+              {pendingRequestsCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground font-black text-[10px] leading-none">
+                  {pendingRequestsCount}
+                </span>
+              )}
+            </Link>
+          </nav>
         </div>
 
-        {/* Right Action Buttons */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          {/* Search Trigger Button (Desktop - on mobile/tablet < md Search is prominent in MobileBottomNav) */}
+        {/* Right Controls (Search, Abos, Theme, Admin, Profile as Rightmost Item) */}
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={openSearch}
-            className="hidden md:flex items-center gap-2 px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 text-slate-400 hover:text-white text-xs font-medium transition shadow-sm"
+            className="hidden md:flex items-center gap-2 px-3 py-2 rounded-xl bg-card border border-border hover:border-border-strong text-muted-foreground hover:text-foreground text-xs font-medium transition cursor-pointer"
           >
-            <Search className="w-4 h-4 text-amber-400" />
-            <span className="hidden sm:inline">Suchen...</span>
-            <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] bg-slate-800 text-slate-400 rounded border border-slate-700 font-mono">
+            <Search className="w-3.5 h-3.5 text-primary-text" aria-hidden="true" />
+            <span>Suchen…</span>
+            <kbd className="hidden lg:inline-block px-1.5 py-0.5 text-[10px] bg-muted text-muted-foreground rounded border border-border font-mono">
               ⌘K
             </kbd>
           </button>
 
-          {/* Subscriptions Setting Button */}
           <button
             type="button"
             onClick={openSubscriptions}
             title="Deine Streaming-Abos verwalten"
             aria-label={`Deine Streaming-Abos verwalten (${userSubscriptions.length} aktiv)`}
-            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 px-3 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-slate-900 border border-slate-800 hover:border-amber-500/40 text-slate-300 text-xs font-semibold transition"
+            className="flex items-center justify-center gap-1.5 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 px-2.5 md:px-3 py-2 rounded-xl bg-card border border-border hover:border-primary/40 text-foreground text-xs font-semibold transition cursor-pointer"
           >
-            <Tv className="w-4 h-4 text-amber-400" />
+            <Tv className="w-4 h-4 text-primary-text" aria-hidden="true" />
             <span className="hidden sm:inline">Abos</span>
-            <span className="text-[11px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 md:py-0.2 rounded font-mono font-bold">
+            <span className="text-[11px] bg-primary-soft text-primary-text px-1.5 py-0.5 rounded font-mono font-bold leading-none">
               {userSubscriptions.length}
             </span>
           </button>
 
-          {/* User Account / Profile */}
+          <NavbarThemeToggle />
+
+          {isAdmin && (
+            <Link
+              href="/admin"
+              title="Admin-Verwaltung"
+              aria-label="Admin-Verwaltung"
+              aria-current={pathname?.startsWith("/admin") ? "page" : undefined}
+              className={`hidden md:flex items-center justify-center size-9 rounded-xl border transition ${
+                pathname?.startsWith("/admin")
+                  ? "bg-primary-soft border-primary/40 text-primary-text"
+                  : "bg-card border-border hover:border-border-strong text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Shield className="w-4 h-4" aria-hidden="true" />
+            </Link>
+          )}
+
+          {/* Rightmost Nav Item: Profil (or Einloggen) */}
           {session?.user ? (
-            <div ref={userMenuRef} className="relative">
-              <button
-                type="button"
-                onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-                aria-label="Benutzermenü öffnen"
-                className="flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-1.5 sm:pr-3 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition"
-              >
-                {currentUserAvatar ? (
-                  <div className="relative w-7 h-7 rounded-lg overflow-hidden border border-amber-500/50 flex-shrink-0">
-                    <Image
-                      src={currentUserAvatar}
-                      alt={session.user.name || "User"}
-                      fill
-                      sizes="28px"
-                      className="object-cover"
-                    />
-                  </div>
-                ) : (
-                  <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-black font-extrabold text-xs">
-                    {session.user.name?.slice(0, 1) || "U"}
-                  </div>
-                )}
-                <span className="hidden sm:inline text-xs font-semibold text-white truncate max-w-[100px]">
-                  {session.user.name}
-                </span>
-              </button>
-
-              {userDropdownOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-48 rounded-2xl bg-[#0f1422] border border-slate-800 shadow-2xl p-1.5 z-50 text-xs animate-in fade-in"
-                  onClick={() => setUserDropdownOpen(false)}
-                >
-                  <div className="px-3 py-2 border-b border-slate-800/80 mb-1">
-                    <p className="font-bold text-white truncate">{session.user.name}</p>
-                    <p className="text-slate-400 text-[11px] truncate">{session.user.email}</p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      openAvatarPicker();
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
-                  >
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Profilbild wählen</span>
-                  </button>
-
-                  <Link
-                    href="/profile"
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
-                  >
-                    <BarChart3 className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Mein Profil & Statistik</span>
-                  </Link>
-
-                  <Link
-                    href="/quick-rate"
-                    className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
-                  >
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                      <span>Filme bewerten & Import</span>
-                    </div>
-                    {myWatchedCount < 250 && (
-                      <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/15 px-1.5 py-0.2 rounded">
-                        {myWatchedCount}/250
-                      </span>
-                    )}
-                  </Link>
-
-                  <Link
-                    href="/my-list"
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-slate-300 hover:bg-slate-800 hover:text-white transition"
-                  >
-                    <Bookmark className="w-3.5 h-3.5 text-sky-400" />
-                    <span>Meine Listen</span>
-                  </Link>
-
-                  {isAdmin && (
-                    <Link
-                      href="/admin"
-                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-amber-400 hover:bg-amber-500/10 transition"
-                    >
-                      <Shield className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Admin-Verwaltung</span>
-                    </Link>
-                  )}
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      clearOfflineWatchlist();
-                      signOut({ callbackUrl: "/" });
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-rose-400 hover:bg-rose-500/10 transition mt-1 border-t border-slate-800/60"
-                  >
-                    <LogOut className="w-3.5 h-3.5" />
-                    <span>Abmelden</span>
-                  </button>
+            <Link
+              href="/profile"
+              aria-current={isProfileActive ? "page" : undefined}
+              className={`flex items-center justify-center gap-2 min-h-[44px] min-w-[44px] md:min-h-0 md:min-w-0 p-1.5 sm:pr-3 rounded-xl border text-xs font-semibold transition ${
+                isProfileActive
+                  ? "bg-primary-soft border-primary/40 text-primary-text"
+                  : "bg-card border-border hover:border-border-strong text-foreground"
+              }`}
+            >
+              {currentUserAvatar ? (
+                <div className="relative w-6 h-6 rounded-lg overflow-hidden border border-primary/40 flex-shrink-0">
+                  <Image
+                    src={currentUserAvatar}
+                    alt={session.user.name || "Profil"}
+                    fill
+                    sizes="24px"
+                    className="object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-6 h-6 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-extrabold text-[11px] flex-shrink-0">
+                  {session.user.name?.slice(0, 1).toUpperCase() || "U"}
                 </div>
               )}
-            </div>
+              <span className="hidden sm:inline">Profil</span>
+            </Link>
           ) : (
             <Link
               href="/login"
-              className="flex items-center gap-1.5 min-h-[44px] md:min-h-0 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow-lg shadow-amber-500/20"
+              className="flex items-center gap-1.5 min-h-[44px] md:min-h-0 px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold transition shadow-sm"
             >
-              <LogIn className="w-3.5 h-3.5" />
+              <LogIn className="w-3.5 h-3.5" aria-hidden="true" />
               <span>Einloggen</span>
             </Link>
           )}
 
-          {/* Mobile menu toggle */}
+          {/* Mobile Drawer Toggle */}
           <button
             type="button"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-expanded={mobileMenuOpen}
-            className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800"
+            className="md:hidden min-h-[44px] min-w-[44px] flex items-center justify-center p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted"
             aria-label="Navigation umschalten"
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -466,68 +413,120 @@ export function Navbar() {
         />
       )}
 
-      {/* Mobile Drawer (Secondary destinations only; Feed, Liste & Freunde live in MobileBottomNav) */}
+      {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div className="md:hidden relative z-40 bg-[#0a0e1a] border-b border-slate-800 px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain space-y-1 text-sm shadow-2xl animate-in slide-in-from-top-2 duration-200">
-          <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 py-1">
-            Entdecken & Listen
+        <div className="md:hidden relative z-40 bg-card border-b border-border px-4 pt-4 pb-[calc(1.5rem+env(safe-area-inset-bottom))] max-h-[calc(100dvh-4rem-env(safe-area-inset-top))] overflow-y-auto overscroll-contain space-y-2 text-sm shadow-2xl animate-in slide-in-from-top-2 duration-200">
+          <div className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider px-3 py-1">
+            Entdecken
           </div>
-          {discoverItems.map((item) => (
+          {DISCOVER_ITEMS.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               onClick={() => setMobileMenuOpen(false)}
               className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
                 pathname === item.href
-                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "text-slate-200 hover:bg-slate-800/60"
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-foreground hover:bg-muted"
               }`}
             >
-              <item.icon className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              <item.icon className="w-4 h-4 text-primary-text flex-shrink-0" aria-hidden="true" />
               <div className="min-w-0">
                 <span className="block leading-tight">{item.label}</span>
-                <span className="block text-xs font-normal text-slate-400 truncate">{item.sub}</span>
+                <span className="block text-xs font-normal text-muted-foreground truncate">
+                  {item.sub}
+                </span>
               </div>
             </Link>
           ))}
 
-          {(session?.user || isAdmin) && (
-            <>
-              <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider px-3 pt-3 pb-1">
-                Konto & Verwaltung
-              </div>
-              {session?.user && (
-                <Link
-                  href="/profile"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
-                    pathname === "/profile"
-                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                      : "text-slate-200 hover:bg-slate-800/60"
-                  }`}
-                >
-                  <BarChart3 className="w-4 h-4 text-amber-400" />
-                  <span>Mein Profil & Kino-DNA</span>
-                </Link>
-              )}
-              {isAdmin && (
-                <Link
-                  href="/admin"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className={`flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
-                    pathname === "/admin" || pathname.startsWith("/admin/")
-                      ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                      : "text-amber-300 hover:bg-amber-500/10"
-                  }`}
-                >
-                  <Shield className="w-4 h-4" />
-                  <span>Admin-Verwaltung</span>
-                </Link>
-              )}
-            </>
+          <Link
+            href="/my-list"
+            aria-current={isWatchlistActive ? "page" : undefined}
+            onClick={() => setMobileMenuOpen(false)}
+            className={`flex items-center justify-between gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
+              isWatchlistActive
+                ? "bg-primary-soft text-primary-text border border-primary/30"
+                : "text-foreground hover:bg-muted"
+            }`}
+          >
+            <span className="flex items-center gap-3">
+              <Bookmark className="w-4 h-4 text-primary-text flex-shrink-0" aria-hidden="true" />
+              <span>Watchlist</span>
+            </span>
+            {session?.user && myWatchlistCount > 0 && (
+              <span className="text-xs font-mono text-muted-foreground">
+                {myWatchlistCount}
+              </span>
+            )}
+          </Link>
+
+          {showQuickRateNav && (
+            <Link
+              href="/quick-rate"
+              aria-current={pathname === "/quick-rate" ? "page" : undefined}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center justify-between gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold transition ${
+                pathname === "/quick-rate"
+                  ? "bg-primary-soft text-primary-text border border-primary/30"
+                  : "text-foreground hover:bg-muted"
+              }`}
+            >
+              <span className="flex items-center gap-3">
+                <Zap className="w-4 h-4 text-primary-text flex-shrink-0" aria-hidden="true" />
+                <span>Schnell-Bewerten</span>
+              </span>
+              <span className="text-xs font-mono text-muted-foreground">
+                {myWatchedCount}/250
+              </span>
+            </Link>
           )}
+
+          <div className="pt-2 border-t border-border space-y-2">
+            <div className="px-3 py-1 flex items-center justify-between gap-2">
+              <span className="text-xs font-semibold text-muted-foreground">Darstellung</span>
+              <ThemeSelector />
+            </div>
+
+            {session?.user && (
+              <Link
+                href="/profile"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-foreground hover:bg-muted transition"
+              >
+                <User className="w-4 h-4 text-primary-text" aria-hidden="true" />
+                <span>Mein Profil</span>
+              </Link>
+            )}
+
+            {isAdmin && (
+              <Link
+                href="/admin"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-primary-text hover:bg-primary-soft transition"
+              >
+                <Shield className="w-4 h-4" aria-hidden="true" />
+                <span>Admin-Verwaltung</span>
+              </Link>
+            )}
+
+            {session?.user && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  clearOfflineWatchlist();
+                  signOut({ callbackUrl: "/" });
+                }}
+                className="w-full flex items-center gap-3 min-h-[44px] px-4 py-2.5 rounded-xl font-semibold text-rose-500 hover:bg-rose-500/10 transition text-left"
+              >
+                <LogOut className="w-4 h-4" aria-hidden="true" />
+                <span>Abmelden</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
-    </nav>
+    </header>
   );
 }

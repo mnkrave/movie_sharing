@@ -4,8 +4,10 @@ import { prisma } from "./prisma";
 import bcrypt from "bcryptjs";
 import { fetchDeStreamingProviders } from "./tmdb";
 import { SUPER_ADMIN_EMAIL, isValidEmailAddress } from "./constants";
+import { isSamePerson } from "./auth-match";
+import { evaluateUserBadges } from "./badges";
 
-export { SUPER_ADMIN_EMAIL, isValidEmailAddress };
+export { SUPER_ADMIN_EMAIL, isValidEmailAddress, isSamePerson };
 
 export const INVITE_LIMITS = {
   maxPer24h: 3,
@@ -180,24 +182,6 @@ export interface AppCustomCollection {
   updatedAt: string;
 }
 
-export function isSamePerson(nameA?: string | null, nameB?: string | null): boolean {
-  if (!nameA || !nameB) return false;
-  const a = nameA.toLowerCase().trim().replace(/^@/, "");
-  const b = nameB.toLowerCase().trim().replace(/^@/, "");
-  if (!a || !b) return false;
-  if (a === b) return true;
-  const aParts = a.split(/\s+/);
-  const bParts = b.split(/\s+/);
-  if (
-    aParts[0].length >= 3 &&
-    aParts[0] === bParts[0] &&
-    (aParts.length === 1 || bParts.length === 1)
-  ) {
-    return true;
-  }
-  return false;
-}
-
 export interface AppFriendship {
   id: string;
   userId: string;
@@ -214,6 +198,18 @@ export interface StreamingSnapshotEntry {
   checkedAt: string;
 }
 
+export interface AppUserBadge {
+  badgeKey: string;
+  unlockedAt: string;
+}
+
+interface StoredUserBadgeRecord {
+  id: string;
+  userId: string;
+  badgeKey: string;
+  unlockedAt: string;
+}
+
 interface LocalDbFile {
   users: AppUser[];
   whitelist: AppWhitelistEntry[];
@@ -225,6 +221,7 @@ interface LocalDbFile {
   customCollections?: AppCustomCollection[];
   streamingSnapshots?: StreamingSnapshotEntry[];
   inviteApprovalRequests?: AppInviteApprovalRequest[];
+  userBadges?: StoredUserBadgeRecord[];
 }
 
 const LOCAL_DB_PATH = path.join(process.cwd(), ".local-db.json");
@@ -239,7 +236,7 @@ function getSeedLocalDb(): LocalDbFile {
       {
         id: "user_lukas",
         name: "Lukas",
-        email: "lukasreinle0@gmail.com",
+        email: SUPER_ADMIN_EMAIL,
         password: defaultPass,
         image: null,
         role: "ADMIN",
@@ -268,7 +265,7 @@ function getSeedLocalDb(): LocalDbFile {
       },
     ],
     whitelist: [
-      { id: "wl_1", email: "lukasreinle0@gmail.com", createdAt: now },
+      { id: "wl_1", email: SUPER_ADMIN_EMAIL, createdAt: now },
       { id: "wl_2", email: "max@freunde.de", createdAt: now },
       { id: "wl_3", email: "sarah@freunde.de", createdAt: now },
     ],
@@ -579,6 +576,34 @@ async function ensureWatchlistAlertSchema() {
   }
 }
 
+let userBadgeSchemaEnsured = false;
+async function ensureUserBadgeSchema() {
+  if (userBadgeSchemaEnsured) return;
+  try {
+    await prisma.$executeRaw`
+      CREATE TABLE IF NOT EXISTS "UserBadge" (
+        "id" TEXT NOT NULL,
+        "userId" TEXT NOT NULL,
+        "badgeKey" TEXT NOT NULL,
+        "unlockedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT "UserBadge_pkey" PRIMARY KEY ("id"),
+        CONSTRAINT "UserBadge_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE
+      )
+    `;
+    await prisma.$executeRaw`
+      CREATE UNIQUE INDEX IF NOT EXISTS "UserBadge_userId_badgeKey_key"
+      ON "UserBadge"("userId", "badgeKey")
+    `;
+    await prisma.$executeRaw`
+      CREATE INDEX IF NOT EXISTS "UserBadge_userId_unlockedAt_idx"
+      ON "UserBadge"("userId", "unlockedAt")
+    `;
+    userBadgeSchemaEnsured = true;
+  } catch {
+    // ignore if permissions or DB unavailable
+  }
+}
+
 let inviteAndModerationSchemaEnsured = false;
 async function ensureInviteAndModerationSchema() {
   if (inviteAndModerationSchemaEnsured) return;
@@ -819,21 +844,33 @@ export async function createOrUpdateUser(data: {
   return newUser;
 }
 
+function normalizeName(name?: string | null): string {
+  return (name || "").trim().replace(/^@+/, "").toLowerCase();
+}
+
 export async function updateUserSubscriptions(userId: string, subscriptions: string[]): Promise<string[]> {
+  const cleanSubs = Array.from(
+    new Set(
+      (Array.isArray(subscriptions) ? subscriptions : [])
+        .map((s) => String(s || "").trim().slice(0, 60))
+        .filter(Boolean)
+    )
+  ).slice(0, 30);
+
   if (await isPostgresAvailable()) {
     await prisma.user.update({
       where: { id: userId },
-      data: { subscriptions: JSON.stringify(subscriptions) },
+      data: { subscriptions: JSON.stringify(cleanSubs) },
     });
-    return subscriptions;
+    return cleanSubs;
   }
   const db = readLocalDb();
   const u = db.users.find((x) => x.id === userId);
   if (u) {
-    u.subscriptions = subscriptions;
+    u.subscriptions = cleanSubs;
     writeLocalDb(db);
   }
-  return subscriptions;
+  return cleanSubs;
 }
 
 export function parseMemberNames(val: any): string[] {
@@ -863,9 +900,19 @@ export async function getUserFriendGroups(
     targetName = u?.name;
   }
 
+  const acceptedFriendIds = new Set(await getAcceptedFriendIds(userId));
+  const normTarget = normalizeName(targetName);
+
   const belongs = (grp: AppFriendGroup) => {
     if (grp.ownerId && grp.ownerId === userId) return true;
-    if (targetName && grp.memberNames.some((m) => isSamePerson(m, targetName))) return true;
+    if (
+      grp.ownerId &&
+      acceptedFriendIds.has(grp.ownerId) &&
+      normTarget &&
+      grp.memberNames.some((m) => normalizeName(m) === normTarget)
+    ) {
+      return true;
+    }
     return false;
   };
 
@@ -968,20 +1015,41 @@ export async function saveFriendGroup(
   userName: string,
   groupData: { id?: string; name: string; emoji: string; memberNames: string[] }
 ): Promise<AppFriendGroup> {
-  const groupId = groupData.id && groupData.id.startsWith("grp_") ? groupData.id : `grp_${Date.now()}`;
-  const cleanMembers = groupData.memberNames.map((s) => s.trim().replace(/^@/, "")).filter(Boolean);
-
-  if (!cleanMembers.some((m) => isSamePerson(m, userName))) {
-    cleanMembers.unshift(userName);
+  if (!groupData || typeof groupData !== "object" || Array.isArray(groupData)) {
+    throw new Error("Ungültige Gruppendaten.");
   }
+  const cleanName = (typeof groupData.name === "string" ? groupData.name : "").trim().slice(0, 80);
+  if (!cleanName) {
+    throw new Error("Gruppenname darf nicht leer sein.");
+  }
+  const cleanEmoji =
+    (typeof groupData.emoji === "string" ? groupData.emoji : "🛋️").trim().slice(0, 16) || "🛋️";
+  const rawGroupId = typeof groupData.id === "string" ? groupData.id.trim() : "";
+  const groupId = /^grp_[a-zA-Z0-9_-]{1,64}$/.test(rawGroupId)
+    ? rawGroupId
+    : `grp_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const cleanMembers = Array.from(
+    new Set(
+      (Array.isArray(groupData.memberNames) ? groupData.memberNames : [])
+        .filter((s): s is string => typeof s === "string")
+        .map((s) => s.trim().replace(/^@+/, "").slice(0, 80))
+        .filter(Boolean)
+    )
+  );
+
+  const normUser = normalizeName(userName);
+  if (normUser && !cleanMembers.some((m) => normalizeName(m) === normUser)) {
+    cleanMembers.unshift(userName.trim().slice(0, 80));
+  }
+  const boundedMembers = cleanMembers.slice(0, 50);
 
   const groupObj: AppFriendGroup = {
     id: groupId,
-    name: groupData.name.trim(),
-    emoji: groupData.emoji || "🛋️",
+    name: cleanName,
+    emoji: cleanEmoji,
     ownerId: userId,
     ownerName: userName,
-    memberNames: cleanMembers,
+    memberNames: boundedMembers,
     updatedAt: new Date().toISOString(),
   };
 
@@ -989,11 +1057,7 @@ export async function saveFriendGroup(
     try {
       const existing = await (prisma as any).friendGroup.findUnique({ where: { id: groupId } });
       if (existing) {
-        const existingMembers = parseMemberNames(existing.memberNames);
-        const isAuthorized =
-          existing.ownerId === userId ||
-          existingMembers.some((m) => isSamePerson(m, userName));
-        if (!isAuthorized) {
+        if (existing.ownerId !== userId) {
           throw new Error("Keine Berechtigung zum Bearbeiten dieser Gruppe.");
         }
         await (prisma as any).friendGroup.update({
@@ -1019,6 +1083,9 @@ export async function saveFriendGroup(
         });
       }
     } catch (err) {
+      if (err instanceof Error && err.message.includes("Keine Berechtigung")) {
+        throw err;
+      }
       console.warn("Could not save to FriendGroup table, saving to User.friendGroups:", err);
       const u = await prisma.user.findUnique({ where: { id: userId } });
       const current = parseFriendGroups(u?.friendGroups);
@@ -1038,11 +1105,8 @@ export async function saveFriendGroup(
   const idx = db.friendGroups.findIndex((g) => g.id === groupId);
   if (idx !== -1) {
     const existing = db.friendGroups[idx];
-    const isAuthorized =
-      existing.ownerId === userId ||
-      (existing.memberNames || []).some((m) => isSamePerson(m, userName));
-    if (!isAuthorized) {
-      return existing;
+    if (existing.ownerId !== userId) {
+      throw new Error("Keine Berechtigung zum Bearbeiten dieser Gruppe.");
     }
     db.friendGroups[idx] = {
       ...existing,
@@ -1062,23 +1126,28 @@ export async function deleteFriendGroup(
   userName: string,
   groupId: string
 ): Promise<boolean> {
+  const acceptedFriendIds = new Set(await getAcceptedFriendIds(userId));
+  const normUser = normalizeName(userName);
+
   if (await isPostgresAvailable()) {
     try {
       const grp = await (prisma as any).friendGroup.findUnique({ where: { id: groupId } });
       if (grp) {
         if (grp.ownerId === userId) {
           await (prisma as any).friendGroup.delete({ where: { id: groupId } });
-        } else {
-          // If a member who is not the owner leaves/deletes
+        } else if (grp.ownerId && acceptedFriendIds.has(grp.ownerId) && normUser) {
+          // If an accepted friend who is a member (and not the owner) leaves/deletes
           const currentMembers = parseMemberNames(grp.memberNames);
-          const nextMembers = currentMembers.filter((m) => !isSamePerson(m, userName));
-          if (nextMembers.length === 0) {
-            await (prisma as any).friendGroup.delete({ where: { id: groupId } });
-          } else {
-            await (prisma as any).friendGroup.update({
-              where: { id: groupId },
-              data: { memberNames: JSON.stringify(nextMembers) },
-            });
+          const nextMembers = currentMembers.filter((m) => normalizeName(m) !== normUser);
+          if (nextMembers.length < currentMembers.length) {
+            if (nextMembers.length === 0) {
+              await (prisma as any).friendGroup.delete({ where: { id: groupId } });
+            } else {
+              await (prisma as any).friendGroup.update({
+                where: { id: groupId },
+                data: { memberNames: JSON.stringify(nextMembers) },
+              });
+            }
           }
         }
       }
@@ -1108,13 +1177,17 @@ export async function deleteFriendGroup(
     if (grp) {
       if (grp.ownerId === userId) {
         db.friendGroups = db.friendGroups.filter((g) => g.id !== groupId);
-      } else {
-        grp.memberNames = grp.memberNames.filter((m) => !isSamePerson(m, userName));
-        if (grp.memberNames.length === 0) {
-          db.friendGroups = db.friendGroups.filter((g) => g.id !== groupId);
+        writeLocalDb(db);
+      } else if (grp.ownerId && acceptedFriendIds.has(grp.ownerId) && normUser) {
+        const nextMembers = grp.memberNames.filter((m) => normalizeName(m) !== normUser);
+        if (nextMembers.length < grp.memberNames.length) {
+          grp.memberNames = nextMembers;
+          if (grp.memberNames.length === 0) {
+            db.friendGroups = db.friendGroups.filter((g) => g.id !== groupId);
+          }
+          writeLocalDb(db);
         }
       }
-      writeLocalDb(db);
     }
   }
   return true;
@@ -1125,10 +1198,21 @@ export async function syncUserFriendGroups(
   userName: string,
   groups: { id?: string; name: string; emoji: string; memberNames: string[] }[]
 ): Promise<AppFriendGroup[]> {
-  for (const grp of groups) {
+  if (!Array.isArray(groups)) {
+    return getUserFriendGroups(userId, userName);
+  }
+  for (const grp of groups.slice(0, 30)) {
+    if (!grp || typeof grp !== "object" || Array.isArray(grp)) continue;
     await saveFriendGroup(userId, userName, grp);
   }
   return getUserFriendGroups(userId, userName);
+}
+
+export function sanitizeTmdbImagePath(val: unknown): string | null {
+  if (typeof val !== "string") return null;
+  const trimmed = val.trim().slice(0, 250);
+  if (!trimmed || !trimmed.startsWith("/") || trimmed.startsWith("//")) return null;
+  return trimmed;
 }
 
 const ALLOWED_AVATAR_HOSTS = new Set([
@@ -2113,7 +2197,10 @@ export async function getAcceptedFriendIds(userId: string): Promise<string[]> {
       const friendships = await prisma.friendship.findMany({
         where: {
           status: "ACCEPTED",
-          OR: [{ userId }, { friendId: userId }],
+          OR: [
+            { userId, friend: { isBanned: false } },
+            { friendId: userId, user: { isBanned: false } },
+          ],
         },
       });
       const ids = new Set<string>();
@@ -2128,11 +2215,12 @@ export async function getAcceptedFriendIds(userId: string): Promise<string[]> {
   }
 
   const db = readLocalDb();
+  const bannedIds = new Set(db.users.filter((u) => u.isBanned).map((u) => u.id));
   const ids = new Set<string>();
   (db.friendships || []).forEach((f) => {
     if (f.status === "ACCEPTED") {
-      if (f.userId === userId) ids.add(f.friendId);
-      else if (f.friendId === userId) ids.add(f.userId);
+      if (f.userId === userId && !bannedIds.has(f.friendId)) ids.add(f.friendId);
+      else if (f.friendId === userId && !bannedIds.has(f.userId)) ids.add(f.userId);
     }
   });
   return Array.from(ids);
@@ -2228,7 +2316,8 @@ export async function sendFriendRequest(requesterId: string, targetIdentifier: s
   message?: string;
   error?: string;
 }> {
-  const cleanTarget = targetIdentifier.trim().toLowerCase();
+  const rawTarget = typeof targetIdentifier === "string" ? targetIdentifier.trim().slice(0, 200) : "";
+  const cleanTarget = rawTarget.toLowerCase();
   if (!cleanTarget) {
     return { success: false, error: "Bitte gib eine E-Mail-Adresse oder einen Namen ein." };
   }
@@ -2240,6 +2329,7 @@ export async function sendFriendRequest(requesterId: string, targetIdentifier: s
         where: {
           isBanned: false,
           OR: [
+            { id: rawTarget },
             { email: { equals: cleanTarget, mode: "insensitive" } },
             { name: { equals: cleanTarget, mode: "insensitive" } },
           ],
@@ -2301,7 +2391,9 @@ export async function sendFriendRequest(requesterId: string, targetIdentifier: s
 
   const db = readLocalDb();
   const targetUser = db.users.find(
-    (u) => !u.isBanned && (u.email.toLowerCase() === cleanTarget || u.name.toLowerCase() === cleanTarget)
+    (u) =>
+      !u.isBanned &&
+      (u.id === rawTarget || u.email.toLowerCase() === cleanTarget || u.name.toLowerCase() === cleanTarget)
   );
 
   if (!targetUser) {
@@ -2444,8 +2536,23 @@ export async function removeFriendship(userId: string, targetUserId: string): Pr
 }
 
 export async function searchUsersForFriendship(currentUserId: string, query: string) {
-  const cleanQ = query.trim().toLowerCase();
+  const cleanQ = (typeof query === "string" ? query : "")
+    .slice(0, 100)
+    .trim()
+    .replace(/^@+/, "")
+    .toLowerCase();
   if (!cleanQ || cleanQ.length < 2) return [];
+
+  const countMutualWatched = (
+    myKeys: Set<string>,
+    otherRows: Array<{ mediaType: string; tmdbId: number }>
+  ) => {
+    let count = 0;
+    for (const row of otherRows) {
+      if (myKeys.has(`${row.mediaType}_${row.tmdbId}`)) count++;
+    }
+    return count;
+  };
 
   if (await isPostgresAvailable()) {
     try {
@@ -2459,17 +2566,54 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
             { email: { contains: cleanQ, mode: "insensitive" } },
           ],
         },
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+        },
         take: 10,
       });
 
-      const friendships = await prisma.friendship.findMany({
-        where: {
-          OR: [
-            { userId: currentUserId, friendId: { in: users.map((u) => u.id) } },
-            { friendId: currentUserId, userId: { in: users.map((u) => u.id) } },
-          ],
-        },
-      });
+      const userIds = users.map((u) => u.id);
+      const friendships =
+        userIds.length > 0
+          ? await prisma.friendship.findMany({
+              where: {
+                OR: [
+                  { userId: currentUserId, friendId: { in: userIds } },
+                  { friendId: currentUserId, userId: { in: userIds } },
+                ],
+              },
+            })
+          : [];
+
+      const acceptedFriendIds = friendships
+        .filter((f) => f.status === "ACCEPTED")
+        .map((f) => (f.userId === currentUserId ? f.friendId : f.userId));
+
+      const watchedRows =
+        acceptedFriendIds.length > 0
+          ? await prisma.mediaStatus.findMany({
+              where: {
+                status: "WATCHED",
+                userId: { in: [currentUserId, ...acceptedFriendIds] },
+              },
+              select: { userId: true, mediaType: true, tmdbId: true },
+            })
+          : [];
+
+      const myWatchedKeys = new Set<string>();
+      const friendWatchedMap = new Map<string, Array<{ mediaType: string; tmdbId: number }>>();
+      for (const w of watchedRows) {
+        if (w.userId === currentUserId) {
+          myWatchedKeys.add(`${w.mediaType}_${w.tmdbId}`);
+        } else {
+          const arr = friendWatchedMap.get(w.userId) || [];
+          arr.push({ mediaType: w.mediaType, tmdbId: w.tmdbId });
+          friendWatchedMap.set(w.userId, arr);
+        }
+      }
 
       return users.map((u) => {
         const fs = friendships.find(
@@ -2497,10 +2641,14 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
         return {
           id: u.id,
           name: u.name,
-          email: u.email,
+          email: relationship === "FRIENDS" ? u.email : undefined,
           image: u.image,
           relationship,
           requestId,
+          mutualWatchedCount:
+            relationship === "FRIENDS"
+              ? countMutualWatched(myWatchedKeys, friendWatchedMap.get(u.id) || [])
+              : undefined,
         };
       });
     } catch {
@@ -2519,6 +2667,12 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
     .slice(0, 10);
 
   const friendships = db.friendships || [];
+  const allStatuses = db.mediaStatuses || [];
+  const myWatchedKeys = new Set(
+    allStatuses
+      .filter((s) => s.userId === currentUserId && s.status === "WATCHED")
+      .map((s) => `${s.mediaType}_${s.tmdbId}`)
+  );
 
   return matchedUsers.map((u) => {
     const fs = friendships.find(
@@ -2543,13 +2697,22 @@ export async function searchUsersForFriendship(currentUserId: string, query: str
       }
     }
 
+    const mutualWatchedCount =
+      relationship === "FRIENDS"
+        ? countMutualWatched(
+            myWatchedKeys,
+            allStatuses.filter((s) => s.userId === u.id && s.status === "WATCHED")
+          )
+        : undefined;
+
     return {
       id: u.id,
       name: u.name,
-      email: u.email,
+      email: relationship === "FRIENDS" ? u.email : undefined,
       image: u.image,
       relationship,
       requestId,
+      mutualWatchedCount,
     };
   });
 }
@@ -3101,6 +3264,48 @@ function parseStringList(val: any): string[] {
   return [];
 }
 
+const ALLOWED_RECOMMENDATION_TARGET_TYPES = new Set(["ALL", "GROUPS", "FRIENDS", "CUSTOM"]);
+
+export function normalizeRecommendationTargetType(
+  raw: unknown
+): "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM" {
+  if (typeof raw !== "string") return "ALL";
+  const upper = raw.trim().toUpperCase();
+  return ALLOWED_RECOMMENDATION_TARGET_TYPES.has(upper)
+    ? (upper as "ALL" | "GROUPS" | "FRIENDS" | "CUSTOM")
+    : "ALL";
+}
+
+export function sanitizeTargetStringList(raw: unknown, maxItems: number): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((item): item is string => typeof item === "string")
+    .slice(0, maxItems)
+    .map((item) => item.trim().slice(0, 100))
+    .filter(Boolean);
+}
+
+function buildGroupVisibilityContext(groups: AppFriendGroup[]): {
+  myGroupIds: Set<string>;
+  myGroupNamesByOwner: Map<string, Set<string>>;
+} {
+  const myGroupIds = new Set<string>();
+  const myGroupNamesByOwner = new Map<string, Set<string>>();
+  for (const grp of groups) {
+    if (grp.id) myGroupIds.add(grp.id);
+    if (!grp.ownerId) continue;
+    const nameLower = grp.name.trim().toLowerCase();
+    if (!nameLower) continue;
+    let ownerNames = myGroupNamesByOwner.get(grp.ownerId);
+    if (!ownerNames) {
+      ownerNames = new Set<string>();
+      myGroupNamesByOwner.set(grp.ownerId, ownerNames);
+    }
+    ownerNames.add(nameLower);
+  }
+  return { myGroupIds, myGroupNamesByOwner };
+}
+
 function isRecommendationVisibleToUser(
   rec: {
     userId: string;
@@ -3112,7 +3317,7 @@ function isRecommendationVisibleToUser(
   currentUserId?: string,
   currentUserName?: string,
   myGroupIds?: Set<string>,
-  myGroupNames?: Set<string>
+  myGroupNamesByOwner?: Map<string, Set<string>>
 ): boolean {
   const targetType = rec.targetType || "ALL";
   const targetNames = rec.targetNames || [];
@@ -3144,8 +3349,14 @@ function isRecommendationVisibleToUser(
     return true;
   }
 
-  // 4. User targeted directly by name or alias
-  if (currentUserName && targetNames.some((t) => isSamePerson(t, currentUserName))) {
+  // 4. Legacy fallback: only match direct non-@ user names when no explicit targetUserIds are stored
+  if (
+    targetUserIds.length === 0 &&
+    currentUserName &&
+    targetNames.some(
+      (t) => !t.trim().startsWith("@") && normalizeName(t) === normalizeName(currentUserName)
+    )
+  ) {
     return true;
   }
 
@@ -3154,13 +3365,23 @@ function isRecommendationVisibleToUser(
     return true;
   }
   if (
-    myGroupNames &&
-    targetNames.some((t) => {
-      const clean = t.replace(/^@/, "").toLowerCase();
-      return myGroupNames.has(clean);
-    })
+    targetGroupIds.length === 0 &&
+    targetUserIds.length === 0 &&
+    myGroupNamesByOwner &&
+    rec.userId
   ) {
-    return true;
+    const authorGroupNames = myGroupNamesByOwner.get(rec.userId);
+    if (
+      authorGroupNames &&
+      targetNames.some((t) => {
+        const trimmed = t.trim();
+        if (!trimmed.startsWith("@")) return false;
+        const clean = trimmed.replace(/^@+/, "").trim().toLowerCase();
+        return Boolean(clean) && authorGroupNames.has(clean);
+      })
+    ) {
+      return true;
+    }
   }
 
   return false;
@@ -3182,29 +3403,170 @@ async function ensureMediaStatusColumns() {
   }
 }
 
+function diffBadgeKeys(
+  earnedKeys: Set<string>,
+  existingKeys: Iterable<string>
+): { missingKeys: string[]; revokedKeys: string[] } {
+  const existingSet = existingKeys instanceof Set ? existingKeys : new Set(existingKeys);
+  const missingKeys = Array.from(earnedKeys).filter((k) => !existingSet.has(k));
+  const revokedKeys = Array.from(existingSet).filter((k) => !earnedKeys.has(k));
+  return { missingKeys, revokedKeys };
+}
+
+function groupBadgesByUser(
+  rows: Array<{ userId: unknown; badgeKey: unknown; unlockedAt: string | Date }>,
+  allowedUserIds?: Set<string>
+): Record<string, AppUserBadge[]> {
+  const grouped: Record<string, AppUserBadge[]> = {};
+  for (const row of rows) {
+    const uid = String(row.userId);
+    if (allowedUserIds && !allowedUserIds.has(uid)) continue;
+    if (!grouped[uid]) grouped[uid] = [];
+    grouped[uid].push({
+      badgeKey: String(row.badgeKey),
+      unlockedAt:
+        typeof row.unlockedAt === "string"
+          ? row.unlockedAt
+          : new Date(row.unlockedAt).toISOString(),
+    });
+  }
+  return grouped;
+}
+
+async function syncAndLoadUserBadges(params: {
+  currentUserId: string;
+  allowedUserIds: string[];
+  statuses: AppMediaStatus[];
+  recommendations: AppRecommendation[];
+  currentUserFriendCount: number;
+}): Promise<Record<string, AppUserBadge[]>> {
+  const {
+    currentUserId,
+    allowedUserIds,
+    statuses,
+    recommendations,
+    currentUserFriendCount,
+  } = params;
+
+  const myWatched = statuses.filter(
+    (s) => s.userId === currentUserId && s.status === "WATCHED"
+  );
+  const myRecsCount = recommendations.filter((r) => r.userId === currentUserId).length;
+  const evaluated = evaluateUserBadges({
+    watchedItems: myWatched,
+    recommendationsCount: myRecsCount,
+    friendsCount: currentUserFriendCount,
+  });
+  const earnedKeys = new Set(evaluated.filter((b) => b.unlocked).map((b) => b.key));
+
+  if (await isPostgresAvailable()) {
+    try {
+      await ensureUserBadgeSchema();
+      const existingRows = await (prisma as any).userBadge.findMany({
+        where: { userId: { in: allowedUserIds } },
+        orderBy: { unlockedAt: "asc" },
+      });
+
+      const { missingKeys, revokedKeys } = diffBadgeKeys(
+        earnedKeys,
+        existingRows
+          .filter((row: any) => row.userId === currentUserId)
+          .map((row: any) => String(row.badgeKey))
+      );
+
+      if (missingKeys.length > 0) {
+        await (prisma as any).userBadge.createMany({
+          data: missingKeys.map((badgeKey) => ({
+            userId: currentUserId,
+            badgeKey,
+          })),
+          skipDuplicates: true,
+        });
+      }
+      if (revokedKeys.length > 0) {
+        await (prisma as any).userBadge.deleteMany({
+          where: {
+            userId: currentUserId,
+            badgeKey: { in: revokedKeys },
+          },
+        });
+      }
+
+      const finalRows =
+        missingKeys.length > 0 || revokedKeys.length > 0
+          ? await (prisma as any).userBadge.findMany({
+              where: { userId: { in: allowedUserIds } },
+              orderBy: { unlockedAt: "asc" },
+            })
+          : existingRows;
+
+      return groupBadgesByUser(finalRows);
+    } catch {
+      // Graceful fallback if DB schema isn't migrated yet
+      return {
+        [currentUserId]: Array.from(earnedKeys).map((badgeKey) => ({
+          badgeKey,
+          unlockedAt: new Date().toISOString(),
+        })),
+      };
+    }
+  }
+
+  const db = readLocalDb();
+  const existing = db.userBadges || [];
+  const { missingKeys, revokedKeys } = diffBadgeKeys(
+    earnedKeys,
+    existing.filter((b) => b.userId === currentUserId).map((b) => b.badgeKey)
+  );
+  const revokedSet = new Set(revokedKeys);
+
+  let updated = existing;
+  if (missingKeys.length > 0 || revokedSet.size > 0) {
+    const now = new Date().toISOString();
+    updated = existing.filter(
+      (b) => !(b.userId === currentUserId && revokedSet.has(b.badgeKey))
+    );
+    missingKeys.forEach((badgeKey, idx) => {
+      updated.push({
+        id: `ub_${Date.now()}_${idx}`,
+        userId: currentUserId,
+        badgeKey,
+        unlockedAt: now,
+      });
+    });
+    db.userBadges = updated;
+    writeLocalDb(db);
+  }
+
+  return groupBadgesByUser(updated, new Set(allowedUserIds));
+}
+
 export async function getAllCommunityData(
   currentUserId?: string,
   currentUserName?: string
 ): Promise<{
   mediaStatuses: AppMediaStatus[];
   recommendations: AppRecommendation[];
+  userBadges: Record<string, AppUserBadge[]>;
 }> {
   if (!currentUserId) {
     return {
       mediaStatuses: [],
       recommendations: [],
+      userBadges: {},
     };
   }
   const friendIds = await getAcceptedFriendIds(currentUserId);
   const allowedUserIds = new Set([currentUserId, ...friendIds]);
 
   let myGroupIds: Set<string> | undefined;
-  let myGroupNames: Set<string> | undefined;
+  let myGroupNamesByOwner: Map<string, Set<string>> | undefined;
   if (currentUserId) {
     try {
       const myGroups = await getUserFriendGroups(currentUserId, currentUserName);
-      myGroupIds = new Set(myGroups.map((g) => g.id));
-      myGroupNames = new Set(myGroups.map((g) => g.name.toLowerCase()));
+      const visibilityContext = buildGroupVisibilityContext(myGroups);
+      myGroupIds = visibilityContext.myGroupIds;
+      myGroupNamesByOwner = visibilityContext.myGroupNamesByOwner;
     } catch {
       // ignore
     }
@@ -3245,17 +3607,27 @@ export async function getAllCommunityData(
     const activeStatuses = statuses.filter(
       (s: any) => !s.user?.isBanned || s.userId === currentUserId
     );
+    const mappedStatuses = activeStatuses.map((s: any) => mapRawMediaStatus(s));
     const mappedRecs: AppRecommendation[] = recs
       .filter((r: any) => !r.user?.isBanned || r.userId === currentUserId)
       .map((r: any) => mapRawRecommendation(r));
 
     const visibleRecs = mappedRecs.filter((r) =>
-      isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
+      isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNamesByOwner)
     );
 
+    const userBadges = await syncAndLoadUserBadges({
+      currentUserId,
+      allowedUserIds: Array.from(allowedUserIds),
+      statuses: mappedStatuses,
+      recommendations: mappedRecs,
+      currentUserFriendCount: friendIds.length,
+    });
+
     return {
-      mediaStatuses: activeStatuses.map((s: any) => mapRawMediaStatus(s)),
+      mediaStatuses: mappedStatuses,
       recommendations: visibleRecs,
+      userBadges,
     };
   }
 
@@ -3281,12 +3653,21 @@ export async function getAllCommunityData(
       })
     )
     .filter((r) =>
-      isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNames)
+      isRecommendationVisibleToUser(r, currentUserId, currentUserName, myGroupIds, myGroupNamesByOwner)
     );
+
+  const userBadges = await syncAndLoadUserBadges({
+    currentUserId,
+    allowedUserIds: Array.from(allowedUserIds),
+    statuses,
+    recommendations: visibleRecs,
+    currentUserFriendCount: friendIds.length,
+  });
 
   return {
     mediaStatuses: statuses,
     recommendations: visibleRecs,
+    userBadges,
   };
 }
 
@@ -3307,7 +3688,11 @@ export async function toggleMediaStatus(params: {
   // "WATCHING" is strictly reserved for TV series; never allow it on movies.
   const effectiveStatus =
     params.status === "WATCHING" && params.mediaType !== "tv" ? "WATCHED" : params.status;
-  const normalizedParams = { ...params, status: effectiveStatus };
+  const normalizedParams = {
+    ...params,
+    posterPath: sanitizeTmdbImagePath(params.posterPath),
+    status: effectiveStatus,
+  };
 
   if (await isPostgresAvailable()) {
     await ensureMediaStatusColumns();
@@ -3467,6 +3852,9 @@ export async function addRecommendation(params: {
   targetGroupIds?: string[];
   targetUserIds?: string[];
 }) {
+  const safePosterPath = sanitizeTmdbImagePath(params.posterPath);
+  const safeBackdropPath = sanitizeTmdbImagePath(params.backdropPath);
+
   // Also mark as WATCHED automatically when recommending!
   await toggleMediaStatus({
     userId: params.userId,
@@ -3475,16 +3863,16 @@ export async function addRecommendation(params: {
     tmdbId: params.tmdbId,
     mediaType: params.mediaType,
     title: params.title,
-    posterPath: params.posterPath,
+    posterPath: safePosterPath,
     releaseYear: params.releaseYear,
     status: "WATCHED",
     rating: params.rating,
   });
 
-  const targetType = params.targetType || "ALL";
-  const targetNames = params.targetNames || [];
-  const targetGroupIds = params.targetGroupIds || [];
-  const targetUserIds = params.targetUserIds || [];
+  const targetType = normalizeRecommendationTargetType(params.targetType);
+  const targetNames = sanitizeTargetStringList(params.targetNames, 50);
+  const targetGroupIds = sanitizeTargetStringList(params.targetGroupIds, 30);
+  const targetUserIds = sanitizeTargetStringList(params.targetUserIds, 50);
 
   if (await isPostgresAvailable()) {
     try {
@@ -3494,8 +3882,8 @@ export async function addRecommendation(params: {
           tmdbId: params.tmdbId,
           mediaType: params.mediaType,
           title: params.title,
-          posterPath: params.posterPath,
-          backdropPath: params.backdropPath,
+          posterPath: safePosterPath,
+          backdropPath: safeBackdropPath,
           releaseYear: params.releaseYear,
           rating: params.rating,
           comment: params.comment,
@@ -3515,8 +3903,8 @@ export async function addRecommendation(params: {
           tmdbId: params.tmdbId,
           mediaType: params.mediaType,
           title: params.title,
-          posterPath: params.posterPath,
-          backdropPath: params.backdropPath,
+          posterPath: safePosterPath,
+          backdropPath: safeBackdropPath,
           releaseYear: params.releaseYear,
           rating: params.rating,
           comment: params.comment,
@@ -3536,8 +3924,8 @@ export async function addRecommendation(params: {
     tmdbId: params.tmdbId,
     mediaType: params.mediaType,
     title: params.title,
-    posterPath: params.posterPath,
-    backdropPath: params.backdropPath,
+    posterPath: safePosterPath,
+    backdropPath: safeBackdropPath,
     releaseYear: params.releaseYear,
     rating: params.rating,
     comment: params.comment,
@@ -3565,10 +3953,10 @@ export async function updateRecommendation(params: {
   targetGroupIds?: string[];
   targetUserIds?: string[];
 }): Promise<boolean> {
-  const targetType = params.targetType || "ALL";
-  const targetNames = params.targetNames || [];
-  const targetGroupIds = params.targetGroupIds || [];
-  const targetUserIds = params.targetUserIds || [];
+  const targetType = normalizeRecommendationTargetType(params.targetType);
+  const targetNames = sanitizeTargetStringList(params.targetNames, 50);
+  const targetGroupIds = sanitizeTargetStringList(params.targetGroupIds, 30);
+  const targetUserIds = sanitizeTargetStringList(params.targetUserIds, 50);
 
   if (await isPostgresAvailable()) {
     try {
@@ -3644,16 +4032,72 @@ export async function deleteRecommendation(
   return false;
 }
 
-export async function toggleRecommendationUpvote(userId: string, recommendationId: string) {
-  const friendIds = await getAcceptedFriendIds(userId);
-  const allowedAuthorIds = new Set([userId, ...friendIds]);
+async function canAccessRecommendation(
+  rec:
+    | {
+        userId: string;
+        targetType?: string | null;
+        targetNames?: unknown;
+        targetGroupIds?: unknown;
+        targetUserIds?: unknown;
+      }
+    | null
+    | undefined,
+  currentUserId: string,
+  currentUserName?: string
+): Promise<boolean> {
+  if (!rec) return false;
+  if (rec.userId === currentUserId) return true;
+  const friendIds = await getAcceptedFriendIds(currentUserId);
+  if (!friendIds.includes(rec.userId)) return false;
 
+  const targetType = rec.targetType || "ALL";
+  const targetNames = parseStringList(rec.targetNames);
+  const targetGroupIds = parseStringList(rec.targetGroupIds);
+  const targetUserIds = parseStringList(rec.targetUserIds);
+
+  const isAll =
+    targetType === "ALL" &&
+    targetNames.length === 0 &&
+    targetGroupIds.length === 0 &&
+    targetUserIds.length === 0;
+  if (isAll) return true;
+
+  const myGroups = await getUserFriendGroups(currentUserId, currentUserName);
+  const { myGroupIds, myGroupNamesByOwner } = buildGroupVisibilityContext(myGroups);
+
+  return isRecommendationVisibleToUser(
+    {
+      userId: rec.userId,
+      targetType,
+      targetNames,
+      targetGroupIds,
+      targetUserIds,
+    },
+    currentUserId,
+    currentUserName,
+    myGroupIds,
+    myGroupNamesByOwner
+  );
+}
+
+export async function toggleRecommendationUpvote(
+  userId: string,
+  recommendationId: string,
+  userName?: string
+) {
   if (await isPostgresAvailable()) {
     const rec = await prisma.recommendation.findUnique({
       where: { id: recommendationId },
-      select: { userId: true },
+      select: {
+        userId: true,
+        targetType: true,
+        targetNames: true,
+        targetGroupIds: true,
+        targetUserIds: true,
+      },
     });
-    if (!rec || !allowedAuthorIds.has(rec.userId)) {
+    if (!(await canAccessRecommendation(rec, userId, userName))) {
       return { upvoted: false };
     }
     const existing = await prisma.recommendationUpvote.findUnique({
@@ -3674,14 +4118,16 @@ export async function toggleRecommendationUpvote(userId: string, recommendationI
 
   const db = readLocalDb();
   const rec = db.recommendations.find((r) => r.id === recommendationId);
-  if (!rec || !allowedAuthorIds.has(rec.userId)) return { upvoted: false };
-  const idx = rec.upvoterIds.indexOf(userId);
+  if (!(await canAccessRecommendation(rec, userId, userName))) {
+    return { upvoted: false };
+  }
+  const idx = rec!.upvoterIds.indexOf(userId);
   if (idx !== -1) {
-    rec.upvoterIds.splice(idx, 1);
+    rec!.upvoterIds.splice(idx, 1);
     writeLocalDb(db);
     return { upvoted: false };
   } else {
-    rec.upvoterIds.push(userId);
+    rec!.upvoterIds.push(userId);
     writeLocalDb(db);
     return { upvoted: true };
   }
@@ -3697,16 +4143,19 @@ export async function addRecommendationReply(params: {
   const cleanText = params.text.trim().slice(0, 1000);
   if (!cleanText) throw new Error("Reply text cannot be empty");
 
-  const friendIds = await getAcceptedFriendIds(params.userId);
-  const allowedAuthorIds = new Set([params.userId, ...friendIds]);
-
   if (await isPostgresAvailable()) {
     try {
       const rec = await prisma.recommendation.findUnique({
         where: { id: params.recommendationId },
-        select: { userId: true },
+        select: {
+          userId: true,
+          targetType: true,
+          targetNames: true,
+          targetGroupIds: true,
+          targetUserIds: true,
+        },
       });
-      if (!rec || !allowedAuthorIds.has(rec.userId)) {
+      if (!(await canAccessRecommendation(rec, params.userId, params.userName))) {
         throw new Error("Keine Berechtigung für diese Empfehlung.");
       }
       const created = await (prisma as any).recommendationReply.create({
@@ -3737,7 +4186,7 @@ export async function addRecommendationReply(params: {
 
   const db = readLocalDb();
   const rec = db.recommendations.find((r) => r.id === params.recommendationId);
-  if (!rec || !allowedAuthorIds.has(rec.userId)) {
+  if (!(await canAccessRecommendation(rec, params.userId, params.userName))) {
     throw new Error("Keine Berechtigung für diese Empfehlung.");
   }
   if (!db.recommendationReplies) db.recommendationReplies = [];
@@ -3811,10 +4260,8 @@ function sanitizeCustomMoviesList(raw: any): AppCustomCollectionMovie[] {
     const title = String(item?.title || "").trim().slice(0, 250);
     if (!title) continue;
     const releaseYear = String(item?.releaseYear || "").trim().slice(0, 10);
-    const rawPoster = item?.posterPath ? String(item.posterPath).trim().slice(0, 200) : null;
-    const posterPath = rawPoster && rawPoster.startsWith("/") ? rawPoster : null;
-    const rawBackdrop = item?.backdropPath ? String(item.backdropPath).trim().slice(0, 200) : null;
-    const backdropPath = rawBackdrop && rawBackdrop.startsWith("/") ? rawBackdrop : null;
+    const posterPath = sanitizeTmdbImagePath(item?.posterPath);
+    const backdropPath = sanitizeTmdbImagePath(item?.backdropPath);
     const voteAverage = Math.min(10, Math.max(0, Number(item?.voteAverage) || 8.0));
 
     sanitized.push({
@@ -3868,11 +4315,10 @@ function isCustomCollectionVisibleToUser(
   isAdmin?: boolean,
   friendIds?: Set<string>,
   myGroupIds?: Set<string>,
-  myGroupNames?: Set<string>
+  myGroupNamesByOwner?: Map<string, Set<string>>
 ): boolean {
   // 1. Admin sees everything (including PENDING collections to approve them) and owner always sees their own
   if (currentUserId && col.ownerId === currentUserId) return true;
-  if (currentUserName && isSamePerson(col.ownerName, currentUserName)) return true;
 
   // 2. Publicly shared & approved collections are visible to everyone
   if (col.visibility === "PUBLIC" && col.approvalStatus === "APPROVED") {
@@ -3906,7 +4352,7 @@ function isCustomCollectionVisibleToUser(
     currentUserId,
     currentUserName,
     myGroupIds,
-    myGroupNames
+    myGroupNamesByOwner
   );
 }
 
@@ -3917,15 +4363,16 @@ export async function getVisibleCustomCollections(
 ): Promise<AppCustomCollection[]> {
   let friendIdSet = new Set<string>();
   let myGroupIds = new Set<string>();
-  let myGroupNames = new Set<string>();
+  let myGroupNamesByOwner = new Map<string, Set<string>>();
 
   if (currentUserId) {
     try {
       const fIds = await getAcceptedFriendIds(currentUserId);
       friendIdSet = new Set(fIds);
       const myGroups = await getUserFriendGroups(currentUserId, currentUserName);
-      myGroupIds = new Set(myGroups.map((g) => g.id));
-      myGroupNames = new Set(myGroups.map((g) => g.name.toLowerCase()));
+      const visibilityContext = buildGroupVisibilityContext(myGroups);
+      myGroupIds = visibilityContext.myGroupIds;
+      myGroupNamesByOwner = visibilityContext.myGroupNamesByOwner;
     } catch {
       // ignore
     }
@@ -3957,7 +4404,7 @@ export async function getVisibleCustomCollections(
       isAdmin,
       friendIdSet,
       myGroupIds,
-      myGroupNames
+      myGroupNamesByOwner
     )
   );
 }
@@ -3997,15 +4444,13 @@ export async function saveCustomCollection(params: {
   const cleanEmoji = (params.emoji || "🎬").trim().slice(0, 10);
   const cleanMovies = sanitizeCustomMoviesList(params.movies);
 
-  const rawFirstPoster = params.posterPath ? String(params.posterPath).trim().slice(0, 200) : null;
   const firstPoster =
-    (rawFirstPoster && rawFirstPoster.startsWith("/") ? rawFirstPoster : null) ||
+    sanitizeTmdbImagePath(params.posterPath) ||
     cleanMovies.find((m) => m.posterPath)?.posterPath ||
     null;
 
-  const rawFirstBackdrop = params.backdropPath ? String(params.backdropPath).trim().slice(0, 200) : null;
   const firstBackdrop =
-    (rawFirstBackdrop && rawFirstBackdrop.startsWith("/") ? rawFirstBackdrop : null) ||
+    sanitizeTmdbImagePath(params.backdropPath) ||
     cleanMovies.find((m) => m.backdropPath)?.backdropPath ||
     firstPoster ||
     null;
@@ -4021,18 +4466,9 @@ export async function saveCustomCollection(params: {
   };
 
   const targetType = params.targetType === "CUSTOM" ? "CUSTOM" : "ALL";
-  const targetNames = (params.targetNames || [])
-    .slice(0, 50)
-    .map((n) => String(n).trim().slice(0, 100))
-    .filter(Boolean);
-  const targetGroupIds = (params.targetGroupIds || [])
-    .slice(0, 30)
-    .map((g) => String(g).trim().slice(0, 100))
-    .filter(Boolean);
-  const targetUserIds = (params.targetUserIds || [])
-    .slice(0, 50)
-    .map((u) => String(u).trim().slice(0, 100))
-    .filter(Boolean);
+  const targetNames = sanitizeTargetStringList(params.targetNames, 50);
+  const targetGroupIds = sanitizeTargetStringList(params.targetGroupIds, 30);
+  const targetUserIds = sanitizeTargetStringList(params.targetUserIds, 50);
 
   if (await isPostgresAvailable()) {
     try {
@@ -4222,10 +4658,11 @@ export async function reviewCustomCollectionApproval(params: {
 
 export async function toggleCustomCollectionUpvote(
   userId: string,
-  collectionId: string
+  collectionId: string,
+  userName?: string
 ): Promise<{ upvoted: boolean }> {
   // Verify user has visibility permission to this collection before allowing upvote
-  const visibleCol = await getCustomCollectionById(collectionId, userId, undefined, false);
+  const visibleCol = await getCustomCollectionById(collectionId, userId, userName, false);
   if (!visibleCol) return { upvoted: false };
 
   if (await isPostgresAvailable()) {

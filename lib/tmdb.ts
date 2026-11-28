@@ -468,6 +468,30 @@ export async function getTopRatedTv(pages = 2): Promise<MediaItem[]> {
   }
 }
 
+function dedupeAndMapTrendingItems(
+  rawResults: any[] = [],
+  mediaType: "all" | "movie" | "tv" = "all",
+  options?: { requirePoster?: boolean; includeRank?: boolean }
+): MediaItem[] {
+  const seen = new Set<string>();
+  const items: MediaItem[] = [];
+  for (const raw of rawResults) {
+    const resolvedType = mediaType === "all" ? raw.media_type : mediaType;
+    if (resolvedType !== "movie" && resolvedType !== "tv") continue;
+    const item = mapRawItem(
+      raw,
+      mediaType === "all" ? undefined : mediaType,
+      options?.includeRank ? items.length + 1 : undefined
+    );
+    if (options?.requirePoster && !item.posterPath) continue;
+    const key = `${item.mediaType}_${item.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    items.push(item);
+  }
+  return items;
+}
+
 export async function getTrendingAll(pages = 2): Promise<MediaItem[]> {
   try {
     const pagePromises = Array.from({ length: pages }, (_, i) =>
@@ -477,15 +501,7 @@ export async function getTrendingAll(pages = 2): Promise<MediaItem[]> {
     );
     const responses = await Promise.all(pagePromises);
     const allResults = responses.flatMap((r) => r.results || []);
-    const seen = new Set<string>();
-    const uniqueResults = allResults.filter((r) => {
-      if (r.media_type !== "movie" && r.media_type !== "tv") return false;
-      const key = `${r.media_type}_${r.id}`;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-    return uniqueResults.map((item, idx) => mapRawItem(item, undefined, idx + 1));
+    return dedupeAndMapTrendingItems(allResults, "all", { includeRank: true });
   } catch (err) {
     console.error("Error fetching trending:", err);
     return getOscarWinnersList();
@@ -605,6 +621,32 @@ export interface DiscoverMediaResult {
   page: number;
   totalPages: number;
   hasMore: boolean;
+}
+
+export async function getTrendingPage(
+  mediaType: "all" | "movie" | "tv" = "all",
+  page = 1
+): Promise<DiscoverMediaResult> {
+  const safePage = Math.min(500, Math.max(1, Math.floor(page || 1)));
+  try {
+    const res = await tmdbFetch<{ results: any[]; total_pages?: number }>(
+      `/trending/${mediaType}/week`,
+      { page: String(safePage) }
+    );
+    const results = dedupeAndMapTrendingItems(res.results || [], mediaType, {
+      requirePoster: true,
+    });
+    const totalPages = Math.min(500, Math.max(1, res.total_pages || 1));
+    return {
+      results,
+      page: safePage,
+      totalPages,
+      hasMore: safePage < totalPages && results.length > 0,
+    };
+  } catch (err) {
+    console.error("Error fetching trending page:", err);
+    return { results: [], page: safePage, totalPages: 1, hasMore: false };
+  }
 }
 
 export async function discoverMedia(filters: DiscoverFilters): Promise<DiscoverMediaResult> {

@@ -67,7 +67,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[80dvh] flex items-center justify-center px-4 py-8 sm:py-12">
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)] flex items-center justify-center px-4 py-8 sm:py-12">
       <div className="bg-[#0e1422] border border-slate-800 rounded-3xl w-full max-w-md p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-amber-500 to-rose-500 flex items-center justify-center text-black font-black mx-auto shadow-lg shadow-amber-500/20">

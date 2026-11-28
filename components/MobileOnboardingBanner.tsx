@@ -49,11 +49,11 @@ export function MobileOnboardingBanner() {
   };
 
   return (
-    <div className="md:hidden rounded-3xl bg-gradient-to-br from-amber-500/15 via-slate-900 to-purple-950/40 border border-amber-500/30 p-4 shadow-xl space-y-3">
+    <div className="md:hidden rounded-2xl bg-card border border-border p-4 shadow-sm space-y-3">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-amber-400 flex-shrink-0" />
-          <p className="text-sm font-black text-white leading-tight">
+          <Sparkles className="w-4 h-4 text-primary-text flex-shrink-0" />
+          <p className="text-sm font-bold text-foreground leading-tight">
             Starte in 2 schnellen Schritten
           </p>
         </div>
@@ -61,7 +61,7 @@ export function MobileOnboardingBanner() {
           type="button"
           onClick={handleDismiss}
           aria-label="Start-Hilfe ausblenden"
-          className="-mr-1.5 -mt-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-slate-400 active:bg-slate-800"
+          className="-mr-1.5 -mt-1.5 min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl text-muted-foreground active:bg-muted"
         >
           <X className="w-4 h-4" />
         </button>
@@ -71,30 +71,30 @@ export function MobileOnboardingBanner() {
         <button
           type="button"
           onClick={openSubscriptions}
-          className="min-h-[48px] p-3 rounded-2xl bg-slate-950/80 border border-slate-800 text-left flex flex-col justify-between gap-1.5 active:scale-[0.98] transition"
+          className="min-h-[48px] p-3 rounded-xl bg-muted border border-border text-left flex flex-col justify-between gap-1.5 active:scale-[0.98] transition"
         >
           <div className="flex items-center justify-between">
-            <Tv className="w-4 h-4 text-amber-400" />
-            <span className="text-[11px] font-bold text-amber-300 flex items-center gap-0.5">
+            <Tv className="w-4 h-4 text-primary-text" />
+            <span className="text-[11px] font-bold text-primary-text flex items-center gap-0.5">
               <Check className="w-3 h-3" /> {userSubscriptions.length}
             </span>
           </div>
-          <span className="text-xs font-bold text-white leading-snug">
+          <span className="text-xs font-bold text-foreground leading-snug">
             1. Deine Abos wählen
           </span>
         </button>
 
         <Link
           href="/quick-rate"
-          className="min-h-[48px] p-3 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-left flex flex-col justify-between gap-1.5 active:scale-[0.98] transition"
+          className="min-h-[48px] p-3 rounded-xl bg-primary-soft border border-primary/30 text-left flex flex-col justify-between gap-1.5 active:scale-[0.98] transition"
         >
           <div className="flex items-center justify-between">
-            <Zap className="w-4 h-4 text-amber-400 fill-amber-400" />
-            <span className="text-[11px] font-mono font-bold text-amber-300">
+            <Zap className="w-4 h-4 text-primary-text" />
+            <span className="text-[11px] font-mono font-bold text-primary-text">
               {myWatchedCount}/10
             </span>
           </div>
-          <span className="text-xs font-bold text-white leading-snug">
+          <span className="text-xs font-bold text-foreground leading-snug">
             2. Per Swipe bewerten
           </span>
         </Link>

@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bookmark, Compass, Flame, Search, Users } from "lucide-react";
+import { useSession } from "next-auth/react";
+import { Compass, Search, Sparkles, User, Users } from "lucide-react";
 import { useMedia } from "./MediaContext";
 import { isDiscoverRoute } from "./Navbar";
 
 export function MobileBottomNav() {
   const pathname = usePathname();
+  const { data: session } = useSession();
   const { openSearch, communityData } = useMedia();
 
   if (pathname === "/login" || pathname === "/register") {
@@ -17,15 +19,17 @@ export function MobileBottomNav() {
   const pendingRequestsCount = communityData?.friendRequests?.pendingReceived?.length || 0;
 
   const isDiscoverActive = isDiscoverRoute(pathname);
-  const isFeedActive = pathname?.startsWith("/feed");
+  const isRecsActive = pathname?.startsWith("/recommendations");
   const isSearchActive = pathname?.startsWith("/search");
-  const isListActive = pathname?.startsWith("/my-list");
   const isFriendsActive = pathname?.startsWith("/friends");
+  const isProfileActive = pathname === "/profile";
+
+  const profileHref = session?.user ? "/profile" : "/login";
 
   return (
     <nav
       aria-label="Mobile Navigation"
-      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-[#07090e]/95 backdrop-blur-xl border-t border-slate-800/80 pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-[0_-8px_30px_rgba(0,0,0,0.45)] select-none"
+      className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-xl border-t border-border pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] shadow-[0_-8px_24px_rgba(0,0,0,0.18)] select-none"
     >
       <div className="grid grid-cols-5 items-stretch max-w-lg mx-auto h-16 px-1">
         <Link
@@ -33,37 +37,37 @@ export function MobileBottomNav() {
           aria-current={isDiscoverActive ? "page" : undefined}
           className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
             isDiscoverActive
-              ? "text-amber-400"
-              : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
+              ? "text-primary-text"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span
             className={`px-3 py-1 rounded-full transition-colors ${
-              isDiscoverActive ? "bg-amber-500/15" : ""
+              isDiscoverActive ? "bg-primary-soft" : ""
             }`}
           >
-            <Compass className="w-5 h-5" />
+            <Compass className="w-5 h-5" aria-hidden="true" />
           </span>
           <span className="text-[11px] font-semibold leading-none tracking-tight">Entdecken</span>
         </Link>
 
         <Link
-          href="/feed"
-          aria-current={isFeedActive ? "page" : undefined}
+          href="/recommendations"
+          aria-current={isRecsActive ? "page" : undefined}
           className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
-            isFeedActive
-              ? "text-amber-400"
-              : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
+            isRecsActive
+              ? "text-primary-text"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span
             className={`px-3 py-1 rounded-full transition-colors ${
-              isFeedActive ? "bg-amber-500/15" : ""
+              isRecsActive ? "bg-primary-soft" : ""
             }`}
           >
-            <Flame className="w-5 h-5" />
+            <Sparkles className="w-5 h-5" aria-hidden="true" />
           </span>
-          <span className="text-[11px] font-semibold leading-none tracking-tight">Feed</span>
+          <span className="text-[11px] font-semibold leading-none tracking-tight">Tipps</span>
         </Link>
 
         <button
@@ -71,20 +75,20 @@ export function MobileBottomNav() {
           onClick={() => openSearch()}
           aria-label="Schnellsuche öffnen"
           aria-current={isSearchActive ? "page" : undefined}
-          className="flex flex-col items-center justify-center gap-1 rounded-xl text-slate-300 hover:text-amber-400 active:scale-95 transition-all"
+          className="flex flex-col items-center justify-center gap-1 rounded-xl text-foreground hover:text-primary-text active:scale-95 transition-all"
         >
           <span
             className={`px-3.5 py-1.5 rounded-full border shadow-sm transition-colors ${
               isSearchActive
-                ? "bg-amber-500 text-black border-amber-400"
-                : "bg-amber-500/15 border-amber-500/30 text-amber-400"
+                ? "bg-primary text-primary-foreground border-primary"
+                : "bg-primary-soft border-primary/30 text-primary-text"
             }`}
           >
-            <Search className="w-5 h-5" />
+            <Search className="w-5 h-5" aria-hidden="true" />
           </span>
           <span
             className={`text-[11px] font-semibold leading-none tracking-tight ${
-              isSearchActive ? "text-amber-400" : "text-amber-300/90"
+              isSearchActive ? "text-primary-text" : "text-primary-text"
             }`}
           >
             Suche
@@ -92,46 +96,48 @@ export function MobileBottomNav() {
         </button>
 
         <Link
-          href="/my-list"
-          aria-current={isListActive ? "page" : undefined}
-          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
-            isListActive
-              ? "text-amber-400"
-              : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
-          }`}
-        >
-          <span
-            className={`px-3 py-1 rounded-full transition-colors ${
-              isListActive ? "bg-amber-500/15" : ""
-            }`}
-          >
-            <Bookmark className="w-5 h-5" />
-          </span>
-          <span className="text-[11px] font-semibold leading-none tracking-tight">Liste</span>
-        </Link>
-
-        <Link
           href="/friends"
           aria-current={isFriendsActive ? "page" : undefined}
           className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 relative ${
             isFriendsActive
-              ? "text-amber-400"
-              : "text-slate-400 hover:text-slate-200 active:bg-slate-900/70"
+              ? "text-primary-text"
+              : "text-muted-foreground hover:text-foreground"
           }`}
         >
           <span
             className={`relative px-3 py-1 rounded-full transition-colors ${
-              isFriendsActive ? "bg-amber-500/15" : ""
+              isFriendsActive ? "bg-primary-soft" : ""
             }`}
           >
-            <Users className="w-5 h-5" />
+            <Users className="w-5 h-5" aria-hidden="true" />
             {pendingRequestsCount > 0 && (
-              <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-amber-500 text-black text-[10px] font-bold flex items-center justify-center shadow">
+              <span className="absolute -top-0.5 right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-primary text-primary-foreground text-[10px] font-bold flex items-center justify-center shadow">
                 {pendingRequestsCount}
               </span>
             )}
           </span>
           <span className="text-[11px] font-semibold leading-none tracking-tight">Freunde</span>
+        </Link>
+
+        <Link
+          href={profileHref}
+          aria-current={isProfileActive ? "page" : undefined}
+          className={`flex flex-col items-center justify-center gap-1 rounded-xl transition-all active:scale-95 ${
+            isProfileActive
+              ? "text-primary-text"
+              : "text-muted-foreground hover:text-foreground"
+          }`}
+        >
+          <span
+            className={`px-3 py-1 rounded-full transition-colors ${
+              isProfileActive ? "bg-primary-soft" : ""
+            }`}
+          >
+            <User className="w-5 h-5" aria-hidden="true" />
+          </span>
+          <span className="text-[11px] font-semibold leading-none tracking-tight">
+            {session?.user ? "Profil" : "Login"}
+          </span>
         </Link>
       </div>
     </nav>

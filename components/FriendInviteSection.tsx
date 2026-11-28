@@ -26,11 +26,17 @@ import {
   InviteStatusBadge,
 } from "./InviteStatusBadge";
 
-export function FriendInviteSection() {
+export function FriendInviteSection({ initialEmail = "" }: { initialEmail?: string }) {
   const { data: session, status } = useSession();
   const { confirmDialog, showToast } = useMedia();
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
+
+  useEffect(() => {
+    if (initialEmail && initialEmail.trim()) {
+      setEmail(initialEmail.trim());
+    }
+  }, [initialEmail]);
   const [hasEdited, setHasEdited] = useState(false);
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -263,39 +269,39 @@ export function FriendInviteSection() {
     <section
       id="invite-friends"
       aria-labelledby="friend-invite-heading"
-      className="p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/25 via-slate-900/75 to-slate-900/60 border border-amber-500/30 space-y-5 shadow-xl scroll-mt-24"
+      className="p-5 sm:p-6 rounded-2xl bg-card border border-border space-y-5 shadow-sm scroll-mt-24"
     >
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
         <div className="space-y-1">
           <h2
             id="friend-invite-heading"
-            className="text-lg sm:text-xl font-black text-white flex items-center gap-2"
+            className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2"
           >
-            <Mail className="w-5 h-5 text-amber-400" aria-hidden="true" />
-            <span>Freunde zu CineCircle einladen</span>
+            <Mail className="w-4 h-4 text-primary-text" aria-hidden="true" />
+            <span>Freunde per E-Mail einladen</span>
           </h2>
-          <p className="text-xs text-slate-300 leading-relaxed max-w-2xl">
-            Lade Freunde oder Familie per E-Mail ein. Sie erhalten sofort eine persönliche Einladungs-Mail, werden freigeschaltet und nach der Registrierung direkt als Freund vorgeschlagen.
+          <p className="text-xs text-muted-foreground leading-relaxed max-w-2xl">
+            Lade Freunde oder Familie ein. Sie erhalten sofort eine Einladungs-Mail, werden freigeschaltet und nach der Registrierung direkt als Freund vorgeschlagen.
           </p>
         </div>
 
         {quota && (
           <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
             {quota.isAdmin ? (
-              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/35 text-[11px] font-bold text-amber-300">
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-primary-soft border border-primary/30 text-[11px] font-bold text-primary-text">
                 <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>Admin · Ohne Limit</span>
               </span>
             ) : (
               <>
-                <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-[11px] font-semibold text-slate-300">
-                  Heute: <strong className="text-amber-300">{quota.used24h}/{quota.limit24h}</strong>
+                <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-[11px] font-semibold text-muted-foreground">
+                  Heute: <strong className="text-foreground">{quota.used24h}/{quota.limit24h}</strong>
                 </span>
-                <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-[11px] font-semibold text-slate-300">
-                  Offen: <strong className="text-sky-300">{quota.openPending}/{quota.maxOpenPending}</strong>
+                <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-[11px] font-semibold text-muted-foreground">
+                  Offen: <strong className="text-foreground">{quota.openPending}/{quota.maxOpenPending}</strong>
                 </span>
-                <span className="px-2.5 py-1 rounded-full bg-slate-950/80 border border-slate-800 text-[11px] font-semibold text-slate-300">
-                  30 Tage: <strong className="text-slate-100">{quota.used30d}/{quota.limit30d}</strong>
+                <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-[11px] font-semibold text-muted-foreground">
+                  30 Tage: <strong className="text-foreground">{quota.used30d}/{quota.limit30d}</strong>
                 </span>
               </>
             )}
@@ -317,12 +323,12 @@ export function FriendInviteSection() {
         <div className="space-y-1">
           <label
             htmlFor="friend-invite-email"
-            className="block text-xs font-bold text-slate-200"
+            className="block text-xs font-bold text-foreground"
           >
-            E-Mail-Adresse deines Freundes <span aria-hidden="true" className="text-amber-400">*</span>
+            E-Mail-Adresse <span aria-hidden="true" className="text-primary-text">*</span>
           </label>
-          <p id="friend-invite-hint" className="text-[11px] text-slate-400">
-            Format: freund@example.com — Einladungen von Mitgliedern sind {quota?.inviteTtlDays ?? 14} Tage gültig. Der Admin erhält zur Sicherheit eine Benachrichtigung.
+          <p id="friend-invite-hint" className="text-[11px] text-muted-foreground">
+            Format: freund@example.com — Einladungen sind {quota?.inviteTtlDays ?? 14} Tage gültig.
           </p>
         </div>
 
@@ -330,7 +336,7 @@ export function FriendInviteSection() {
           <div className="flex-1 space-y-1.5">
             <div className="relative">
               <Mail
-                className="w-4 h-4 text-slate-500 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                className="w-4 h-4 text-muted-foreground absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
                 aria-hidden="true"
               />
               <input
@@ -352,10 +358,10 @@ export function FriendInviteSection() {
                 aria-invalid={fieldError ? "true" : "false"}
                 aria-describedby={describedBy}
                 placeholder="freund@example.com"
-                className={`w-full min-h-[48px] sm:min-h-0 bg-slate-950/90 border rounded-2xl py-2.5 pl-10 pr-3 text-base sm:text-sm text-white placeholder-slate-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 transition ${
+                className={`w-full min-h-[48px] sm:min-h-0 bg-input border rounded-xl py-2.5 pl-10 pr-3 text-base sm:text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-primary transition ${
                   fieldError
-                    ? "border-rose-500 bg-rose-950/20"
-                    : "border-slate-800 focus:border-amber-400 user-invalid:border-rose-500"
+                    ? "border-rose-500 bg-rose-500/10"
+                    : "border-border focus:border-primary user-invalid:border-rose-500"
                 }`}
               />
             </div>
@@ -363,9 +369,9 @@ export function FriendInviteSection() {
             {fieldError && (
               <p
                 id="friend-invite-error"
-                className="text-xs text-rose-300 flex items-center gap-1.5 font-medium"
+                className="text-xs text-rose-600 dark:text-rose-300 flex items-center gap-1.5 font-medium"
               >
-                <AlertCircle className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" aria-hidden="true" />
+                <AlertCircle className="w-3.5 h-3.5 text-rose-500 flex-shrink-0" aria-hidden="true" />
                 <span>{fieldError}</span>
               </p>
             )}
@@ -374,7 +380,7 @@ export function FriendInviteSection() {
           <button
             type="submit"
             disabled={submitting}
-            className="min-h-[48px] sm:min-h-[42px] px-5 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+            className="min-h-[48px] sm:min-h-[42px] px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs transition shadow-sm disabled:opacity-50 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer"
           >
             <Send className="w-4 h-4" aria-hidden="true" />
             <span>{submitting ? "Wird eingeladen..." : "Einladung senden"}</span>
@@ -382,9 +388,9 @@ export function FriendInviteSection() {
         </div>
 
         {serverError && (
-          <div className="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/40 text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/35 text-rose-700 dark:text-rose-200 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" aria-hidden="true" />
+              <AlertCircle className="w-4 h-4 text-rose-500 flex-shrink-0 mt-0.5" aria-hidden="true" />
               <span>{serverError}</span>
             </div>
             {blockedApprovalEmail && (
@@ -392,7 +398,7 @@ export function FriendInviteSection() {
                 type="button"
                 disabled={requestingApproval}
                 onClick={handleRequestAdminApproval}
-                className="min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-black text-xs transition whitespace-nowrap disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0"
+                className="min-h-[40px] sm:min-h-0 px-3.5 py-1.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs transition whitespace-nowrap disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer flex-shrink-0"
               >
                 <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
                 <span>
@@ -406,15 +412,15 @@ export function FriendInviteSection() {
 
       {/* Latest Invite Link Confirmation */}
       {lastResult && (
-        <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/35 space-y-2.5 animate-in fade-in">
+        <div className="p-4 rounded-xl bg-primary-soft border border-primary/30 space-y-2.5 animate-in fade-in">
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
-            <span className="font-bold text-amber-300">
+            <span className="font-bold text-primary-text">
               Einladung für {lastResult.email} aktiviert!
             </span>
-            <span className={lastResult.emailSent ? "text-emerald-400 font-semibold" : "text-slate-300"}>
+            <span className={lastResult.emailSent ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-muted-foreground"}>
               {lastResult.emailSent
                 ? "✓ Einladungs-E-Mail verschickt"
-                : "Hinweis: Mailversand derzeit inaktiv — teile den Link direkt"}
+                : "Hinweis: Mailversand inaktiv — teile den Link direkt"}
             </span>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -423,12 +429,12 @@ export function FriendInviteSection() {
               readOnly
               aria-label="Persönlicher Einladungslink"
               value={lastResult.inviteLink}
-              className="w-full min-w-0 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-300 font-mono"
+              className="w-full min-w-0 bg-input border border-border rounded-xl px-3 py-2 text-xs text-foreground font-mono"
             />
             <button
               type="button"
               onClick={() => handleCopyOrShare(lastResult.inviteLink, "latest")}
-              className="min-h-[44px] sm:min-h-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold whitespace-nowrap cursor-pointer"
+              className="min-h-[44px] sm:min-h-0 flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold whitespace-nowrap cursor-pointer"
             >
               {copiedKey === "latest" ? (
                 <>
@@ -448,22 +454,22 @@ export function FriendInviteSection() {
 
       {/* User's Own Pending / Reviewed Admin Approval Requests */}
       {!loadingInvites && approvalRequests.length > 0 && (
-        <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        <div className="pt-3 border-t border-border space-y-2.5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Deine Admin-Freigabe-Anfragen ({approvalRequests.length})
           </h3>
           <div className="space-y-2">
             {approvalRequests.map((req) => (
               <div
                 key={req.id}
-                className="p-3 rounded-2xl bg-slate-950/75 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                className="p-3 rounded-xl bg-muted/60 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2"
               >
                 <div className="min-w-0 space-y-0.5">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-white break-all">{req.targetEmail}</span>
+                    <span className="text-xs font-bold text-foreground break-all">{req.targetEmail}</span>
                     <ApprovalStatusBadge status={req.status} variant="user" />
                   </div>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-[11px] text-muted-foreground">
                     Limit: {req.blockedReason} · {new Date(req.createdAt).toLocaleDateString("de-DE")}
                   </p>
                 </div>
@@ -475,8 +481,8 @@ export function FriendInviteSection() {
 
       {/* User's Own Sent Invites List */}
       {!loadingInvites && invites.length > 0 && (
-        <div className="pt-2 border-t border-slate-800/80 space-y-2.5">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        <div className="pt-3 border-t border-border space-y-2.5">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
             Deine gesendeten Einladungen ({invites.length})
           </h3>
           <div className="space-y-2">
@@ -490,14 +496,14 @@ export function FriendInviteSection() {
               return (
                 <div
                   key={item.id}
-                  className="p-3 rounded-2xl bg-slate-950/75 border border-slate-800/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
+                  className="p-3 rounded-xl bg-muted/60 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5"
                 >
                   <div className="min-w-0 space-y-0.5">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-xs font-bold text-white break-all">{item.email}</span>
+                      <span className="text-xs font-bold text-foreground break-all">{item.email}</span>
                       <InviteStatusBadge item={item} nowMs={nowMs} registeredIcon="user" />
                     </div>
-                    <p className="text-[11px] text-slate-500">
+                    <p className="text-[11px] text-muted-foreground">
                       Eingeladen am {new Date(item.createdAt).toLocaleDateString("de-DE")}
                     </p>
                   </div>
@@ -507,10 +513,10 @@ export function FriendInviteSection() {
                       <button
                         type="button"
                         onClick={() => handleCopyOrShare(inviteUrl, item.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-bold transition cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-card hover:bg-muted border border-border text-foreground text-[11px] font-bold transition cursor-pointer"
                       >
                         {copiedKey === item.id ? (
-                          <Check className="w-3.5 h-3.5 text-emerald-400" aria-hidden="true" />
+                          <Check className="w-3.5 h-3.5 text-emerald-500" aria-hidden="true" />
                         ) : (
                           <Copy className="w-3.5 h-3.5" aria-hidden="true" />
                         )}
@@ -520,7 +526,7 @@ export function FriendInviteSection() {
                         type="button"
                         disabled={revokingId === item.id}
                         onClick={() => handleRevoke(item)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-300 text-[11px] font-bold transition disabled:opacity-50 cursor-pointer"
+                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/25 text-rose-600 dark:text-rose-300 text-[11px] font-bold transition disabled:opacity-50 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
                         <span>{revokingId === item.id ? "..." : "Zurückziehen"}</span>

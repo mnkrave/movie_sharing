@@ -6,6 +6,7 @@ import { Bell, Check, Tv, X, Filter } from "lucide-react";
 import { useMedia } from "./MediaContext";
 import { useSession } from "next-auth/react";
 import { BottomSheetDialog } from "./BottomSheetDialog";
+import { useWatchlistAlerts } from "@/lib/useWatchlistAlerts";
 
 interface SubscriptionModalProps {
   isOpen: boolean;
@@ -21,52 +22,17 @@ export function SubscriptionModal({
   onSave,
 }: SubscriptionModalProps) {
   const [current, setCurrent] = useState<string[]>(selectedSubscriptions);
-  const { onlyMySubs, toggleOnlyMySubs, showToast } = useMedia();
+  const { onlyMySubs, toggleOnlyMySubs } = useMedia();
   const { data: session } = useSession();
-  const [watchlistAlerts, setWatchlistAlerts] = useState<boolean>(true);
-  const [savingAlerts, setSavingAlerts] = useState(false);
+  const { watchlistAlerts, savingAlerts, toggleWatchlistAlerts } = useWatchlistAlerts({
+    enabled: isOpen && Boolean(session?.user),
+  });
 
   useEffect(() => {
     setCurrent(selectedSubscriptions);
   }, [selectedSubscriptions, isOpen]);
 
-  useEffect(() => {
-    if (!isOpen || !session?.user) return;
-    fetch("/api/user/notifications")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (typeof d?.watchlistAlertsEnabled === "boolean") {
-          setWatchlistAlerts(d.watchlistAlertsEnabled);
-        }
-      })
-      .catch(() => {});
-  }, [isOpen, session]);
-
   if (!isOpen) return null;
-
-  const toggleWatchlistAlerts = async () => {
-    if (!session?.user || savingAlerts) return;
-    const next = !watchlistAlerts;
-    setWatchlistAlerts(next);
-    setSavingAlerts(true);
-    try {
-      const res = await fetch("/api/user/notifications", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ watchlistAlertsEnabled: next }),
-      });
-      if (!res.ok) throw new Error();
-      showToast(
-        next ? "Watchlist-E-Mail-Alarm aktiviert!" : "Watchlist-E-Mail-Alarm deaktiviert.",
-        { type: "info" }
-      );
-    } catch {
-      setWatchlistAlerts(!next);
-      showToast("Einstellung konnte nicht gespeichert werden.", { type: "error" });
-    } finally {
-      setSavingAlerts(false);
-    }
-  };
 
   const toggle = (key: string) => {
     if (current.includes(key)) {

@@ -7,53 +7,36 @@ import type {
   AiRecommendedPick,
   AiParsedIntent,
 } from "@/app/api/ai/recommend/route";
+import { isCurrentUserMatch, isSamePerson } from "@/lib/auth-match";
 import {
   Sparkles,
-  Send,
   Users,
   Clock,
   Star,
   Film,
   Check,
-  Plus,
-  Wand2,
+  Bookmark,
   UserPlus,
   X,
-  MessageSquareText,
-  Zap,
 } from "lucide-react";
 import Image from "next/image";
 
-const QUICK_SUGGESTIONS = [
+const PROMPT_STARTERS = [
   {
-    icon: "🛋️",
-    label: "WG-Filmabend",
-    tag: "Lustig mit Dennis & 120m",
-    prompt: "Heute will ich mit Dennis einen Film schauen der sehr lustig ist und maximal 120 Minuten geht",
+    label: "Etwas für heute Abend",
+    prompt: "Empfiehl mir einen packenden, gut bewerteten Film für heute Abend aus meinen Abos",
   },
   {
-    icon: "⚡",
-    label: "Slash-Befehl",
-    tag: "/match @WG-Couch",
-    prompt: "/match @WG-Couch max:120min humor:hoch",
+    label: "Ähnlich wie Interstellar",
+    prompt: "Ich suche etwas Ähnliches wie Interstellar: große Ideen, emotional und visuell stark",
   },
   {
-    icon: "🧠",
-    label: "Mindfuck-Thriller",
-    tag: "Netflix & Plottwist",
-    prompt: "Suche einen packenden Mindfuck-Thriller für @Dennis und mich auf Netflix",
+    label: "Filmabend mit Freunden",
+    prompt: "Wir machen heute einen entspannten Filmabend mit Freunden: unterhaltsam, maximal 120 Minuten",
   },
   {
-    icon: "🍷",
-    label: "Date Night",
-    tag: "Abenteuer ohne Horror",
-    prompt: "Date Night mit @Sarah: Ein bildgewaltiges Abenteuer ohne Horror",
-  },
-  {
-    icon: "🍿",
-    label: "Popcorn Action",
-    tag: "Sci-Fi & Blockbuster",
-    prompt: "Empfiehl einen bildgewaltigen Sci-Fi-Action-Blockbuster mit Top-Bewertung für heute Abend",
+    label: "Packender Thriller",
+    prompt: "Suche einen spannenden Mindfuck-Thriller mit starkem Plottwist auf meinen Streaming-Abos",
   },
 ];
 
@@ -69,9 +52,11 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
     updateMediaStatus,
   } = useMedia();
 
-  const [prompt, setPrompt] = useState(
-    initialPrompt ||
-      "Heute will ich mit WG-Couch einen Film schauen der sehr lustig ist und maximal 120 Minuten geht"
+  const [prompt, setPrompt] = useState(initialPrompt || "");
+  const [advisorMode, setAdvisorMode] = useState<"solo" | "crew">(() =>
+    initialPrompt && friendGroups.some((g) => initialPrompt.toLowerCase().includes(g.name.toLowerCase()))
+      ? "crew"
+      : "solo"
   );
   const [selectedFriends, setSelectedFriends] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
@@ -80,27 +65,18 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
   const [resultSummary, setResultSummary] = useState<string | null>(null);
   const [parsedIntent, setParsedIntent] = useState<AiParsedIntent | null>(null);
   const [picks, setPicks] = useState<AiRecommendedPick[]>([]);
-  const [usedModel, setUsedModel] = useState<string | null>(null);
 
-  // Quick inline group creator modal
+  // Quick inline group creator
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupEmoji, setNewGroupEmoji] = useState("🛋️");
   const [newGroupMembers, setNewGroupMembers] = useState<string[]>([]);
 
+  const myUserId = (session?.user as any)?.id || "";
   const myName = session?.user?.name || "Lukas Reinle";
+  const myEmail = session?.user?.email;
 
-  // Check if a given name refers to the current logged in user (e.g. "Lukas" vs "Lukas Reinle")
-  const isMe = (name: string): boolean => {
-    if (!name) return false;
-    const a = name.toLowerCase().trim();
-    const b = (session?.user?.name || myName).toLowerCase().trim();
-    if (a === b) return true;
-    const aParts = a.split(/\s+/);
-    const bParts = b.split(/\s+/);
-    if (aParts[0] === bParts[0] && (aParts.length === 1 || bParts.length === 1)) return true;
-    return a.startsWith(b) || b.startsWith(a);
-  };
+  const isMe = (name?: string | null): boolean => isSamePerson(name, session?.user?.name || myName);
 
   useEffect(() => {
     if (session?.user?.name && newGroupMembers.length === 0) {
@@ -123,6 +99,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
   };
 
   const applyGroupToPrompt = (groupName: string, memberNames: string[]) => {
+    setAdvisorMode("crew");
     setSelectedFriends(memberNames.filter((n) => !isMe(n)));
     if (!prompt.toLowerCase().includes(groupName.toLowerCase())) {
       setPrompt((prev) =>
@@ -140,18 +117,20 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
     setLoading(true);
     setError(null);
 
-    const myUserId = (session?.user as any)?.id || "";
     const myWatchedStatuses = communityData.mediaStatuses.filter(
       (m) =>
         m.status === "WATCHED" &&
-        ((myUserId && m.userId === myUserId) ||
-          isMe(m.userName))
+        isCurrentUserMatch(
+          { userId: myUserId, name: session?.user?.name || myName, email: myEmail },
+          { userId: m.userId, userName: m.userName, userEmail: (m as any).userEmail }
+        )
     );
 
     const userWatchedTmdbIds = myWatchedStatuses.map((m) => m.tmdbId);
     const userWatchedKeys = myWatchedStatuses.map((m) => `${m.mediaType}_${m.tmdbId}`);
     const userWatchedTitles = myWatchedStatuses.map((m) => m.title);
-    const cleanExplicitParticipants = selectedFriends.filter((n) => !isMe(n));
+    const cleanExplicitParticipants =
+      advisorMode === "crew" ? selectedFriends.filter((n) => !isMe(n)) : [];
 
     try {
       const res = await fetch("/api/ai/recommend", {
@@ -184,7 +163,7 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
         setError(
           data?.error ||
             (res.status === 504 || res.status === 502
-              ? "Die KI-Anfrage hat zu lange gedauert (Gateway Timeout). Bitte versuche es noch einmal."
+              ? "Die KI-Anfrage hat zu lange gedauert. Bitte versuche es noch einmal."
               : `Fehler bei der KI-Anfrage (HTTP ${res.status}). Bitte versuche es kurz erneut.`)
         );
       } else {
@@ -196,13 +175,12 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
         setResultSummary(data.aiSummary);
         setParsedIntent(data.parsedIntent);
         setPicks(filteredPicks);
-        setUsedModel(data.usedModel || "gemini-3.1-flash-lite");
       }
     } catch (err: any) {
       setError(
         err?.message?.includes("aborted")
           ? "Die Verbindung zum Server wurde abgebrochen. Bitte versuche es erneut."
-          : "Netzwerkfehler bei der Verbindung zum KI-Filmberater. Bitte überprüfe deine Verbindung oder versuche es gleich erneut."
+          : "Netzwerkfehler bei der Verbindung zum KI-Filmberater. Bitte versuche es gleich erneut."
       );
     } finally {
       setLoading(false);
@@ -218,507 +196,544 @@ export function AiMovieAdvisor({ initialPrompt }: { initialPrompt?: string }) {
   };
 
   return (
-    <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-purple-950/40 via-slate-900 to-[#0c1222] border border-purple-500/35 shadow-2xl space-y-6">
-      {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/20 border border-purple-500/40 text-purple-300 text-xs font-bold uppercase tracking-wider">
-            <Zap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-            <span>Stufe 2 • KI-Filmberater & Gruppen-Matcher (Gemini Flash)</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
-            Frag CineBot: Was schauen wir heute Abend?
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-3xl">
-            Schreibe einfach in normaler Sprache (z. B.{" "}
-            <span className="text-amber-300 italic">
-              „Heute will ich mit WG-Couch einen Film schauen der sehr lustig ist und maximal 120
-              Minuten geht“
-            </span>
-            ) oder nutze <code className="text-purple-300">/match @Gruppe</code>. Die KI gleicht
-            alle Geschmäcker, No-Gos, Watchlists und eure Streaming-Abos ab!
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={() => setShowNewGroup(!showNewGroup)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-xs font-bold transition self-start"
-        >
-          <UserPlus className="w-3.5 h-3.5 text-purple-400" />
-          <span>+ Freundesgruppe anlegen</span>
-        </button>
-      </div>
-
-      {/* Inline Quick Group Creator */}
-      {showNewGroup && (
-        <form
-          onSubmit={handleCreateQuickGroup}
-          className="p-4 rounded-2xl bg-slate-950/90 border border-purple-500/40 space-y-3 animate-in fade-in"
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-purple-300">
-              Neue Filmabend-Gruppe (CineCrew) speichern
-            </span>
+    <section className="space-y-8">
+      {/* Two-Column Flowstep Layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left Column: Dein Abend */}
+        <div className="lg:col-span-5 rounded-2xl bg-card border border-border p-5 sm:p-6 space-y-5 shadow-xs">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-base font-bold text-foreground">Dein Abend</h2>
             <button
               type="button"
-              onClick={() => setShowNewGroup(false)}
-              className="text-slate-400 hover:text-white"
+              onClick={() => {
+                setAdvisorMode("crew");
+                setShowNewGroup(!showNewGroup);
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition cursor-pointer"
             >
-              <X className="w-4 h-4" />
+              <UserPlus className="w-3.5 h-3.5 text-primary-text" aria-hidden="true" />
+              <span>CineCrew anlegen</span>
             </button>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <input
-              type="text"
-              value={newGroupName}
-              onChange={(e) => setNewGroupName(e.target.value)}
-              placeholder="Gruppenname (z. B. WG-Couch, Mädelsabend)..."
-              className="flex-1 px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-xs text-white focus:outline-none focus:border-purple-400"
-              required
-            />
-            <div className="flex items-center gap-1">
-              {["🛋️", "🍿", "✨", "🍻", "🔥"].map((em) => (
+
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleAskAi();
+            }}
+            className="space-y-4"
+          >
+            <div className="space-y-2">
+              <label htmlFor="ai-evening-prompt" className="block text-xs font-semibold text-foreground">
+                Beschreib deinen Abend
+              </label>
+              <textarea
+                id="ai-evening-prompt"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                placeholder="Zum Beispiel: Ein spannender Science-Fiction-Film mit starken Figuren, aber nicht zu düster …"
+                rows={5}
+                className="w-full min-h-[136px] resize-none rounded-xl bg-input border border-border focus:border-primary p-3.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none transition"
+              />
+            </div>
+
+            {/* Prompt Starter Buttons */}
+            <div className="flex flex-wrap gap-1.5">
+              {PROMPT_STARTERS.map((starter) => (
                 <button
-                  key={em}
+                  key={starter.label}
                   type="button"
-                  onClick={() => setNewGroupEmoji(em)}
-                  className={`w-8 h-8 rounded-lg text-sm border ${
-                    newGroupEmoji === em
-                      ? "bg-purple-500/20 border-purple-400"
-                      : "bg-slate-900 border-slate-800"
-                  }`}
+                  onClick={() => setPrompt(starter.prompt)}
+                  className="px-3 py-1.5 rounded-lg bg-background hover:bg-muted border border-border text-xs font-medium text-foreground transition cursor-pointer"
                 >
-                  {em}
+                  {starter.label}
                 </button>
               ))}
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] text-slate-400">Mitglieder:</span>
-            {communityData.friends.map((f) => {
-              const active = newGroupMembers.includes(f.name);
-              return (
+
+            {/* Minimal Mode Tabs: Allein / Mit CineCrew */}
+            <div className="space-y-3">
+              <div className="inline-flex items-center p-1 rounded-xl bg-muted border border-border">
                 <button
-                  key={f.id}
                   type="button"
-                  onClick={() =>
-                    setNewGroupMembers((prev) =>
-                      prev.includes(f.name)
-                        ? prev.filter((n) => n !== f.name)
-                        : [...prev, f.name]
-                    )
-                  }
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition ${
-                    active
-                      ? "bg-purple-500 text-black border-purple-400"
-                      : "bg-slate-900 text-slate-300 border-slate-800"
+                  onClick={() => setAdvisorMode("solo")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    advisorMode === "solo"
+                      ? "bg-card text-foreground shadow-xs border border-border"
+                      : "text-muted-foreground hover:text-foreground border border-transparent"
                   }`}
                 >
-                  @{f.name}
+                  Allein
                 </button>
-              );
-            })}
-            <button
-              type="submit"
-              className="w-full sm:w-auto sm:ml-auto px-4 py-2 sm:py-1.5 rounded-xl bg-purple-500 hover:bg-purple-400 text-black font-bold text-xs"
-            >
-              Gruppe speichern
-            </button>
-          </div>
-        </form>
-      )}
-
-      {/* Quick Group & Friend Selector Chips */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 mr-1">
-          <Users className="w-3.5 h-3.5 text-purple-400" />
-          <span>Gruppen & Freunde einbinden:</span>
-        </span>
-
-        {friendGroups.map((grp) => {
-          const displayMembers = grp.memberNames.map((m) => (isMe(m) ? "Du" : m));
-          return (
-            <button
-              key={grp.id}
-              type="button"
-              onClick={() => applyGroupToPrompt(grp.name, grp.memberNames)}
-              className="px-3 py-1 rounded-xl bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-200 text-xs font-bold transition flex items-center gap-1.5"
-              title={`Mitglieder: ${grp.memberNames.join(", ")}`}
-            >
-              <span>{grp.emoji}</span>
-              <span>@{grp.name}</span>
-              <span className="text-[10px] text-purple-400">({displayMembers.join(", ")})</span>
-            </button>
-          );
-        })}
-
-        {communityData.friends
-          .filter((f) => !isMe(f.name))
-          .map((friend) => {
-            const active = selectedFriends.includes(friend.name);
-            return (
-              <button
-                key={friend.id}
-                type="button"
-                onClick={() => toggleFriendChip(friend.name)}
-                className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition ${
-                  active
-                    ? "bg-amber-500 text-black border-amber-400 font-bold"
-                    : "bg-slate-900/90 text-slate-300 border-slate-800 hover:border-slate-700"
-                }`}
-              >
-                @{friend.name} {active && "✓"}
-              </button>
-            );
-          })}
-      </div>
-
-      {/* Quick Vorschläge (Suggestions) Oben */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-[11px]">
-          <span className="font-bold uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-            <span>Vorschläge zum Ausprobieren:</span>
-          </span>
-          <span className="text-slate-400 text-[10px] hidden sm:inline">
-            1 Klick zum sofortigen Starten
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {QUICK_SUGGESTIONS.map((sug) => (
-            <button
-              key={sug.label}
-              type="button"
-              onClick={() => {
-                setPrompt(sug.prompt);
-                handleAskAi(sug.prompt);
-              }}
-              className="group px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-purple-950/60 border border-slate-800 hover:border-purple-400/50 text-left transition flex items-center gap-2 shadow-sm"
-              title={sug.prompt}
-            >
-              <span className="text-sm">{sug.icon}</span>
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-slate-200 group-hover:text-white">
-                  {sug.label}
-                </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-300 font-medium border border-purple-500/20">
-                  {sug.tag}
-                </span>
+                <button
+                  type="button"
+                  onClick={() => setAdvisorMode("crew")}
+                  className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                    advisorMode === "crew"
+                      ? "bg-card text-foreground shadow-xs border border-border"
+                      : "text-muted-foreground hover:text-foreground border border-transparent"
+                  }`}
+                >
+                  Mit CineCrew
+                </button>
               </div>
-            </button>
-          ))}
-        </div>
-      </div>
 
-      {/* Main Prompt Input Box */}
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleAskAi();
-        }}
-        className="space-y-3"
-      >
-        <div className="relative flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <MessageSquareText className="w-5 h-5 text-purple-400 absolute left-4 top-3.5" />
-            <input
-              type="text"
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder='z. B. "Heute will ich mit WG-Couch einen Film schauen der sehr lustig ist und maximal 120 Minuten geht"'
-              className="w-full pl-12 pr-4 py-3.5 rounded-2xl bg-slate-950/90 border border-slate-700/90 focus:border-purple-400 text-sm text-white placeholder-slate-500 focus:outline-none shadow-inner"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={loading || !prompt.trim()}
-            className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-purple-500 via-fuchsia-500 to-amber-500 hover:from-purple-400 hover:to-amber-400 text-black font-black text-sm transition shadow-lg shadow-purple-500/20 flex items-center justify-center gap-2 disabled:opacity-50 flex-shrink-0"
-          >
-            <Wand2 className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            <span>{loading ? "KI analysiert Profile..." : "KI-Match starten"}</span>
-          </button>
-        </div>
-      </form>
-
-      {/* Error Notice */}
-      {error && (
-        <div className="p-4 rounded-2xl bg-rose-950/40 border border-rose-500/40 text-xs text-rose-300">
-          {error}
-        </div>
-      )}
-
-      {/* Loading Skeleton */}
-      {loading && (
-        <div className="p-8 rounded-2xl bg-slate-950/60 border border-purple-500/20 text-center space-y-3 animate-pulse">
-          <Wand2 className="w-8 h-8 text-purple-400 mx-auto animate-spin" />
-          <p className="text-sm font-bold text-white">
-            CineBot gleicht Geschmäcker, Bewertungen, Laufzeiten & Streaming-Abos ab...
-          </p>
-          <p className="text-xs text-slate-400">
-            Bereits gesehene Filme der Gruppe werden automatisch ausgeschlossen.
-          </p>
-        </div>
-      )}
-
-      {/* AI Results Section */}
-      {!loading && parsedIntent && (
-        <div className="space-y-5 pt-2 animate-in fade-in">
-          {/* Parsed Intent Badges & AI Mediator Summary */}
-          <div className="p-5 rounded-2xl bg-slate-950/80 border border-purple-500/30 space-y-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-400">
-                KI-Verständnis:
-              </span>
-
-              {parsedIntent.detectedGroupName && (
-                <span className="px-2.5 py-1 rounded-lg bg-purple-500/20 border border-purple-500/40 text-purple-200 text-xs font-bold">
-                  Gruppe: {parsedIntent.detectedGroupName}
-                </span>
-              )}
-
-              <span className="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 text-xs font-semibold flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-amber-400" />
-                <span>Teilnehmer: {parsedIntent.detectedParticipants.join(", ")}</span>
-              </span>
-
-              {parsedIntent.mood && (
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
-                  Stimmung: {parsedIntent.mood}
-                </span>
-              )}
-
-              {parsedIntent.maxRuntimeMinutes && (
-                <span className="px-2.5 py-1 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold flex items-center gap-1">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>Max. {parsedIntent.maxRuntimeMinutes} Min.</span>
-                </span>
-              )}
-
-              {usedModel && (
-                <span className="ml-auto px-2 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] font-mono text-slate-400">
-                  ⚡ {usedModel}
-                </span>
+              {advisorMode === "crew" && (
+                <div className="p-3 rounded-xl bg-muted/60 border border-border space-y-2.5 animate-in fade-in">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {friendGroups.map((grp) => (
+                      <button
+                        key={grp.id}
+                        type="button"
+                        onClick={() => applyGroupToPrompt(grp.name, grp.memberNames)}
+                        className="px-2.5 py-1 rounded-lg bg-primary-soft border border-primary/30 text-primary-text text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
+                      >
+                        <span>{grp.emoji}</span>
+                        <span>@{grp.name}</span>
+                      </button>
+                    ))}
+                    {communityData.friends
+                      .filter((f) => !isMe(f.name))
+                      .map((friend) => {
+                        const active = selectedFriends.includes(friend.name);
+                        return (
+                          <button
+                            key={friend.id}
+                            type="button"
+                            onClick={() => toggleFriendChip(friend.name)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition cursor-pointer ${
+                              active
+                                ? "bg-primary text-primary-foreground border-primary font-semibold"
+                                : "bg-card text-foreground border-border hover:border-border-strong"
+                            }`}
+                          >
+                            @{friend.name} {active && "✓"}
+                          </button>
+                        );
+                      })}
+                    {friendGroups.length === 0 && communityData.friends.length === 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        Noch keine Freunde oder CineCrews verknüpft.
+                      </p>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
 
-            {resultSummary && (
-              <p className="text-xs sm:text-sm text-slate-200 leading-relaxed border-l-2 border-purple-400 pl-3">
-                {resultSummary}
-              </p>
-            )}
-          </div>
+            <button
+              type="submit"
+              disabled={loading || !prompt.trim()}
+              className="w-full py-3 px-4 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-sm transition shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+            >
+              <Sparkles className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
+              <span>{loading ? "CineBot analysiert…" : "Empfehlungen finden"}</span>
+            </button>
+          </form>
 
-          {/* Enriched Movie/Series Cards with Per-Person Reasons */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {picks.map((pick) => {
-              const mySubs = pick.availableProvidersDE.filter((p) => p.isMySub);
-              const displayProviders =
-                mySubs.length > 0 ? mySubs : pick.availableProvidersDE.slice(0, 3);
-              const currentUserId = (session?.user as any)?.id;
-              const currentUserName = session?.user?.name;
-              const isMatchUser = (m: any) =>
-                (currentUserId && m.userId === currentUserId) ||
-                (currentUserName && m.userName?.toLowerCase() === currentUserName.toLowerCase());
-
-              const isOnWatchlist = communityData.mediaStatuses.some(
-                (m) =>
-                  m.tmdbId === pick.id &&
-                  m.mediaType === pick.mediaType &&
-                  m.status === "WATCHLIST" &&
-                  isMatchUser(m)
-              );
-
-              const isWatched = communityData.mediaStatuses.some(
-                (m) =>
-                  m.tmdbId === pick.id &&
-                  m.mediaType === pick.mediaType &&
-                  m.status === "WATCHED" &&
-                  isMatchUser(m)
-              );
-
-              return (
-                <div
-                  key={`${pick.mediaType}_${pick.id}`}
-                  onClick={() =>
-                    openMediaModal({
-                      id: pick.id,
-                      mediaType: pick.mediaType,
-                      title: pick.title,
-                      posterPath: pick.posterPath,
-                      genreIds: pick.genreIds,
-                    })
-                  }
-                  className="group cursor-pointer rounded-2xl bg-slate-950/85 border border-slate-800 hover:border-purple-500/50 overflow-hidden flex flex-col justify-between transition duration-300 [@media(hover:hover)]:hover:-translate-y-1 shadow-xl"
+          {/* Inline Quick Group Creator */}
+          {showNewGroup && (
+            <form
+              onSubmit={handleCreateQuickGroup}
+              className="p-4 rounded-xl bg-muted/60 border border-border space-y-3 animate-in fade-in"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-foreground">Neue CineCrew speichern</span>
+                <button
+                  type="button"
+                  onClick={() => setShowNewGroup(false)}
+                  className="text-muted-foreground hover:text-foreground cursor-pointer"
+                  aria-label="Schließen"
                 >
-                  <div className="p-4 flex gap-4">
-                    {/* Poster Thumbnail */}
-                    <div className="relative w-24 sm:w-28 aspect-[2/3] rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 border border-slate-800">
-                      {pick.posterPath ? (
-                        <Image
-                          src={`https://image.tmdb.org/t/p/w342${pick.posterPath}`}
-                          alt={pick.title}
-                          fill
-                          sizes="120px"
-                          className="object-cover group-hover:scale-105 transition duration-500"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-slate-600">
-                          <Film className="w-6 h-6" />
-                        </div>
-                      )}
-                      <div className="absolute top-1.5 left-1.5 px-2 py-0.5 rounded-md bg-emerald-500 text-black font-black text-[10px] shadow">
-                        {pick.matchScore}% Match
-                      </div>
-                    </div>
-
-                    {/* Title, Runtime, Genres & Pitch */}
-                    <div className="flex-1 min-w-0 space-y-2">
-                      <div>
-                        <div className="flex items-center gap-2 text-[11px] text-slate-400 font-semibold">
-                          <span>{pick.releaseYear}</span>
-                          {pick.runtimeMinutes && (
-                            <span className="flex items-center gap-0.5 text-amber-300">
-                              <Clock className="w-3 h-3" />
-                              {pick.runtimeMinutes} Min.
-                            </span>
-                          )}
-                          <span className="flex items-center gap-0.5 text-amber-400 ml-auto">
-                            <Star className="w-3 h-3 fill-amber-400" />
-                            {pick.voteAverage}
-                          </span>
-                        </div>
-                        <h4 className="text-base font-black text-white group-hover:text-purple-300 transition leading-snug mt-0.5">
-                          {pick.title}
-                        </h4>
-                      </div>
-
-                      {/* Genres */}
-                      {pick.genres.length > 0 && (
-                        <div className="flex flex-wrap gap-1">
-                          {pick.genres.slice(0, 3).map((g) => (
-                            <span
-                              key={g.id}
-                              className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-[10px] text-slate-300 font-semibold"
-                            >
-                              {g.emoji} {g.name}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-
-                      {pick.seriesNote && (
-                        <div className="text-[11px] leading-snug rounded-xl px-2.5 py-1.5 bg-indigo-950/60 border border-indigo-500/40 text-indigo-200 font-medium">
-                          {pick.seriesNote}
-                        </div>
-                      )}
-
-                      <p className="text-xs text-slate-300 leading-snug">{pick.groupPitch}</p>
-
-                      {/* Streaming Providers */}
-                      {displayProviders.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 pt-1">
-                          {displayProviders.map((p) => (
-                            <span
-                              key={p.providerId}
-                              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${
-                                p.isMySub
-                                  ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
-                                  : "bg-slate-900 border-slate-800 text-slate-400"
-                              }`}
-                            >
-                              {p.logoPath && (
-                                <Image
-                                  src={`https://image.tmdb.org/t/p/w45${p.logoPath}`}
-                                  alt={p.providerName}
-                                  width={12}
-                                  height={12}
-                                  className="rounded-xs"
-                                />
-                              )}
-                              <span>{p.providerName}</span>
-                              {p.isMySub && <span>✓</span>}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Per-Person Reasons (Warum für jeden in der Gruppe?) */}
-                  {pick.perPersonReasons.length > 0 && (
-                    <div className="px-4 py-3 bg-slate-900/60 border-t border-slate-800/80 space-y-1.5">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-purple-300">
-                        Warum es jedem von euch gefällt:
-                      </p>
-                      {pick.perPersonReasons.map((pr, idx) => (
-                        <div key={idx} className="text-[11px] text-slate-300 flex items-start gap-1.5">
-                          <span className="font-bold text-amber-400 flex-shrink-0">
-                            @{pr.personName}:
-                          </span>
-                          <span className="text-slate-300">{pr.reason}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Action Buttons */}
-                  <div className="p-3 bg-slate-950 border-t border-slate-800/80 flex items-center gap-2">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                  placeholder="Gruppenname (z. B. WG-Couch)…"
+                  className="flex-1 px-3 py-2 rounded-lg bg-input border border-border text-xs text-foreground focus:outline-none focus:border-primary"
+                  required
+                />
+                <div className="flex items-center gap-1">
+                  {["🛋️", "🍿", "✨", "🍻", "🔥"].map((em) => (
                     <button
+                      key={em}
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        openRatingModal({
-                          tmdbId: pick.id,
-                          mediaType: pick.mediaType,
-                          title: pick.title,
-                          posterPath: pick.posterPath,
-                          releaseYear: pick.releaseYear,
-                          isWatched,
-                        });
-                      }}
-                      className={`flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-bold border transition ${
-                        isWatched
-                          ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
-                          : "bg-slate-900 hover:bg-emerald-500 hover:text-black text-slate-200 border-slate-800"
+                      onClick={() => setNewGroupEmoji(em)}
+                      className={`w-8 h-8 rounded-lg text-sm border cursor-pointer ${
+                        newGroupEmoji === em
+                          ? "bg-primary-soft border-primary"
+                          : "bg-card border-border"
                       }`}
                     >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>{isWatched ? "Gesehen ✓" : "Gesehen?"}</span>
+                      {em}
                     </button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                {communityData.friends.map((f) => {
+                  const active = newGroupMembers.includes(f.name);
+                  return (
                     <button
+                      key={f.id}
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        updateMediaStatus({
-                          tmdbId: pick.id,
-                          mediaType: pick.mediaType,
-                          title: pick.title,
-                          posterPath: pick.posterPath,
-                          releaseYear: pick.releaseYear,
-                          status: isOnWatchlist ? "NONE" : "WATCHLIST",
-                        });
-                      }}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
-                        isOnWatchlist
-                          ? "bg-emerald-500 text-black border-emerald-400 shadow-sm shadow-emerald-500/20"
-                          : "bg-slate-900 hover:bg-emerald-500 hover:text-black text-slate-200 border-slate-800"
+                      onClick={() =>
+                        setNewGroupMembers((prev) =>
+                          prev.includes(f.name)
+                            ? prev.filter((n) => n !== f.name)
+                            : [...prev, f.name]
+                        )
+                      }
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-card text-foreground border-border"
                       }`}
                     >
-                      {isOnWatchlist ? (
-                        <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                      ) : (
-                        <Plus className="w-3.5 h-3.5" />
-                      )}
-                      <span>{isOnWatchlist ? "Merkliste ✓" : "Merkliste"}</span>
+                      @{f.name}
                     </button>
+                  );
+                })}
+                <button
+                  type="submit"
+                  className="ml-auto px-3.5 py-1.5 rounded-lg bg-primary text-primary-foreground font-bold text-xs cursor-pointer"
+                >
+                  Speichern
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Right Column: Empty / Loading / Results */}
+        <div className="lg:col-span-7 space-y-4">
+          {error && (
+            <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/35 text-xs sm:text-sm text-rose-700 dark:text-rose-300">
+              {error}
+            </div>
+          )}
+
+          {loading ? (
+            <div className="rounded-2xl bg-card border border-border p-6 space-y-4">
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-foreground">CineBot sucht passende Titel…</p>
+                <p className="text-xs text-muted-foreground">
+                  Bewertungen, Laufzeiten, No-Gos und Streaming-Abos werden abgeglichen.
+                </p>
+              </div>
+              <div className="space-y-3">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-24 rounded-xl bg-muted border border-border animate-pulse"
+                  />
+                ))}
+              </div>
+            </div>
+          ) : !parsedIntent ? (
+            <div className="rounded-2xl bg-card/50 border border-dashed border-border min-h-[380px] flex flex-col items-center justify-center text-center p-8 space-y-3">
+              <div className="w-11 h-11 rounded-xl bg-muted border border-border flex items-center justify-center text-primary-text">
+                <Sparkles className="w-5 h-5" aria-hidden="true" />
+              </div>
+              <h3 className="text-base font-bold text-foreground">Dein nächster Film wartet</h3>
+              <p className="text-xs sm:text-sm text-muted-foreground max-w-sm leading-relaxed">
+                Je genauer du deinen Abend beschreibst, desto persönlicher wird die Auswahl.
+              </p>
+            </div>
+          ) : (
+            <div className="rounded-2xl bg-card border border-border p-5 sm:p-6 space-y-5 shadow-xs animate-in fade-in">
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="text-base sm:text-lg font-bold text-foreground">
+                    CineBot empfiehlt dir
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                    {parsedIntent.detectedGroupName && (
+                      <span className="px-2 py-0.5 rounded-md bg-primary-soft text-primary-text font-semibold">
+                        {parsedIntent.detectedGroupName}
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted border border-border text-muted-foreground font-medium">
+                      <Users className="w-3 h-3" />
+                      {parsedIntent.detectedParticipants.join(", ")}
+                    </span>
+                    {parsedIntent.maxRuntimeMinutes && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted border border-border text-muted-foreground font-medium">
+                        <Clock className="w-3 h-3" />
+                        Max. {parsedIntent.maxRuntimeMinutes} Min.
+                      </span>
+                    )}
                   </div>
                 </div>
-              );
-            })}
-          </div>
+                {resultSummary && (
+                  <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    {resultSummary}
+                  </p>
+                )}
+              </div>
+
+              {picks.length === 0 ? (
+                <p className="text-xs text-muted-foreground py-4">
+                  Alle gefundenen Titel hast du bereits gesehen. Versuche eine andere Beschreibung.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {picks.map((pick) => {
+                    const mySubs = pick.availableProvidersDE.filter((p) => p.isMySub);
+                    const displayProviders =
+                      mySubs.length > 0 ? mySubs : pick.availableProvidersDE.slice(0, 3);
+                    const currentUserIdentity = {
+                      userId: myUserId,
+                      name: session?.user?.name || myName,
+                      email: myEmail,
+                    };
+                    const isMatchUser = (m: any) =>
+                      isCurrentUserMatch(currentUserIdentity, {
+                        userId: m.userId,
+                        userName: m.userName,
+                        userEmail: m.userEmail,
+                      });
+
+                    const isOnWatchlist = communityData.mediaStatuses.some(
+                      (m) =>
+                        m.tmdbId === pick.id &&
+                        m.mediaType === pick.mediaType &&
+                        m.status === "WATCHLIST" &&
+                        isMatchUser(m)
+                    );
+
+                    const isWatched = communityData.mediaStatuses.some(
+                      (m) =>
+                        m.tmdbId === pick.id &&
+                        m.mediaType === pick.mediaType &&
+                        m.status === "WATCHED" &&
+                        isMatchUser(m)
+                    );
+
+                    return (
+                      <div
+                        key={`${pick.mediaType}_${pick.id}`}
+                        className="rounded-xl border border-border bg-background/60 p-3.5 hover:border-primary/40 transition space-y-3"
+                      >
+                        <div className="flex items-start gap-3.5">
+                          {/* Poster */}
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openMediaModal({
+                                id: pick.id,
+                                mediaType: pick.mediaType,
+                                title: pick.title,
+                                posterPath: pick.posterPath,
+                                genreIds: pick.genreIds,
+                              })
+                            }
+                            className="relative w-14 h-20 rounded-lg overflow-hidden bg-muted border border-border flex-shrink-0 cursor-pointer"
+                          >
+                            {pick.posterPath ? (
+                              <Image
+                                src={`https://image.tmdb.org/t/p/w342${pick.posterPath}`}
+                                alt={pick.title}
+                                fill
+                                sizes="56px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                <Film className="w-5 h-5" />
+                              </div>
+                            )}
+                          </button>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-0 space-y-1.5">
+                            <div className="flex flex-wrap items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    openMediaModal({
+                                      id: pick.id,
+                                      mediaType: pick.mediaType,
+                                      title: pick.title,
+                                      posterPath: pick.posterPath,
+                                      genreIds: pick.genreIds,
+                                    })
+                                  }
+                                  className="text-left text-sm sm:text-base font-bold text-foreground hover:text-primary-text transition cursor-pointer"
+                                >
+                                  {pick.title}
+                                </button>
+                                <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5 mt-0.5">
+                                  <span>{pick.releaseYear}</span>
+                                  {pick.genres[0] && (
+                                    <>
+                                      <span>·</span>
+                                      <span>{pick.genres[0].name}</span>
+                                    </>
+                                  )}
+                                  {pick.runtimeMinutes && (
+                                    <>
+                                      <span>·</span>
+                                      <span>{pick.runtimeMinutes} Min.</span>
+                                    </>
+                                  )}
+                                  <span>·</span>
+                                  <span className="inline-flex items-center gap-0.5 text-primary-text font-semibold">
+                                    <Star className="w-3 h-3 fill-current" />
+                                    {pick.voteAverage}
+                                  </span>
+                                </p>
+                              </div>
+
+                              <span className="px-2 py-0.5 rounded-md bg-primary-soft text-primary-text font-bold text-[11px] flex-shrink-0">
+                                {pick.matchScore}% Match
+                              </span>
+                            </div>
+
+                            {pick.seriesNote && (
+                              <p className="text-[11px] text-primary-text font-medium">
+                                {pick.seriesNote}
+                              </p>
+                            )}
+
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                              {pick.groupPitch}
+                            </p>
+
+                            {displayProviders.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {displayProviders.map((p) => (
+                                  <span
+                                    key={p.providerId}
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-semibold border ${
+                                      p.isMySub
+                                        ? "bg-primary-soft border-primary/35 text-primary-text"
+                                        : "bg-muted border-border text-muted-foreground"
+                                    }`}
+                                  >
+                                    <span>{p.providerName}</span>
+                                    {p.isMySub && <span>✓</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Per-person reasons */}
+                        {pick.perPersonReasons.length > 0 && (
+                          <div className="pt-2 border-t border-border space-y-1">
+                            {pick.perPersonReasons.map((pr, idx) => (
+                              <p key={idx} className="text-[11px] text-muted-foreground">
+                                <span className="font-semibold text-foreground">
+                                  @{pr.personName}:
+                                </span>{" "}
+                                {pr.reason}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Row Actions */}
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              updateMediaStatus({
+                                tmdbId: pick.id,
+                                mediaType: pick.mediaType,
+                                title: pick.title,
+                                posterPath: pick.posterPath,
+                                releaseYear: pick.releaseYear,
+                                status: isOnWatchlist ? "NONE" : "WATCHLIST",
+                              })
+                            }
+                            aria-label={
+                              isOnWatchlist
+                                ? `${pick.title} von Merkliste entfernen`
+                                : `${pick.title} zur Merkliste hinzufügen`
+                            }
+                            title={isOnWatchlist ? "Auf Merkliste" : "Auf Merkliste setzen"}
+                            className={`p-2 rounded-lg border transition cursor-pointer ${
+                              isOnWatchlist
+                                ? "bg-primary text-primary-foreground border-primary"
+                                : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border-border"
+                            }`}
+                          >
+                            <Bookmark className={`w-4 h-4 ${isOnWatchlist ? "fill-current" : ""}`} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openRatingModal({
+                                tmdbId: pick.id,
+                                mediaType: pick.mediaType,
+                                title: pick.title,
+                                posterPath: pick.posterPath,
+                                releaseYear: pick.releaseYear,
+                                isWatched,
+                              })
+                            }
+                            className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition cursor-pointer ${
+                              isWatched
+                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35"
+                                : "bg-card hover:bg-muted text-foreground border-border"
+                            }`}
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>{isWatched ? "Gesehen" : "Bewerten"}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              openMediaModal({
+                                id: pick.id,
+                                mediaType: pick.mediaType,
+                                title: pick.title,
+                                posterPath: pick.posterPath,
+                                genreIds: pick.genreIds,
+                              })
+                            }
+                            className="px-3 py-1.5 rounded-lg bg-card hover:bg-muted text-foreground border border-border text-xs font-semibold transition cursor-pointer"
+                          >
+                            Details
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
-      )}
+      </div>
+
+      {/* Bottom Context Strip (Berücksichtigt werden) */}
+      <div className="space-y-2.5 pt-2">
+        <p className="text-xs font-semibold text-muted-foreground">Berücksichtigt werden</p>
+        <div className="flex flex-wrap gap-2">
+          <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium text-foreground">
+            Deine Bewertungen
+          </span>
+          <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium text-foreground">
+            Watchlist
+          </span>
+          <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium text-foreground">
+            Freundes-Feed
+          </span>
+          <span className="px-2.5 py-1 rounded-full bg-muted border border-border text-xs font-medium text-foreground">
+            Streaming-Abos ({userSubscriptions.length})
+          </span>
+        </div>
+      </div>
     </section>
   );
 }

@@ -369,14 +369,16 @@ export default function AdminPage() {
 
   if (!isAdmin) {
     return (
-      <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
-        <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
-          <Shield className="w-8 h-8" />
+      <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
+        <div className="max-w-md mx-auto px-4 py-20 text-center space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-rose-500/10 border border-rose-500/30 text-rose-400 flex items-center justify-center mx-auto">
+            <Shield className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-black text-white">Zugriff verweigert</h2>
+          <p className="text-sm text-slate-400">
+            Dieser Bereich ist exklusiv für Lukas (Super-Admin) reserviert.
+          </p>
         </div>
-        <h2 className="text-2xl font-black text-white">Zugriff verweigert</h2>
-        <p className="text-sm text-slate-400">
-          Dieser Bereich ist exklusiv für Lukas (Super-Admin) reserviert.
-        </p>
       </div>
     );
   }
@@ -392,6 +394,7 @@ export default function AdminPage() {
   ];
 
   return (
+    <div className="legacy-dark-surface min-h-[calc(100dvh-4rem)]">
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-10">
       {/* Header */}
       <div className="space-y-5 p-5 sm:p-8 rounded-3xl bg-gradient-to-br from-amber-950/40 via-slate-900 to-[#0e1424] border border-amber-500/30 shadow-xl">
@@ -1111,6 +1114,7 @@ export default function AdminPage() {
         onClose={() => setBanModalTarget(null)}
         onConfirm={handleConfirmBan}
       />
+    </div>
     </div>
   );
 }

@@ -216,36 +216,35 @@ export function AlgorithmRecommendations() {
     const progressPercent = Math.round((watchedItems.length / TARGET_RATINGS) * 100);
 
     return (
-      <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-[#0c1424] via-slate-900 to-[#070b14] border border-amber-500/30 shadow-2xl space-y-6">
+      <div className="p-6 sm:p-8 rounded-2xl bg-card border border-border shadow-xs space-y-6">
         {/* Setup Header */}
         <div className="space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-bold uppercase tracking-wider">
-              <Zap className="w-3.5 h-3.5 text-amber-400" />
-              <span>Geschmacks-Setup für deinen Algorithmus</span>
-            </div>
-            <span className="text-xs font-extrabold text-amber-400 bg-amber-500/10 px-3 py-1 rounded-xl border border-amber-500/20">
+            <span className="text-xs font-bold uppercase tracking-wider text-primary-text">
+              Geschmacks-Setup für deinen Algorithmus
+            </span>
+            <span className="text-xs font-bold text-primary-text bg-primary-soft px-3 py-1 rounded-lg border border-primary/30">
               {watchedItems.length} / {TARGET_RATINGS} bewertet (Mind. {MIN_RATINGS_FOR_RECS} für erste Tipps)
             </span>
           </div>
 
-          <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight">
+          <h2 className="text-xl sm:text-3xl font-black text-foreground tracking-tight">
             Noch {needed} {needed === 1 ? "Bewertung" : "Bewertungen"} bis zu deinen ersten Empfehlungen!
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-2xl leading-relaxed">
-            Damit der Algorithmus deinen Geschmack versteht und nicht einseitig wird (wie z. B. nur Batman-Filme vorschlägt), benötigt er mindestens {MIN_RATINGS_FOR_RECS} Bewertungen aus verschiedenen Genres (optimal sind {TARGET_RATINGS} für das volle Profi-Profil).
+          <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl leading-relaxed">
+            Damit der Algorithmus deinen Geschmack versteht, benötigt er mindestens {MIN_RATINGS_FOR_RECS} Bewertungen aus verschiedenen Genres (optimal sind {TARGET_RATINGS} für das volle Profil).
           </p>
 
           {/* Progress Bar */}
           <div className="space-y-1.5 pt-1">
-            <div className="flex justify-between text-xs font-semibold text-slate-400">
+            <div className="flex justify-between text-xs font-semibold text-muted-foreground">
               <span>Fortschritt zur Freischaltung</span>
-              <span className="text-amber-400 font-bold">{progressPercent}% ({watchedItems.length}/{TARGET_RATINGS})</span>
+              <span className="text-primary-text font-bold">{progressPercent}% ({watchedItems.length}/{TARGET_RATINGS})</span>
             </div>
-            <div className="w-full h-3 bg-slate-950 rounded-full overflow-hidden p-0.5 border border-slate-800">
+            <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden border border-border">
               <div
                 style={{ width: `${Math.max(4, progressPercent)}%` }}
-                className="h-full bg-gradient-to-r from-amber-500 to-emerald-400 rounded-full transition-all duration-300 shadow-sm"
+                className="h-full bg-primary rounded-full transition-all duration-300"
               />
             </div>
           </div>
@@ -254,14 +253,14 @@ export function AlgorithmRecommendations() {
         {/* Quick Rate Deck */}
         <div className="space-y-3 pt-2">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-white flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-amber-400" />
-              <span>Schnellbewertung: Kennst du diese bekannten Meilensteine? (1-Klick)</span>
+            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+              <Sparkles className="w-4 h-4 text-primary-text" />
+              <span>Schnellbewertung bekannter Titel</span>
             </h3>
             <button
               type="button"
               onClick={openSearch}
-              className="text-xs text-amber-400 hover:text-amber-300 font-bold underline flex items-center gap-1"
+              className="text-xs text-primary-text hover:underline font-bold flex items-center gap-1 cursor-pointer"
             >
               <Search className="w-3 h-3" />
               <span>Andere Filme suchen</span>
@@ -273,7 +272,7 @@ export function AlgorithmRecommendations() {
               {availableLandmarks.slice(0, 8).map((lm) => (
                 <div
                   key={`${lm.mediaType}-${lm.tmdbId}`}
-                  className="bg-slate-950/70 border border-slate-800 rounded-2xl p-3 flex gap-3 items-center group hover:border-slate-700 transition relative overflow-hidden"
+                  className="bg-background/60 border border-border rounded-xl p-3 flex gap-3 items-center group hover:border-border-strong transition relative overflow-hidden"
                 >
                   <div
                     onClick={() =>
@@ -285,7 +284,7 @@ export function AlgorithmRecommendations() {
                         releaseYear: lm.year,
                       })
                     }
-                    className="w-14 h-20 rounded-xl overflow-hidden bg-slate-900 flex-shrink-0 relative shadow cursor-pointer hover:opacity-90 transition group/poster"
+                    className="w-14 h-20 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative shadow cursor-pointer hover:opacity-90 transition"
                     title="Klicken für komplette Punkteauswahl (1-10)"
                   >
                     <Image
@@ -293,19 +292,20 @@ export function AlgorithmRecommendations() {
                       alt={lm.title}
                       fill
                       sizes="56px"
-                      className="object-cover group-hover/poster:scale-105 transition duration-200"
+                      className="object-cover"
                     />
                   </div>
 
                   <div className="flex-1 min-w-0 space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-slate-400 font-semibold uppercase">
-                        {lm.mediaType === "tv" ? "TV Serie" : "Film"} • {lm.year}
+                      <span className="text-[10px] text-muted-foreground font-semibold uppercase">
+                        {lm.mediaType === "tv" ? "Serie" : "Film"} · {lm.year}
                       </span>
                       <button
+                        type="button"
                         onClick={() => handleSkipLandmark(lm.tmdbId)}
-                        title="Nicht gesehen / Überspringen"
-                        className="text-slate-500 hover:text-slate-300 p-0.5"
+                        title="Überspringen"
+                        className="text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -321,43 +321,24 @@ export function AlgorithmRecommendations() {
                           releaseYear: lm.year,
                         })
                       }
-                      className="text-xs font-bold text-white truncate cursor-pointer hover:text-amber-400 transition"
-                      title={`${lm.title} (Klicken für komplette Note 1-10)`}
+                      className="text-xs font-bold text-foreground truncate cursor-pointer hover:text-primary-text transition"
                     >
-                      {lm.genreEmoji} {lm.title}
+                      {lm.title}
                     </h4>
 
-                    {/* Quick 1-Click Rating Buttons & Full 1-10 Points Button */}
                     <div className="flex items-center gap-1 pt-0.5 flex-wrap">
+                      {[10, 8, 6].map((score) => (
+                        <button
+                          key={score}
+                          type="button"
+                          onClick={() => handleQuickRate(lm, score)}
+                          className="px-2 py-1 rounded-md bg-muted hover:bg-primary hover:text-primary-foreground border border-border text-foreground text-[10px] font-bold transition cursor-pointer"
+                        >
+                          {score}★
+                        </button>
+                      ))}
                       <button
-                        onClick={() => handleQuickRate(lm, 10)}
-                        title="10★ Meisterwerk"
-                        className="px-2 py-1 rounded-lg bg-emerald-500/20 hover:bg-emerald-500 hover:text-black border border-emerald-500/40 text-emerald-300 text-[10px] font-extrabold transition"
-                      >
-                        10★
-                      </button>
-                      <button
-                        onClick={() => handleQuickRate(lm, 8)}
-                        title="8★ Sehr gut"
-                        className="px-2 py-1 rounded-lg bg-cyan-500/20 hover:bg-cyan-500 hover:text-black border border-cyan-500/40 text-cyan-300 text-[10px] font-extrabold transition"
-                      >
-                        8★
-                      </button>
-                      <button
-                        onClick={() => handleQuickRate(lm, 6)}
-                        title="6★ Ganz gut"
-                        className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500 hover:text-black border border-amber-500/40 text-amber-300 text-[10px] font-extrabold transition"
-                      >
-                        6★
-                      </button>
-                      <button
-                        onClick={() => handleQuickRate(lm, 4)}
-                        title="4★ Schlecht"
-                        className="px-1.5 py-1 rounded-lg bg-rose-500/15 hover:bg-rose-500 hover:text-white border border-rose-500/30 text-rose-300 text-[10px] font-extrabold transition"
-                      >
-                        👎
-                      </button>
-                      <button
+                        type="button"
                         onClick={() =>
                           openRatingModal({
                             tmdbId: lm.tmdbId,
@@ -367,11 +348,9 @@ export function AlgorithmRecommendations() {
                             releaseYear: lm.year,
                           })
                         }
-                        title="Komplette Note wählen (1 bis 10 Punkte)"
-                        className="px-2 py-1 rounded-lg bg-indigo-500/20 hover:bg-indigo-500 hover:text-white border border-indigo-500/40 text-indigo-300 text-[10px] font-extrabold transition flex items-center gap-0.5 shadow-sm"
+                        className="px-2 py-1 rounded-md bg-primary-soft text-primary-text border border-primary/30 text-[10px] font-bold transition cursor-pointer"
                       >
-                        <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                        <span>1-10</span>
+                        1–10
                       </button>
                     </div>
                   </div>
@@ -379,21 +358,20 @@ export function AlgorithmRecommendations() {
               ))}
             </div>
           ) : (
-            <div className="p-6 text-center rounded-2xl bg-slate-950/40 border border-slate-800 text-slate-400 text-xs">
-              Alle Starter-Vorschläge bewertet oder übersprungen. Nutze die Suche, um weitere Titel hinzuzufügen!
+            <div className="p-6 text-center rounded-xl bg-muted/50 border border-border text-muted-foreground text-xs">
+              Alle Starter-Vorschläge bewertet oder übersprungen. Nutze die Suche, um weitere Titel hinzuzufügen.
             </div>
           )}
         </div>
 
-        {/* Action Button: Search */}
         <div className="flex justify-center pt-2">
           <button
             type="button"
             onClick={openSearch}
-            className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-xs transition shadow-lg hover:scale-102"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-bold text-xs transition shadow-sm cursor-pointer"
           >
             <Search className="w-4 h-4" />
-            <span>Eigene Lieblingsfilme & Serien suchen ({watchedItems.length}/{TARGET_RATINGS})</span>
+            <span>Eigene Titel suchen ({watchedItems.length}/{TARGET_RATINGS})</span>
           </button>
         </div>
       </div>
@@ -404,19 +382,15 @@ export function AlgorithmRecommendations() {
   const progressPercent = Math.min(100, Math.round((watchedItems.length / TARGET_RATINGS) * 100));
 
   return (
-    <section className="p-6 sm:p-8 rounded-3xl bg-gradient-to-br from-emerald-950/30 via-slate-900 to-[#0b1220] border border-emerald-500/30 shadow-2xl space-y-6">
-      {/* Precision Level Banner (if between 10 and 24 ratings) */}
+    <section className="p-5 sm:p-8 rounded-2xl bg-card border border-border shadow-xs space-y-6">
       {!isPrecisionActive && (
-        <div className="p-4 rounded-2xl bg-slate-950/60 border border-emerald-500/30 flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-md">
+        <div className="p-4 rounded-xl bg-muted/60 border border-border flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div className="space-y-1">
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-emerald-400 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-emerald-400" />
-                <span>Basis-Modus aktiv ({watchedItems.length} / {TARGET_RATINGS} bewertet • {progressPercent}%)</span>
-              </span>
-            </div>
-            <p className="text-xs text-slate-300">
-              Noch <strong>{TARGET_RATINGS - watchedItems.length} Titel</strong> bis zum vollen <strong>Profi-Profil</strong> mit maximaler Treffsicherheit & Kombi-Matches.
+            <span className="text-xs font-bold text-primary-text">
+              Basis-Modus ({watchedItems.length} / {TARGET_RATINGS} bewertet · {progressPercent}%)
+            </span>
+            <p className="text-xs text-muted-foreground">
+              Noch <strong className="text-foreground">{TARGET_RATINGS - watchedItems.length} Titel</strong> bis zum vollständigen Profil mit maximaler Treffsicherheit.
             </p>
           </div>
 
@@ -424,27 +398,26 @@ export function AlgorithmRecommendations() {
             <button
               type="button"
               onClick={() => setShowMoreQuickRatings(!showMoreQuickRatings)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 border border-slate-700 text-xs font-bold transition self-start md:self-auto"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card hover:bg-muted text-foreground border border-border text-xs font-semibold transition self-start md:self-auto cursor-pointer"
             >
-              <span>{showMoreQuickRatings ? "Schnellbewertung schließen" : "+ Schnell weitere Titel bewerten"}</span>
+              <span>{showMoreQuickRatings ? "Schnellbewertung schließen" : "Weitere Titel bewerten"}</span>
               {showMoreQuickRatings ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </button>
           )}
         </div>
       )}
 
-      {/* Optional Expanded Quick Rater Deck */}
       {!isPrecisionActive && showMoreQuickRatings && availableLandmarks.length > 0 && (
-        <div className="p-4 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3 animate-in fade-in">
-          <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
-            <span>Klicke auf deine Bewertung (10★ / 8★ / 6★ / 👎):</span>
-            <span className="text-slate-500 text-[11px]">{availableLandmarks.length} Vorschläge verfügbar</span>
+        <div className="p-4 rounded-xl bg-background/60 border border-border space-y-3 animate-in fade-in">
+          <div className="text-xs font-semibold text-muted-foreground flex items-center justify-between">
+            <span>Schnell bewerten:</span>
+            <span>{availableLandmarks.length} Vorschläge verfügbar</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
             {availableLandmarks.slice(0, 8).map((lm) => (
               <div
                 key={`${lm.mediaType}-${lm.tmdbId}`}
-                className="bg-slate-900/70 border border-slate-800 rounded-xl p-2.5 flex gap-2.5 items-center group"
+                className="bg-card border border-border rounded-xl p-2.5 flex gap-2.5 items-center"
               >
                 <div
                   onClick={() =>
@@ -456,86 +429,41 @@ export function AlgorithmRecommendations() {
                       releaseYear: lm.year,
                     })
                   }
-                  className="w-12 h-16 rounded-lg overflow-hidden bg-slate-800 flex-shrink-0 relative shadow cursor-pointer hover:opacity-90 transition group/poster"
-                  title="Klicken für komplette Note (1-10)"
+                  className="w-12 h-16 rounded-lg overflow-hidden bg-muted flex-shrink-0 relative cursor-pointer"
                 >
                   <Image
                     src={`https://image.tmdb.org/t/p/w185${lm.posterPath}`}
                     alt={lm.title}
                     fill
                     sizes="48px"
-                    className="object-cover group-hover/poster:scale-105 transition duration-200"
+                    className="object-cover"
                   />
                 </div>
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-slate-400 font-semibold uppercase truncate">
-                      {lm.mediaType === "tv" ? "TV" : "Film"} • {lm.year}
+                    <span className="text-[10px] text-muted-foreground font-semibold uppercase">
+                      {lm.mediaType === "tv" ? "Serie" : "Film"} · {lm.year}
                     </span>
                     <button
+                      type="button"
                       onClick={() => handleSkipLandmark(lm.tmdbId)}
-                      title="Überspringen"
-                      className="text-slate-500 hover:text-slate-300 p-0.5"
+                      className="text-muted-foreground hover:text-foreground p-0.5 cursor-pointer"
                     >
                       <X className="w-3 h-3" />
                     </button>
                   </div>
-                  <h5
-                    onClick={() =>
-                      openRatingModal({
-                        tmdbId: lm.tmdbId,
-                        mediaType: lm.mediaType,
-                        title: lm.title,
-                        posterPath: lm.posterPath,
-                        releaseYear: lm.year,
-                      })
-                    }
-                    className="text-xs font-bold text-white truncate cursor-pointer hover:text-amber-400 transition"
-                    title={`${lm.title} (Klicken für 1-10)`}
-                  >
-                    {lm.genreEmoji} {lm.title}
-                  </h5>
+                  <h5 className="text-xs font-bold text-foreground truncate">{lm.title}</h5>
                   <div className="flex items-center gap-1 pt-0.5 flex-wrap">
-                    <button
-                      onClick={() => handleQuickRate(lm, 10)}
-                      className="px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500 hover:text-black text-emerald-300 text-[10px] font-bold"
-                    >
-                      10★
-                    </button>
-                    <button
-                      onClick={() => handleQuickRate(lm, 8)}
-                      className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500 hover:text-black text-cyan-300 text-[10px] font-bold"
-                    >
-                      8★
-                    </button>
-                    <button
-                      onClick={() => handleQuickRate(lm, 6)}
-                      className="px-1.5 py-0.5 rounded bg-amber-500/20 hover:bg-amber-500 hover:text-black text-amber-300 text-[10px] font-bold"
-                    >
-                      6★
-                    </button>
-                    <button
-                      onClick={() => handleQuickRate(lm, 4)}
-                      className="px-1 py-0.5 rounded bg-rose-500/15 hover:bg-rose-500 text-rose-300 text-[10px]"
-                    >
-                      👎
-                    </button>
-                    <button
-                      onClick={() =>
-                        openRatingModal({
-                          tmdbId: lm.tmdbId,
-                          mediaType: lm.mediaType,
-                          title: lm.title,
-                          posterPath: lm.posterPath,
-                          releaseYear: lm.year,
-                        })
-                      }
-                      title="Komplette Note wählen (1-10)"
-                      className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500 hover:text-white border border-indigo-500/40 text-indigo-300 text-[10px] font-bold flex items-center gap-0.5 shadow-sm"
-                    >
-                      <Star className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
-                      <span>1-10</span>
-                    </button>
+                    {[10, 8, 6].map((score) => (
+                      <button
+                        key={score}
+                        type="button"
+                        onClick={() => handleQuickRate(lm, score)}
+                        className="px-1.5 py-0.5 rounded bg-muted hover:bg-primary hover:text-primary-foreground text-foreground text-[10px] font-bold cursor-pointer"
+                      >
+                        {score}★
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -545,134 +473,102 @@ export function AlgorithmRecommendations() {
       )}
 
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1.5">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold uppercase tracking-wider">
-            {isPrecisionActive ? (
-              <>
-                <Flame className="w-3.5 h-3.5 text-amber-400" />
-                <span>🔥 Vollständiges Profi-Profil aktiv ({watchedItems.length} Titel)</span>
-              </>
-            ) : (
-              <>
-                <Wand2 className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Persönlicher Empfehlungs-Algorithmus</span>
-              </>
-            )}
-          </div>
-          <h2 className="text-xl sm:text-3xl font-black text-white tracking-tight">
+        <div className="space-y-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-primary-text">
+            {isPrecisionActive
+              ? `Vollständiges Geschmacks-Profil (${watchedItems.length} Titel)`
+              : "Persönlicher Empfehlungs-Algorithmus"}
+          </p>
+          <h2 className="text-xl sm:text-2xl font-black text-foreground tracking-tight">
             Maßgeschneidert für deinen Geschmack & deine Abos
           </h2>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-3xl">
-            Berechnet aus deinen <strong>{watchedItems.length} gesehenen Titeln</strong>, deinen Bewertungen, TMDB-Themen-Keywords und deinen{" "}
-            <strong>{userSubscriptions.length} Streaming-Abos</strong> in Deutschland.
+          <p className="text-xs sm:text-sm text-muted-foreground max-w-3xl">
+            Berechnet aus deinen <strong className="text-foreground">{watchedItems.length} gesehenen Titeln</strong>, Bewertungen und{" "}
+            <strong className="text-foreground">{userSubscriptions.length} Streaming-Abos</strong>.
           </p>
         </div>
 
-        {/* Controls: MediaType, OnlyMySubs, ExcludeWatchlist, Refresh */}
+        {/* Controls */}
         <div className="flex flex-wrap items-center gap-2 self-start">
-          {/* Media Type Switcher */}
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-950/90 border border-slate-800">
-            <button
-              type="button"
-              onClick={() => setRecMediaType("ALL")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                recMediaType === "ALL"
-                  ? "bg-emerald-500 text-black"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Alle
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecMediaType("movie")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                recMediaType === "movie"
-                  ? "bg-emerald-500 text-black"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              🎬 Filme
-            </button>
-            <button
-              type="button"
-              onClick={() => setRecMediaType("tv")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                recMediaType === "tv"
-                  ? "bg-emerald-500 text-black"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              📺 Serien
-            </button>
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-muted border border-border">
+            {(
+              [
+                { key: "ALL", label: "Alle" },
+                { key: "movie", label: "Filme" },
+                { key: "tv", label: "Serien" },
+              ] as const
+            ).map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                onClick={() => setRecMediaType(t.key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer ${
+                  recMediaType === t.key
+                    ? "bg-card text-foreground shadow-xs border border-border"
+                    : "text-muted-foreground hover:text-foreground border border-transparent"
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
 
-          {/* Only My Subscriptions Toggle */}
           <button
             type="button"
             onClick={() => setRecOnlyMySubs(!recOnlyMySubs)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
               recOnlyMySubs
-                ? "bg-amber-500/15 border-amber-500/50 text-amber-300"
-                : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                ? "bg-primary-soft border-primary/40 text-primary-text"
+                : "bg-background border-border text-muted-foreground hover:text-foreground"
             }`}
           >
             <Filter className="w-3.5 h-3.5" />
             <span>Nur meine Abos</span>
-            <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-black ${
-                recOnlyMySubs ? "bg-amber-400 text-black" : "bg-slate-800 text-slate-400"
-              }`}
-            >
-              {recOnlyMySubs ? "AN" : "AUS"}
-            </span>
           </button>
 
-          {/* Exclude Watchlist Toggle */}
           <button
             type="button"
             onClick={() => setRecExcludeWatchlist(!recExcludeWatchlist)}
-            className={`px-3 py-2 rounded-xl text-xs font-semibold border transition ${
+            className={`px-3 py-2 rounded-xl text-xs font-semibold border transition cursor-pointer ${
               recExcludeWatchlist
-                ? "bg-sky-500/20 border-sky-500/40 text-sky-300"
-                : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white"
+                ? "bg-primary-soft border-primary/40 text-primary-text"
+                : "bg-background border-border text-muted-foreground hover:text-foreground"
             }`}
           >
-            {recExcludeWatchlist ? "Watchlist ausgeblendet ✓" : "Inkl. Watchlist"}
+            {recExcludeWatchlist ? "Watchlist ausgeblendet" : "Inkl. Watchlist"}
           </button>
 
-          {/* Refresh Button */}
           <button
             type="button"
             onClick={() => setRecRefreshCounter((c) => c + 1)}
             disabled={loadingRecs}
             title="Empfehlungen neu berechnen"
-            className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-300 hover:text-white hover:border-slate-700 transition disabled:opacity-50"
+            className="p-2 rounded-xl bg-background border border-border text-muted-foreground hover:text-foreground transition disabled:opacity-50 cursor-pointer"
           >
-            <RefreshCw className={`w-4 h-4 ${loadingRecs ? "animate-spin text-emerald-400" : ""}`} />
+            <RefreshCw className={`w-4 h-4 ${loadingRecs ? "animate-spin text-primary-text" : ""}`} />
           </button>
         </div>
       </div>
 
-      {/* Detected Taste Vector & Keywords Bar */}
+      {/* Detected Taste Vector */}
       {tasteSummary && (tasteSummary.topGenres.length > 0 || tasteSummary.topKeywords.length > 0) && (
-        <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800/80 flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-1 mr-1">
+        <div className="p-3.5 rounded-xl bg-muted/50 border border-border flex flex-wrap items-center gap-2">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-primary-text flex items-center gap-1 mr-1">
             <Tag className="w-3.5 h-3.5" />
-            <span>Erkanntes Geschmacks-Profil:</span>
+            <span>Geschmacks-Profil:</span>
           </span>
           {tasteSummary.topGenres.slice(0, 4).map((g) => (
             <span
               key={g.id}
-              className="px-2.5 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold"
+              className="px-2.5 py-0.5 rounded-md bg-card border border-border text-foreground text-xs font-semibold"
             >
-              {g.emoji} {g.name}
+              {g.name}
             </span>
           ))}
           {tasteSummary.topKeywords.slice(0, 5).map((kw) => (
             <span
               key={kw.id}
-              className="px-2 py-0.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-[11px] font-medium"
+              className="px-2 py-0.5 rounded-md bg-card border border-border text-muted-foreground text-[11px] font-medium"
             >
               #{kw.name}
             </span>
@@ -680,17 +576,17 @@ export function AlgorithmRecommendations() {
           {tasteSummary.favoriteDirectors?.slice(0, 2).map((dir) => (
             <span
               key={`dir_${dir}`}
-              className="px-2 py-0.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-[11px] font-semibold"
+              className="px-2 py-0.5 rounded-md bg-primary-soft border border-primary/30 text-primary-text text-[11px] font-semibold"
             >
-              🎬 {dir}
+              Regie: {dir}
             </span>
           ))}
           {tasteSummary.favoriteActors?.slice(0, 2).map((actor) => (
             <span
               key={`act_${actor}`}
-              className="px-2 py-0.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-200 text-[11px] font-semibold"
+              className="px-2 py-0.5 rounded-md bg-card border border-border text-foreground text-[11px] font-medium"
             >
-              ⭐ {actor}
+              {actor}
             </span>
           ))}
         </div>
@@ -702,7 +598,7 @@ export function AlgorithmRecommendations() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="aspect-[2/3] rounded-2xl bg-slate-900/80 border border-slate-800 animate-pulse"
+              className="aspect-[2/3] rounded-2xl bg-muted border border-border animate-pulse"
             />
           ))}
         </div>
@@ -728,11 +624,10 @@ export function AlgorithmRecommendations() {
                     genreIds: item.genreIds,
                   })
                 }
-                className="group cursor-pointer rounded-2xl bg-slate-950/80 border border-slate-800/90 hover:border-emerald-500/50 overflow-hidden flex flex-col justify-between transition duration-300 hover:-translate-y-1.5 shadow-lg"
+                className="group cursor-pointer rounded-2xl bg-background/60 border border-border hover:border-primary/50 overflow-hidden flex flex-col justify-between transition duration-300 shadow-xs"
               >
                 <div>
-                  {/* Poster */}
-                  <div className="relative aspect-[2/3] w-full bg-slate-900 overflow-hidden">
+                  <div className="relative aspect-[2/3] w-full bg-muted overflow-hidden">
                     {item.posterPath ? (
                       <Image
                         src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
@@ -742,79 +637,57 @@ export function AlgorithmRecommendations() {
                         className="object-cover group-hover:scale-105 transition duration-500"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-slate-600">
+                      <div className="w-full h-full flex items-center justify-center text-muted-foreground">
                         <Film className="w-8 h-8" />
                       </div>
                     )}
 
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/20 to-transparent" />
 
-                    {/* Match Score Badge Top-Left */}
-                    <div
-                      className={`absolute top-2.5 left-2.5 px-2.5 py-1 rounded-lg font-black text-xs shadow-lg flex items-center gap-1 ${
-                        item.isComboMatch
-                          ? "bg-gradient-to-r from-amber-400 via-rose-500 to-purple-500 text-white shadow-rose-500/25 ring-1 ring-white/30"
-                          : "bg-emerald-500 text-black"
-                      }`}
-                    >
-                      <Sparkles className="w-3 h-3 fill-current" />
-                      <span>{item.isComboMatch ? `🔥 ${item.matchScore}% Kombi` : `${item.matchScore}% Match`}</span>
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-amber-500 text-slate-950 font-black text-[11px] shadow">
+                      {item.matchScore}% Match
                     </div>
 
-                    {/* TMDB Rating Top-Right */}
-                    <div className="absolute top-2.5 right-2.5 px-2 py-0.5 rounded-lg bg-black/80 backdrop-blur-md border border-slate-700 text-amber-400 font-bold text-xs flex items-center gap-1">
+                    <div className="absolute top-2 right-2 px-2 py-0.5 rounded-md bg-black/75 backdrop-blur-md text-amber-400 font-bold text-[11px] flex items-center gap-1">
                       <Star className="w-3 h-3 fill-amber-400" />
                       <span>{item.voteAverage}</span>
                     </div>
 
-                    {/* Streaming Providers Bottom Overlay */}
                     {displayProviders.length > 0 && (
-                      <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center gap-1.5 flex-wrap">
-                        {displayProviders.slice(0, 3).map((p) => (
+                      <div className="absolute bottom-2 left-2 right-2 flex items-center gap-1 flex-wrap">
+                        {displayProviders.slice(0, 2).map((p) => (
                           <div
                             key={p.providerId}
-                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold backdrop-blur-md border ${
+                            className={`flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold backdrop-blur-md ${
                               p.isMySub
-                                ? "bg-amber-500/90 text-black border-amber-300"
-                                : "bg-black/75 text-slate-200 border-slate-700"
+                                ? "bg-amber-500/95 text-slate-950"
+                                : "bg-black/75 text-slate-200"
                             }`}
                           >
-                            {p.logoPath && (
-                              <Image
-                                src={`https://image.tmdb.org/t/p/w45${p.logoPath}`}
-                                alt={p.providerName}
-                                width={14}
-                                height={14}
-                                className="rounded-xs"
-                              />
-                            )}
-                            <span className="truncate max-w-[85px]">{p.providerName}</span>
+                            <span className="truncate max-w-[80px]">{p.providerName}</span>
                           </div>
                         ))}
                       </div>
                     )}
                   </div>
 
-                  {/* Info & Personal Match Reasons */}
                   <div className="p-3 space-y-2">
                     <div>
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 uppercase font-bold">
-                        <span>{item.mediaType === "tv" ? "📺 Serie" : "🎬 Film"}</span>
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground uppercase font-semibold">
+                        <span>{item.mediaType === "tv" ? "Serie" : "Film"}</span>
                         <span>{item.releaseYear}</span>
                       </div>
-                      <h4 className="text-xs font-extrabold text-white line-clamp-1 group-hover:text-emerald-400 transition mt-0.5">
+                      <h4 className="text-xs font-bold text-foreground line-clamp-1 group-hover:text-primary-text transition mt-0.5">
                         {item.title}
                       </h4>
                     </div>
 
-                    {/* Sequential Series / Filmreihe Note */}
                     {item.seriesNote && (
-                      <div className="text-[10px] leading-snug rounded-xl px-2 py-1.5 bg-indigo-950/50 border border-indigo-500/40 text-indigo-200 font-medium">
+                      <div className="text-[10px] leading-snug rounded-lg px-2 py-1 bg-primary-soft text-primary-text font-medium">
                         {item.seriesNote}
                       </div>
                     )}
 
-                    {/* Explainable Reason (Click to toggle expansion) */}
                     {item.reasons.length > 0 && (() => {
                       const isExpanded = expandedReasonIds.has(item.id);
                       return (
@@ -823,53 +696,34 @@ export function AlgorithmRecommendations() {
                             e.stopPropagation();
                             toggleExpandReason(item.id);
                           }}
-                          className={`text-[11px] leading-snug rounded-xl p-2 border cursor-pointer transition select-none ${
-                            item.isComboMatch
-                              ? "bg-amber-950/40 border-amber-500/40 text-amber-200 hover:bg-amber-950/70 hover:border-amber-400"
-                              : "bg-emerald-950/40 border-emerald-500/20 text-emerald-300/90 hover:bg-emerald-950/70 hover:border-emerald-400"
-                          }`}
-                          title={
-                            isExpanded
-                              ? "Klicken zum Einklappen"
-                              : "Klicken, um die ganze Begründung zu lesen"
-                          }
+                          className="text-[11px] leading-snug rounded-lg p-2 bg-muted/70 border border-border text-foreground/85 cursor-pointer select-none"
                         >
                           <div className="flex items-start justify-between gap-1">
-                            <p className={isExpanded ? "font-semibold" : "line-clamp-2"}>
+                            <p className={isExpanded ? "font-medium" : "line-clamp-2"}>
                               {item.reasons[0]}
                             </p>
-                            <span className="text-slate-400 hover:text-white p-0.5 flex-shrink-0 mt-0.5">
-                              {isExpanded ? (
-                                <ChevronUp className="w-3 h-3 text-amber-400" />
-                              ) : (
-                                <ChevronDown className="w-3 h-3 text-slate-400" />
-                              )}
+                            <span className="text-muted-foreground flex-shrink-0 mt-0.5">
+                              {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
                             </span>
                           </div>
 
-                          {/* Extra details when expanded */}
                           {isExpanded && (
-                            <div className="mt-2 pt-2 border-t border-white/10 space-y-1.5 animate-in fade-in duration-150">
+                            <div className="mt-2 pt-2 border-t border-border space-y-1">
                               {item.reasons.slice(1).map((r, i) => (
-                                <p key={i} className="text-[10px] text-slate-300 flex items-center gap-1">
-                                  <span className="text-amber-400">•</span> {r}
+                                <p key={i} className="text-[10px] text-muted-foreground">
+                                  • {r}
                                 </p>
                               ))}
                               {item.seedTitles && item.seedTitles.length > 0 && (
-                                <div className="pt-1">
-                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-bold block mb-1">
-                                    Basiert auf deinen Favoriten:
-                                  </span>
-                                  <div className="flex flex-wrap gap-1">
-                                    {item.seedTitles.map((st, i) => (
-                                      <span
-                                        key={i}
-                                        className="px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-[10px] text-amber-300 font-medium"
-                                      >
-                                        ✓ {st}
-                                      </span>
-                                    ))}
-                                  </div>
+                                <div className="pt-1 flex flex-wrap gap-1">
+                                  {item.seedTitles.map((st, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-1.5 py-0.5 rounded bg-card border border-border text-[10px] text-primary-text font-medium"
+                                    >
+                                      ✓ {st}
+                                    </span>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -877,24 +731,9 @@ export function AlgorithmRecommendations() {
                         </div>
                       );
                     })()}
-
-                    {/* Genres */}
-                    {item.genres.length > 0 && (
-                      <div className="flex flex-wrap gap-1">
-                        {item.genres.slice(0, 2).map((g) => (
-                          <span
-                            key={g.id}
-                            className="px-1.5 py-0.5 rounded bg-slate-900 border border-slate-800 text-[10px] text-slate-300 truncate max-w-full"
-                          >
-                            {g.emoji} {g.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
                 </div>
 
-                {/* Quick Action Footer Buttons */}
                 <div className="px-3 pb-3 pt-1 flex items-center gap-1.5">
                   <button
                     type="button"
@@ -909,7 +748,7 @@ export function AlgorithmRecommendations() {
                         isWatched: false,
                       });
                     }}
-                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-slate-900 hover:bg-emerald-500 hover:text-black text-slate-300 text-[11px] font-bold border border-slate-800 transition"
+                    className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-card hover:bg-primary hover:text-primary-foreground text-foreground text-[11px] font-semibold border border-border transition cursor-pointer"
                   >
                     <Check className="w-3 h-3" />
                     <span>Gesehen?</span>
@@ -928,17 +767,13 @@ export function AlgorithmRecommendations() {
                       });
                     }}
                     title={isOnWatchlist ? "Von Merkliste entfernen" : "Auf Merkliste setzen"}
-                    className={`p-1.5 rounded-lg border transition ${
+                    className={`p-1.5 rounded-lg border transition cursor-pointer ${
                       isOnWatchlist
-                        ? "bg-emerald-500 text-black border-emerald-400 shadow-sm shadow-emerald-500/20"
-                        : "bg-slate-900 hover:bg-slate-800 text-slate-300 border-slate-800"
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-card hover:bg-muted text-muted-foreground hover:text-foreground border-border"
                     }`}
                   >
-                    {isOnWatchlist ? (
-                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                    ) : (
-                      <Plus className="w-3.5 h-3.5" />
-                    )}
+                    {isOnWatchlist ? <Check className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
                   </button>
                 </div>
               </div>
@@ -946,17 +781,17 @@ export function AlgorithmRecommendations() {
           })}
         </div>
       ) : (
-        <div className="p-8 rounded-2xl bg-slate-950/50 border border-slate-800 text-center space-y-3">
-          <p className="text-xs text-slate-400">
+        <div className="p-8 rounded-xl bg-muted/40 border border-border text-center space-y-3">
+          <p className="text-xs text-muted-foreground">
             Keine passenden Empfehlungen mit dem aktuellen Abo-Filter gefunden.
           </p>
           {recOnlyMySubs && (
             <button
               type="button"
               onClick={() => setRecOnlyMySubs(false)}
-              className="px-4 py-2 rounded-xl bg-amber-500 text-black text-xs font-bold"
+              className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-bold cursor-pointer"
             >
-              Alle Anbieter anzeigen (auch außerhalb meiner Abos)
+              Alle Anbieter anzeigen
             </button>
           )}
         </div>

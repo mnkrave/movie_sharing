@@ -138,7 +138,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
       }}
     >
       {/* Poster Image Container */}
-      <div className="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-slate-900 border border-slate-800/80 shadow-md group-hover:shadow-2xl group-hover:border-amber-500/40 transition duration-300">
+      <div className="relative aspect-[2/3] w-full rounded-2xl overflow-hidden bg-muted border border-border shadow-sm group-hover:shadow-xl group-hover:border-primary/50 transition duration-300">
         {item.posterPath ? (
           <Image
             src={`https://image.tmdb.org/t/p/w500${item.posterPath}`}
@@ -149,7 +149,7 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             className="object-cover group-hover:scale-105 transition duration-500 ease-out"
           />
         ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-slate-600 bg-slate-900">
+          <div className="w-full h-full flex flex-col items-center justify-center p-4 text-center text-muted-foreground bg-muted">
             {item.mediaType === "tv" ? <Tv className="w-8 h-8 mb-2" /> : <Film className="w-8 h-8 mb-2" />}
             <span className="text-xs">{item.title}</span>
           </div>
@@ -332,18 +332,18 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
 
       {/* Title & Metadata */}
       <div className="mt-2.5 px-0.5 flex-1 flex flex-col">
-        <h3 className="text-sm font-semibold text-white truncate group-hover:text-amber-400 transition">
+        <h3 className="text-sm font-semibold text-foreground truncate group-hover:text-primary-text transition">
           {item.title}
         </h3>
-        <div className="flex items-center justify-between mt-0.5 text-xs text-slate-400">
-          <span className={item.isUpcoming ? "text-amber-300 font-semibold text-[11px]" : ""}>
+        <div className="flex items-center justify-between mt-0.5 text-xs text-muted-foreground">
+          <span className={item.isUpcoming ? "text-primary-text font-semibold text-[11px]" : ""}>
             {item.isUpcoming
               ? item.releaseDate
                 ? `Kinostart ${item.releaseDate.slice(0, 4)}`
                 : "Upcoming"
               : item.releaseYear || "–"}
           </span>
-          <span className="uppercase text-[10px] tracking-wider text-slate-500 font-mono">
+          <span className="uppercase text-[10px] tracking-wider text-muted-foreground font-mono">
             {item.mediaType === "tv" ? "Serie" : "Film"}
           </span>
         </div>
@@ -365,8 +365,8 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             }
             className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl flex items-center justify-center transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHLIST"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                : "bg-slate-900 text-slate-200 border border-slate-800 active:bg-slate-800"
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
+                : "bg-card text-foreground border border-border active:bg-muted"
             }`}
           >
             {myStatusObj?.status === "WATCHLIST" ? (
@@ -391,17 +391,17 @@ export function MediaCard({ item, priority = false }: MediaCardProps) {
             }
             className={`flex-1 min-w-0 min-h-[44px] py-2 px-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1 transition active:scale-[0.97] ${
               myStatusObj?.status === "WATCHING"
-                ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                ? "bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border border-cyan-500/40"
                 : myStatusObj?.status === "WATCHED"
-                ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
-                : "bg-slate-900 text-slate-200 border border-slate-800 active:bg-slate-800"
+                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/40"
+                : "bg-card text-foreground border border-border active:bg-muted"
             }`}
           >
             {myStatusObj?.status === "WATCHING" ? (
               <Tv className="w-[18px] h-[18px]" />
             ) : myStatusObj?.status === "WATCHED" && myWatched?.rating ? (
               <>
-                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400 flex-shrink-0" />
+                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-500 flex-shrink-0" />
                 <span className="tabular-nums">{myWatched.rating}</span>
               </>
             ) : myStatusObj?.status === "WATCHED" ? (

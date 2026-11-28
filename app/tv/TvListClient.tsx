@@ -43,44 +43,46 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
   return (
     <div className="space-y-6">
       {/* Controls: Search & Genre Filter */}
-      <div className="p-4 sm:p-5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-3.5">
+      <div className="p-4 sm:p-5 rounded-2xl bg-card border border-border space-y-3.5">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
           <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-muted-foreground absolute left-3.5 top-3" />
             <input
               type="search"
               enterKeyHint="search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="In den Top-Serien suchen (z. B. Breaking Bad, Arcane)..."
-              className="w-full min-h-[44px] sm:min-h-0 bg-slate-950 border border-slate-800 rounded-xl py-2 pl-10 pr-9 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-400"
+              className="w-full min-h-[44px] sm:min-h-0 bg-input border border-border rounded-xl py-2 pl-10 pr-9 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-primary"
             />
             {query && (
               <button
+                type="button"
                 onClick={() => setQuery("")}
-                className="absolute right-2.5 top-2.5 text-slate-400 hover:text-white"
+                className="absolute right-2.5 top-2.5 text-muted-foreground hover:text-foreground"
               >
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground">
             <span>
               Zeige {displayedSeries.length} von {filteredSeries.length} Top-Serien
               {selectedGenre !== "ALL" && (
-                <span className="ml-1.5 text-cyan-400 font-semibold">
+                <span className="ml-1.5 text-primary-text font-semibold">
                   ({TV_GENRES.find((g) => g.id === selectedGenre)?.label})
                 </span>
               )}
             </span>
             {(query || selectedGenre !== "ALL") && (
               <button
+                type="button"
                 onClick={() => {
                   setQuery("");
                   setSelectedGenre("ALL");
                 }}
-                className="text-cyan-400 hover:underline font-semibold"
+                className="text-primary-text hover:underline font-semibold cursor-pointer"
               >
                 Filter zurücksetzen
               </button>
@@ -89,18 +91,19 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
         </div>
 
         {/* Genre Pill Filter */}
-        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-1 border-t border-slate-800/60">
-          <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider mr-1 flex-shrink-0">
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none scroll-fade-x pt-2 border-t border-border">
+          <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mr-1 flex-shrink-0">
             Genre:
           </span>
           {TV_GENRES.map((g) => (
             <button
               key={String(g.id)}
+              type="button"
               onClick={() => setSelectedGenre(g.id as any)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition ${
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition cursor-pointer ${
                 selectedGenre === g.id
-                  ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold"
-                  : "bg-slate-950/60 text-slate-400 border border-slate-800 hover:border-slate-700 hover:text-slate-200"
+                  ? "bg-primary-soft text-primary-text border border-primary/35 font-bold"
+                  : "bg-muted/70 text-muted-foreground border border-border hover:text-foreground"
               }`}
             >
               {g.label}
@@ -117,14 +120,15 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
           ))}
         </div>
       ) : (
-        <div className="p-12 text-center rounded-3xl bg-slate-900/30 border border-slate-800 text-slate-400 space-y-4">
+        <div className="p-12 text-center rounded-2xl bg-card border border-border text-muted-foreground space-y-4">
           <p>Keine Serien gefunden, die zu deinen Such- oder Filterkriterien passen.</p>
           <button
+            type="button"
             onClick={() => {
               setQuery("");
               setSelectedGenre("ALL");
             }}
-            className="px-4 py-2 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-black text-xs font-bold transition shadow"
+            className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-bold transition shadow-sm cursor-pointer"
           >
             Alle Filter zurücksetzen
           </button>
@@ -137,7 +141,7 @@ export function TvListClient({ initialSeries }: TvListClientProps) {
           <button
             type="button"
             onClick={() => setVisibleCount((prev) => prev + 30)}
-            className="px-8 py-3 rounded-2xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs border border-slate-700 transition shadow-lg hover:border-cyan-400"
+            className="px-8 py-3 rounded-xl bg-card hover:bg-muted text-foreground font-bold text-xs border border-border hover:border-primary/40 transition shadow-sm cursor-pointer"
           >
             Weitere Serien laden (+30)
           </button>

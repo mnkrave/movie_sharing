@@ -92,3 +92,73 @@ export function getItemRuntimeMinutes(
 
   return baseRuntime;
 }
+
+export interface WatchtimeBreakdown {
+  totalMinutes: number;
+  totalHours: number;
+  totalDays: string;
+  movieMinutes: number;
+  tvMinutes: number;
+  movieHours: number;
+  tvHours: number;
+  movieCount: number;
+  tvCount: number;
+  movieSharePct: number;
+  tvSharePct: number;
+  avgMovieMin: number;
+  avgTvHours: number;
+  itemMinutes: number[];
+}
+
+/** Computes aggregate watchtime totals and per-item runtimes across watched media items. */
+export function computeWatchtimeBreakdown<T extends MediaRuntimeItem & { tmdbId: number }>(
+  watchedItems: T[],
+  metaMap: Record<string, MediaRuntimeMeta | undefined>
+): WatchtimeBreakdown {
+  let totalMinutes = 0;
+  let movieMinutes = 0;
+  let tvMinutes = 0;
+  let movieCount = 0;
+  let tvCount = 0;
+
+  const itemMinutes = watchedItems.map((item) => {
+    const meta = metaMap[`${item.mediaType}_${item.tmdbId}`];
+    const minutes = getItemRuntimeMinutes(item, meta);
+    totalMinutes += minutes;
+
+    if (item.mediaType === "movie") {
+      movieMinutes += minutes;
+      movieCount++;
+    } else {
+      tvMinutes += minutes;
+      tvCount++;
+    }
+    return minutes;
+  });
+
+  const totalHours = Math.round(totalMinutes / 60);
+  const totalDays = (totalHours / 24).toFixed(1);
+  const movieHours = Math.round(movieMinutes / 60);
+  const tvHours = Math.round(tvMinutes / 60);
+  const movieSharePct = totalMinutes > 0 ? Math.round((movieMinutes / totalMinutes) * 100) : 0;
+  const tvSharePct = totalMinutes > 0 ? 100 - movieSharePct : 0;
+  const avgMovieMin = movieCount > 0 ? Math.round(movieMinutes / movieCount) : 0;
+  const avgTvHours = tvCount > 0 ? Math.round((tvMinutes / tvCount / 60) * 10) / 10 : 0;
+
+  return {
+    totalMinutes,
+    totalHours,
+    totalDays,
+    movieMinutes,
+    tvMinutes,
+    movieHours,
+    tvHours,
+    movieCount,
+    tvCount,
+    movieSharePct,
+    tvSharePct,
+    avgMovieMin,
+    avgTvHours,
+    itemMinutes,
+  };
+}

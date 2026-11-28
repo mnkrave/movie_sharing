@@ -10,19 +10,16 @@ export default async function TvPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
-      {/* Header Banner */}
-      <div className="p-8 sm:p-10 rounded-3xl bg-gradient-to-br from-cyan-950/40 via-slate-900 to-[#0e1424] border border-cyan-500/30 shadow-2xl space-y-3">
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-cyan-500/20 text-cyan-300 text-xs font-bold border border-cyan-500/40 uppercase tracking-wider">
-          <Tv className="w-4 h-4 text-cyan-400" />
-          Serien-Bestenliste
-        </div>
-        <h1 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
-          Top bewertete Serien aller Zeiten
+      <div className="space-y-2 max-w-3xl">
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-primary-text flex items-center gap-1.5">
+          <Tv className="w-3.5 h-3.5" aria-hidden="true" />
+          <span>Serien-Bestenliste</span>
+        </p>
+        <h1 className="text-3xl sm:text-4xl font-black text-foreground tracking-tight">
+          Top 250 Serien
         </h1>
-        <p className="text-sm sm:text-base text-slate-300 max-w-3xl leading-relaxed">
-          Von bahnbrechenden Meisterwerken wie Breaking Bad, Chernobyl und Arcane bis zu packenden
-          Dauerbrennern wie Game of Thrones und Avatar. Klicke auf ein Serienplakat, um zu sehen,
-          auf welchen Streaming-Diensten alle Staffeln verfügbar sind.
+        <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+          Von bahnbrechenden Meisterwerken wie Breaking Bad und Chernobyl bis zu packenden Dauerbrennern. Klicke auf ein Serienplakat für weltweite Streaming-Optionen.
         </p>
       </div>
 

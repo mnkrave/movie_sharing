@@ -19,6 +19,7 @@ import type {
   AppRecommendation,
   AppCustomCollection,
   AppCustomCollectionMovie,
+  AppUserBadge,
 } from "@/lib/store";
 import { useSession, signOut } from "next-auth/react";
 import { parseMediaDeepLink } from "@/lib/share";
@@ -79,6 +80,7 @@ interface MediaContextType {
       pendingSent: FriendRequestItem[];
     };
     customCollections?: AppCustomCollection[];
+    userBadges?: Record<string, AppUserBadge[]>;
   };
   customCollections: AppCustomCollection[];
   saveCustomCollection: (params: {
@@ -202,6 +204,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       pendingSent: FriendRequestItem[];
     };
     customCollections?: AppCustomCollection[];
+    userBadges?: Record<string, AppUserBadge[]>;
   }>({
     mediaStatuses: [],
     recommendations: [],
@@ -211,6 +214,7 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       pendingSent: [],
     },
     customCollections: [],
+    userBadges: {},
   });
 
   // Load subscriptions, onlyMySubs & friendGroups from localStorage on start
@@ -228,9 +232,38 @@ export function MediaProvider({ children }: { children: React.ReactNode }) {
       if (savedGroups) {
         const parsed = JSON.parse(savedGroups);
         if (Array.isArray(parsed)) {
-          const cleaned = parsed.filter(
-            (g: FriendGroup) => !LEGACY_DEFAULT_GROUP_IDS.includes(g.id)
-          );
+          const cleaned: FriendGroup[] = parsed.slice(0, 30).flatMap((entry): FriendGroup[] => {
+            if (!entry || typeof entry !== "object") return [];
+            const raw = entry as Record<string, unknown>;
+            const id = typeof raw.id === "string" ? raw.id.trim() : "";
+            if (!/^grp_[a-zA-Z0-9_-]{1,64}$/.test(id) || LEGACY_DEFAULT_GROUP_IDS.includes(id)) {
+              return [];
+            }
+            const name = typeof raw.name === "string" ? raw.name.trim().slice(0, 80) : "";
+            if (!name) return [];
+            const emoji =
+              (typeof raw.emoji === "string" ? raw.emoji.trim().slice(0, 16) : "") || "🍿";
+            const memberNames = Array.isArray(raw.memberNames)
+              ? raw.memberNames
+                  .filter((m): m is string => typeof m === "string")
+                  .map((m) => m.trim().slice(0, 80))
+                  .filter(Boolean)
+                  .slice(0, 50)
+              : [];
+            const ownerId =
+              typeof raw.ownerId === "string" ? raw.ownerId.trim().slice(0, 64) : undefined;
+            const ownerName =
+              typeof raw.ownerName === "string" ? raw.ownerName.trim().slice(0, 80) : undefined;
+            const cleanGroup: FriendGroup & { ownerId?: string; ownerName?: string } = {
+              id,
+              name,
+              emoji,
+              memberNames,
+              ...(ownerId ? { ownerId } : {}),
+              ...(ownerName ? { ownerName } : {}),
+            };
+            return [cleanGroup];
+          });
           setFriendGroupsState(cleaned);
           localStorage.setItem("cinecircle_friend_groups", JSON.stringify(cleaned));
         }
